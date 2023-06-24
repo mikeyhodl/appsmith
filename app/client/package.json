@@ -288,7 +288,7 @@
     "redux-devtools": "^3.5.0",
     "redux-devtools-extension": "^2.13.8",
     "redux-mock-store": "^1.5.4",
-    "semver": "^7.3.5",
+    "semver": "^7.5.2",
     "ts-jest": "27.0.0",
     "webpack-merge": "^5.8.0",
     "workbox-webpack-plugin": "^6.5.3"
