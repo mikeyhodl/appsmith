@@ -12,7 +12,7 @@
 	"devDependencies": {
 		"axios": "^0.21.2",
 		"axios-cookiejar-support": "^1.0.0",
-		"crypto-js": "^4.0.0",
+		"crypto-js": "^4.2.0",
 		"mongodb": "^3.5.8",
 		"tough-cookie": "^4.0.0"
 	}
