@@ -13,14 +13,15 @@ import java.util.List;
 @NoArgsConstructor
 @Builder(toBuilder = true)
 public class ExportingMetaDTO {
-    String applicationId;
-    String branchName;
+    String artifactType;
+    String artifactId;
+    String refName;
     Boolean isGitSync;
     Boolean exportWithConfiguration;
 
-    Instant applicationLastCommittedAt;
+    Instant artifactLastCommittedAt;
     boolean isClientSchemaMigrated;
     boolean isServerSchemaMigrated;
 
-    List<String> unpublishedPages;
+    List<String> unpublishedContextIds;
 }

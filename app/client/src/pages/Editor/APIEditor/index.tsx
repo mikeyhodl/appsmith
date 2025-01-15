@@ -3,54 +3,87 @@ import { useDispatch, useSelector } from "react-redux";
 import type { RouteComponentProps } from "react-router";
 
 import {
+  getIsActionConverting,
   getPageList,
   getPluginSettingConfigs,
   getPlugins,
-} from "@appsmith/selectors/entitiesSelector";
-import { deleteAction, runAction } from "actions/pluginActionActions";
-import AnalyticsUtil from "utils/AnalyticsUtil";
+} from "ee/selectors/entitiesSelector";
+import { runAction, saveActionName } from "actions/pluginActionActions";
+import AnalyticsUtil from "ee/utils/AnalyticsUtil";
 import Editor from "./Editor";
 import BackToCanvas from "components/common/BackToCanvas";
 import MoreActionsMenu from "../Explorer/Actions/MoreActionsMenu";
-import { getIsEditorInitialized } from "selectors/editorSelectors";
-import { getAction } from "@appsmith/selectors/entitiesSelector";
+import {
+  getIsEditorInitialized,
+  getPagePermissions,
+} from "selectors/editorSelectors";
+import { getActionByBaseId } from "ee/selectors/entitiesSelector";
 import type { APIEditorRouteParams } from "constants/routes";
 import {
+  getHasCreateActionPermission,
   getHasDeleteActionPermission,
   getHasManageActionPermission,
-} from "@appsmith/utils/BusinessFeatures/permissionPageHelpers";
-import { FEATURE_FLAG } from "@appsmith/entities/FeatureFlag";
+} from "ee/utils/BusinessFeatures/permissionPageHelpers";
+import { FEATURE_FLAG } from "ee/entities/FeatureFlag";
 import { useFeatureFlag } from "utils/hooks/useFeatureFlag";
 import { ApiEditorContextProvider } from "./ApiEditorContext";
 import type { PaginationField } from "api/ActionAPI";
-import { get } from "lodash";
-import PerformanceTracker, {
-  PerformanceTransactionName,
-} from "utils/PerformanceTracker";
-import CloseEditor from "components/editorComponents/CloseEditor";
+import { get, keyBy } from "lodash";
+import ConvertToModuleInstanceCTA from "ee/pages/Editor/EntityEditor/ConvertToModuleInstanceCTA";
+import { MODULE_TYPE } from "ee/constants/ModuleConstants";
+import Disabler from "pages/common/Disabler";
+import ConvertEntityNotification from "ee/pages/common/ConvertEntityNotification";
+import { Icon } from "@appsmith/ads";
+import { resolveIcon } from "../utils";
+import { ENTITY_ICON_SIZE, EntityIcon } from "../Explorer/ExplorerIcons";
+import { getIDEViewMode } from "selectors/ideSelectors";
+import { EditorViewMode } from "ee/entities/IDE/constants";
 
 type ApiEditorWrapperProps = RouteComponentProps<APIEditorRouteParams>;
 
-function getPageName(pages: any, pageId: string) {
-  const page = pages.find((page: any) => page.pageId === pageId);
+// TODO: Fix this the next time the file is edited
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function getPageName(pages: any, basePageId: string) {
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const page = pages.find((page: any) => page.basePageId === basePageId);
+
   return page ? page.pageName : "";
 }
 
 function ApiEditorWrapper(props: ApiEditorWrapperProps) {
-  const { apiId = "", pageId } = props.match.params;
+  const { baseApiId = "", basePageId } = props.match.params;
   const dispatch = useDispatch();
   const isEditorInitialized = useSelector(getIsEditorInitialized);
-  const action = useSelector((state) => getAction(state, apiId));
+  const action = useSelector((state) => getActionByBaseId(state, baseApiId));
   const apiName = action?.name || "";
   const pluginId = get(action, "pluginId", "");
   const datasourceId = action?.datasource.id || "";
   const plugins = useSelector(getPlugins);
   const pages = useSelector(getPageList);
-  const pageName = getPageName(pages, pageId);
+  const pageName = getPageName(pages, basePageId);
   const settingsConfig = useSelector((state) =>
     getPluginSettingConfigs(state, pluginId),
   );
+  const pagePermissions = useSelector(getPagePermissions);
   const isFeatureEnabled = useFeatureFlag(FEATURE_FLAG.license_gac_enabled);
+  const isConverting = useSelector((state) =>
+    getIsActionConverting(state, action?.id || ""),
+  );
+  const editorMode = useSelector(getIDEViewMode);
+  const pluginGroups = useMemo(() => keyBy(plugins, "id"), [plugins]);
+  const icon = resolveIcon({
+    iconLocation: pluginGroups[pluginId]?.iconLocation || "",
+    pluginType: action?.pluginType || "",
+    moduleType: action?.actionConfiguration?.body?.moduleType,
+  }) || (
+    <EntityIcon
+      height={`${ENTITY_ICON_SIZE}px`}
+      width={`${ENTITY_ICON_SIZE}px`}
+    >
+      <Icon name="module" />
+    </EntityIcon>
+  );
 
   const isChangePermitted = getHasManageActionPermission(
     isFeatureEnabled,
@@ -60,72 +93,88 @@ function ApiEditorWrapper(props: ApiEditorWrapperProps) {
     isFeatureEnabled,
     action?.userPermissions,
   );
-
-  const moreActionsMenu = useMemo(
-    () => (
-      <MoreActionsMenu
-        className="t--more-action-menu"
-        id={action ? action.id : ""}
-        isChangePermitted={isChangePermitted}
-        isDeletePermitted={isDeletePermitted}
-        name={action ? action.name : ""}
-        pageId={pageId}
-      />
-    ),
-    [action?.id, action?.name, isChangePermitted, isDeletePermitted, pageId],
+  const isCreatePermitted = getHasCreateActionPermission(
+    isFeatureEnabled,
+    pagePermissions,
   );
+
+  const moreActionsMenu = useMemo(() => {
+    const convertToModuleProps = {
+      canCreateModuleInstance: isCreatePermitted,
+      canDeleteEntity: isDeletePermitted,
+      entityId: action?.id || "",
+      moduleType: MODULE_TYPE.QUERY,
+    };
+
+    return (
+      <>
+        <MoreActionsMenu
+          basePageId={basePageId}
+          className="t--more-action-menu"
+          id={action?.id || ""}
+          isChangePermitted={isChangePermitted}
+          isDeletePermitted={isDeletePermitted}
+          name={action?.name || ""}
+          prefixAdditionalMenus={
+            editorMode === EditorViewMode.SplitScreen && (
+              <ConvertToModuleInstanceCTA {...convertToModuleProps} />
+            )
+          }
+        />
+        {editorMode !== EditorViewMode.SplitScreen && (
+          <ConvertToModuleInstanceCTA {...convertToModuleProps} />
+        )}
+      </>
+    );
+  }, [
+    action?.id,
+    action?.name,
+    isChangePermitted,
+    isDeletePermitted,
+    basePageId,
+    isCreatePermitted,
+    editorMode,
+  ]);
 
   const handleRunClick = useCallback(
     (paginationField?: PaginationField) => {
       const pluginName = plugins.find((plugin) => plugin.id === pluginId)?.name;
-      PerformanceTracker.startTracking(
-        PerformanceTransactionName.RUN_API_CLICK,
-        {
-          apiId,
-        },
-      );
+
       AnalyticsUtil.logEvent("RUN_API_CLICK", {
         apiName,
-        apiID: apiId,
+        apiID: action?.id,
         pageName: pageName,
         datasourceId,
         pluginName: pluginName,
         isMock: false, // as mock db exists only for postgres and mongo plugins
       });
-      dispatch(runAction(apiId, paginationField));
+      dispatch(runAction(action?.id ?? "", paginationField));
     },
-    [apiId, apiName, pageName, getPageName, plugins, pluginId, datasourceId],
+    [action?.id, apiName, pageName, plugins, pluginId, datasourceId, dispatch],
   );
 
   const actionRightPaneBackLink = useMemo(() => {
-    return <BackToCanvas pageId={pageId} />;
-  }, [pageId]);
+    return <BackToCanvas basePageId={basePageId} />;
+  }, [basePageId]);
 
-  const handleDeleteClick = useCallback(() => {
-    AnalyticsUtil.logEvent("DELETE_API_CLICK", {
-      apiName,
-      apiID: apiId,
-      pageName,
-    });
-    dispatch(deleteAction({ id: apiId, name: apiName }));
-  }, [getPageName, pages, pageId, apiName]);
+  const notification = useMemo(() => {
+    if (!isConverting) return null;
 
-  const isPagesPaneEnabled = useFeatureFlag(
-    FEATURE_FLAG.release_show_new_sidebar_pages_pane_enabled,
-  );
-
-  const closeEditorLink = useMemo(() => <CloseEditor />, []);
+    return <ConvertEntityNotification icon={icon} name={action?.name || ""} />;
+  }, [action?.name, isConverting, icon]);
 
   return (
     <ApiEditorContextProvider
       actionRightPaneBackLink={actionRightPaneBackLink}
-      closeEditorLink={isPagesPaneEnabled ? null : closeEditorLink}
-      handleDeleteClick={handleDeleteClick}
       handleRunClick={handleRunClick}
       moreActionsMenu={moreActionsMenu}
+      notification={notification}
+      saveActionName={saveActionName}
       settingsConfig={settingsConfig}
     >
-      <Editor {...props} isEditorInitialized={isEditorInitialized} />
+      <Disabler isDisabled={isConverting}>
+        <Editor {...props} isEditorInitialized={isEditorInitialized} />
+      </Disabler>
     </ApiEditorContextProvider>
   );
 }

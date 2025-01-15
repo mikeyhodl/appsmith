@@ -4,13 +4,12 @@ import React, { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import styled from "styled-components";
 import { Layers } from "constants/Layers";
-import { theme } from "constants/DefaultTheme";
 import { useDispatch, useSelector } from "react-redux";
 import { getAppViewHeaderHeight } from "selectors/appViewSelectors";
-import { selectWidgetInitAction } from "actions/widgetSelectionActions";
-import { SelectionRequestType } from "sagas/WidgetSelectUtils";
-import { ReduxActionTypes } from "@appsmith/constants/ReduxActionConstants";
+import { ReduxActionTypes } from "ee/constants/ReduxActionConstants";
 import { useMaxModalWidth } from "widgets/ModalWidget/component/useModalWidth";
+import { useAppViewerSidebarProperties } from "utils/hooks/useAppViewerSidebarProperties";
+
 const Container = styled.div<{
   width?: number;
   height?: number;
@@ -23,7 +22,7 @@ const Container = styled.div<{
   minSize?: number;
   isEditMode?: boolean;
   headerHeight?: number;
-  smallHeaderHeight?: string;
+  leftSidebarWidth?: string;
 }>`
   &&& {
     .${Classes.OVERLAY} {
@@ -31,18 +30,16 @@ const Container = styled.div<{
         z-index: ${(props) => props.zIndex || 2 - 1};
       }
       position: fixed;
-      top: ${(props) =>
-        `calc(${props.headerHeight}px + ${
-          props.isEditMode ? props.smallHeaderHeight : "0px"
-        })`};
+      top: 0;
       right: 0;
       bottom: 0;
-      height: ${(props) =>
-        `calc(100vh - (${props.headerHeight}px + ${
-          props.isEditMode ? props.smallHeaderHeight : "0px"
-        }))`};
+      left: ${(props) => props.leftSidebarWidth || 0}px;
+      height: 100%;
       z-index: ${(props) => props.zIndex};
-      width: 100%;
+      width: ${(props) =>
+        props.leftSidebarWidth !== "0"
+          ? `calc(100% - ${props.leftSidebarWidth})`
+          : "100%"};
       display: flex;
       justify-content: center;
       align-items: center;
@@ -87,15 +84,18 @@ const ComponentContainerWrapper = ({
   children: ReactNode;
 }) => {
   const [modalPosition, setModalPosition] = useState<string>("fixed");
+
   useEffect(() => {
     setTimeout(() => {
       setModalPosition("unset");
     }, 100);
   }, []);
+
   if (isEditMode) {
     // eslint-disable-next-line react/jsx-no-useless-fragment
     return <>{children}</>;
   }
+
   return (
     <ComponentContainer modalPosition={modalPosition}>
       {children}
@@ -113,9 +113,12 @@ export function ModalOverlayLayer(props: BaseWidgetProps) {
         !!props.isVisible
       );
     }
+
     return !!props.isVisible;
   };
   const isOpen = getModalVisibility();
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const closeModal = (e: any) => {
     dispatch({
       type: ReduxActionTypes.CLOSE_MODAL,
@@ -123,12 +126,12 @@ export function ModalOverlayLayer(props: BaseWidgetProps) {
         modalName: props.widgetName,
       },
     });
-    dispatch(selectWidgetInitAction(SelectionRequestType.Empty));
     e.stopPropagation();
     e.preventDefault();
   };
 
   const maxModalWidth = useMaxModalWidth();
+  const { hasSidebarPinned, sidebarWidth } = useAppViewerSidebarProperties();
 
   return (
     <ComponentContainerWrapper isEditMode={props.isEditMode}>
@@ -148,10 +151,10 @@ export function ModalOverlayLayer(props: BaseWidgetProps) {
           height={props.height}
           isEditMode={props.isEditMode}
           left={props.left}
+          leftSidebarWidth={hasSidebarPinned ? sidebarWidth.toString() : "0"}
           maxWidth={maxModalWidth}
           minSize={props.minSize}
           right={props.bottom}
-          smallHeaderHeight={theme.smallHeaderHeight}
           top={props.top}
           width={props.width}
           zIndex={

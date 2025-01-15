@@ -1,11 +1,12 @@
-import type { ReduxAction } from "@appsmith/constants/ReduxActionConstants";
+import type { ReduxAction } from "actions/ReduxActionTypes";
 import {
   ReduxActionErrorTypes,
   ReduxActionTypes,
-} from "@appsmith/constants/ReduxActionConstants";
-import type { Plugin } from "api/PluginApi";
+} from "ee/constants/ReduxActionConstants";
+import { type Plugin, PluginType } from "entities/Plugin";
 import {
-  PluginType,
+  ActionCreationSourceTypeEnum,
+  ActionExecutionContext,
   type Action,
   type QueryActionConfig,
 } from "entities/Action";
@@ -21,7 +22,7 @@ import {
   getCurrentPageNameByActionId,
   getDatasource,
   getPlugin,
-} from "@appsmith/selectors/entitiesSelector";
+} from "ee/selectors/entitiesSelector";
 import { createNewApiName, createNewQueryName } from "utils/AppsmithUtils";
 import WidgetQueryGeneratorRegistry from "utils/WidgetQueryGeneratorRegistry";
 import {
@@ -29,7 +30,7 @@ import {
   getPluginActionDefaultValues,
 } from "./ActionSagas";
 import "../WidgetQueryGenerators";
-import type { ActionDataState } from "@appsmith/reducers/entityReducers/actionsReducer";
+import type { ActionDataState } from "ee/reducers/entityReducers/actionsReducer";
 import "WidgetQueryGenerators";
 import { getWidgetByID } from "./selectors";
 import type {
@@ -42,17 +43,20 @@ import type { ApiResponse } from "api/ApiResponses";
 import type { ActionCreateUpdateResponse } from "api/ActionAPI";
 import ActionAPI from "api/ActionAPI";
 import { validateResponse } from "./ErrorSagas";
-import AnalyticsUtil from "utils/AnalyticsUtil";
+import AnalyticsUtil from "ee/utils/AnalyticsUtil";
 import AppsmithConsole from "utils/AppsmithConsole";
-import { ENTITY_TYPE } from "entities/AppsmithConsole";
+import { ENTITY_TYPE } from "ee/entities/AppsmithConsole/utils";
 import { fetchActions, runAction } from "actions/pluginActionActions";
-import { Toaster, Variant } from "design-system-old";
+import { toast } from "@appsmith/ads";
 import WidgetFactory from "WidgetProvider/factory";
 
 export function* createActionsForOneClickBindingSaga(
   payload: Partial<Action> & { eventData: unknown; pluginId: string },
 ) {
   try {
+    // Indicates that source of action creation is one click binding
+    payload.source = ActionCreationSourceTypeEnum.ONE_CLICK_BINDING;
+
     const response: ApiResponse<ActionCreateUpdateResponse> | undefined =
       yield ActionAPI.createAction(payload);
 
@@ -85,6 +89,7 @@ export function* createActionsForOneClickBindingSaga(
           name: response.data.name,
         },
       });
+
       return response.data;
     }
   } catch (e) {
@@ -219,7 +224,15 @@ function* BindWidgetToDatasource(
 
       //TODO(Balaji): Need to make changes to plugin saga to execute the actions in parallel
       for (const actionToRun of actionsToRun) {
-        yield put(runAction(actionToRun.id, undefined, true));
+        yield put(
+          runAction(
+            actionToRun.id,
+            undefined,
+            true,
+            undefined,
+            ActionExecutionContext.ONE_CLICK_BINDING,
+          ),
+        );
 
         const runResponse: ReduxAction<unknown> = yield take([
           ReduxActionTypes.RUN_ACTION_SUCCESS,
@@ -353,6 +366,7 @@ function* BindWidgetToDatasource(
       type: ReduxActionTypes.BIND_WIDGET_TO_DATASOURCE_SUCCESS,
     });
     const { otherFields } = action.payload;
+
     AnalyticsUtil.logEvent("1_CLICK_BINDING_SUCCESS", {
       widgetName: widget.widgetName,
       widgetType: widget.type,
@@ -361,26 +375,28 @@ function* BindWidgetToDatasource(
       isMock: datasource.isMock,
       formType: otherFields?.formType,
     });
-  } catch (e: any) {
-    Toaster.show({
-      text: e.message,
-      hideProgressBar: false,
-      variant: Variant.danger,
-    });
-
+  } catch (e: unknown) {
     yield put({
       type: ReduxActionTypes.BIND_WIDGET_TO_DATASOURCE_ERROR,
+      payload: {
+        show: true,
+        error: {
+          message: e instanceof Error ? e.message : "Failed to Bind to widget",
+        },
+      },
     });
   }
 
-  Toaster.show({
-    text: `Successfully created action${
+  toast.show(
+    `Successfully created action${
       newActions.length > 1 ? "s" : ""
     }: ${newActions.join(", ")}`,
-    hideProgressBar: true,
-    variant: Variant.success,
-    duration: 3000,
-  });
+    {
+      hideProgressBar: true,
+      kind: "success",
+      autoClose: 3000,
+    },
+  );
 }
 
 export default function* oneClickBindingSaga() {

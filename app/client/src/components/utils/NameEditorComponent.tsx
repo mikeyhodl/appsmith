@@ -1,18 +1,18 @@
 import { useEffect, useState, useCallback, memo } from "react";
 import { useSelector, useDispatch, shallowEqual } from "react-redux";
 import { isNameValid } from "utils/helpers";
-import type { AppState } from "@appsmith/reducers";
+import type { AppState } from "ee/reducers";
 import log from "loglevel";
-import { inGuidedTour } from "selectors/onboardingSelectors";
-import { toggleShowDeviationDialog } from "actions/onboardingActions";
 import { getUsedActionNames } from "selectors/actionSelectors";
 import {
   ACTION_INVALID_NAME_ERROR,
   ACTION_NAME_CONFLICT_ERROR,
   createMessage,
-} from "@appsmith/constants/messages";
+} from "ee/constants/messages";
 import styled from "styled-components";
 import { Classes } from "@blueprintjs/core";
+import type { SaveActionNameParams } from "PluginActionEditor";
+import type { ReduxAction } from "actions/ReduxActionTypes";
 
 export const NameWrapper = styled.div<{ enableFontStyling?: boolean }>`
   min-width: 50%;
@@ -35,6 +35,22 @@ export const NameWrapper = styled.div<{ enableFontStyling?: boolean }>`
   font-weight: ${props.theme.typography.h3.fontWeight};
 }`
       : null}
+
+  & .t--action-name-edit-field, & .t--js-action-name-edit-field, & .t--module-instance-name-edit-field {
+    width: 100%;
+
+    & > span {
+      display: inline-block;
+    }
+  }
+
+  & > div > div:nth-child(2) {
+    width: calc(100% - 42px); // 32px icon width and 8px gap of flex
+  }
+
+  & > div > div:nth-child(2) > :first-child {
+    width: 100%;
+  }
 `;
 
 export const IconWrapper = styled.img`
@@ -48,16 +64,20 @@ export const IconBox = styled.div`
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-right: 8px;
   flex-shrink: 0;
 `;
 
 interface NameEditorProps {
-  checkForGuidedTour?: boolean;
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   children: (params: any) => JSX.Element;
   id?: string;
   name?: string;
-  dispatchAction: (a: any) => any;
+  onSaveName: (
+    params: SaveActionNameParams,
+  ) => ReduxAction<SaveActionNameParams>;
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   suffixErrorMessage?: (params?: any) => string;
   idUndefinedErrorMessage: string;
   saveStatus: { isSaving: boolean; error: boolean };
@@ -72,11 +92,10 @@ interface NameEditorProps {
 
 function NameEditor(props: NameEditorProps) {
   const {
-    checkForGuidedTour,
-    dispatchAction,
     id: entityId,
     idUndefinedErrorMessage,
     name: entityName,
+    onSaveName,
     saveStatus,
     suffixErrorMessage = ACTION_NAME_CONFLICT_ERROR,
   } = props;
@@ -84,10 +103,10 @@ function NameEditor(props: NameEditorProps) {
     new URLSearchParams(window.location.search).get("editName") === "true";
   const [forceUpdate, setForceUpdate] = useState(false);
   const dispatch = useDispatch();
+
   if (!entityId) {
     log.error(idUndefinedErrorMessage);
   }
-  const guidedTourEnabled = useSelector(inGuidedTour);
 
   const conflictingNames = useSelector(
     (state: AppState) => getUsedActionNames(state, entityId || ""),
@@ -106,6 +125,7 @@ function NameEditor(props: NameEditorProps) {
       } else if (name !== entityName && hasActionNameConflict(name)) {
         return createMessage(suffixErrorMessage, name);
       }
+
       return false;
     },
     [hasActionNameConflict, entityName],
@@ -113,16 +133,11 @@ function NameEditor(props: NameEditorProps) {
 
   const handleNameChange = useCallback(
     (name: string) => {
-      if (name !== entityName && !isInvalidNameForEntity(name)) {
-        if (checkForGuidedTour && guidedTourEnabled) {
-          dispatch(toggleShowDeviationDialog(true));
-          return;
-        }
-
-        dispatch(dispatchAction({ id: entityId, name }));
+      if (name !== entityName && !isInvalidNameForEntity(name) && entityId) {
+        dispatch(onSaveName({ id: entityId, name }));
       }
     },
-    [dispatch, isInvalidNameForEntity, guidedTourEnabled, entityId, entityName],
+    [dispatch, isInvalidNameForEntity, entityId, entityName],
   );
 
   useEffect(() => {

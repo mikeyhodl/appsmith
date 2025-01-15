@@ -16,6 +16,7 @@ import EditorNavigation, {
   AppSidebarButton,
   AppSidebar,
   PageLeftPane,
+  PagePaneSegment,
 } from "../../../../support/Pages/EditorNavigation";
 
 const successMessage = "Successful Trigger";
@@ -56,7 +57,7 @@ const createMySQLDatasourceQuery = () => {
   dataSources.CreateQueryForDS(dsName, `SELECT * FROM spacecrafts LIMIT 10;`);
 };
 
-describe("Linting", { tags: ["@tag.JS"] }, () => {
+describe("Linting", { tags: ["@tag.JS", "@tag.Binding"] }, () => {
   before(() => {
     entityExplorer.DragDropWidgetNVerify("buttonwidget", 300, 300);
     dataSources.CreateDataSource("MySql");
@@ -66,8 +67,13 @@ describe("Linting", { tags: ["@tag.JS"] }, () => {
     AppSidebar.navigate(AppSidebarButton.Editor);
   });
 
-  it("1. TC 1927 - Shows correct lint error when Api is deleted or created", () => {
+  it("1. TC 1927 - Show correct lint errors", () => {
+    // For browser APIs it should give linting error
     EditorNavigation.SelectEntityByName("Button1", EntityType.Widget);
+    propPane.EnterJSContext("onClick", `{{window}}`);
+    agHelper.AssertElementExist(locators._lintErrorElement);
+
+    // Shows correct lint error when Api is deleted or created
     propPane.EnterJSContext(
       "onClick",
       `{{function(){
@@ -91,7 +97,7 @@ describe("Linting", { tags: ["@tag.JS"] }, () => {
     clickButtonAndAssertLintError(false);
 
     // Delete Api and assert that lint error shows
-    PageLeftPane.expandCollapseItem("Queries/JS");
+    PageLeftPane.switchSegment(PagePaneSegment.Queries);
     entityExplorer.ActionContextMenuByEntityName({
       entityNameinLeftSidebar: "Api1",
       action: "Delete",
@@ -109,12 +115,12 @@ describe("Linting", { tags: ["@tag.JS"] }, () => {
 
   it("2. TC 1927 Cont'd - Doesn't show lint errors when Api is renamed", () => {
     EditorNavigation.SelectEntityByName("Api1", EntityType.Api);
-    agHelper.RenameWithInPane("Api2");
+    agHelper.RenameQuery("Api2");
 
     clickButtonAndAssertLintError(false);
 
     EditorNavigation.SelectEntityByName("Api2", EntityType.Api);
-    agHelper.RenameWithInPane("Api1");
+    agHelper.RenameQuery("Api1");
 
     clickButtonAndAssertLintError(false);
   });
@@ -154,7 +160,7 @@ describe("Linting", { tags: ["@tag.JS"] }, () => {
       },
     );
     clickButtonAndAssertLintError(false);
-    PageLeftPane.expandCollapseItem("Queries/JS");
+    PageLeftPane.switchSegment(PagePaneSegment.JS);
     entityExplorer.ActionContextMenuByEntityName({
       entityNameinLeftSidebar: "JSObject1",
       action: "Delete",
@@ -215,7 +221,7 @@ describe("Linting", { tags: ["@tag.JS"] }, () => {
     clickButtonAndAssertLintError(false);
 
     // Delete
-    PageLeftPane.expandCollapseItem("Queries/JS");
+    PageLeftPane.switchSegment(PagePaneSegment.Queries);
     entityExplorer.ActionContextMenuByEntityName({
       entityNameinLeftSidebar: "Query1",
       action: "Delete",
@@ -231,13 +237,13 @@ describe("Linting", { tags: ["@tag.JS"] }, () => {
 
   it("6. TC 1928 Cont'd - Shows correct lint error when Query is renamed", () => {
     EditorNavigation.SelectEntityByName("Query1", EntityType.Query);
-    agHelper.RenameWithInPane("Query2");
+    agHelper.RenameQuery("Query2");
 
     // Assert Absence of lint error
     clickButtonAndAssertLintError(false);
 
     EditorNavigation.SelectEntityByName("Query2", EntityType.Query);
-    agHelper.RenameWithInPane("Query1");
+    agHelper.RenameQuery("Query1");
 
     // Assert Absence of lint error
     clickButtonAndAssertLintError(false);
@@ -264,12 +270,13 @@ describe("Linting", { tags: ["@tag.JS"] }, () => {
     clickButtonAndAssertLintError(false);
 
     // Delete all
-    PageLeftPane.expandCollapseItem("Queries/JS");
+    PageLeftPane.switchSegment(PagePaneSegment.JS);
     entityExplorer.ActionContextMenuByEntityName({
       entityNameinLeftSidebar: "JSObject1",
       action: "Delete",
       entityType: entityItems.JSObject,
     });
+    PageLeftPane.switchSegment(PagePaneSegment.Queries);
     entityExplorer.ActionContextMenuByEntityName({
       entityNameinLeftSidebar: "Api1",
       action: "Delete",
@@ -328,8 +335,8 @@ describe("Linting", { tags: ["@tag.JS"] }, () => {
   });
 
   it(
-    "excludeForAirgap",
     "9. Shows lint errors for usage of library that are not installed yet",
+    { tags: ["@tag.excludeForAirgap"] },
     () => {
       const JS_OBJECT_WITH_LIB_API = `export default {
       myFun1: () => {

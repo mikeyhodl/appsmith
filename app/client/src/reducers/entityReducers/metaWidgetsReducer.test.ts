@@ -1,10 +1,12 @@
 import type { MetaWidgetsReduxState } from "./metaWidgetsReducer";
-import reducer from "./metaWidgetsReducer";
-import { ReduxActionTypes } from "@appsmith/constants/ReduxActionConstants";
+import reducer, {
+  initialState as reducerInitialState,
+} from "./metaWidgetsReducer";
+import { ReduxActionTypes } from "ee/constants/ReduxActionConstants";
 import { metaWidgetState } from "utils/metaWidgetState";
 import { nestedMetaWidgetInitialState } from "./testData/metaWidgetReducer";
 import { ASSETS_CDN_URL } from "constants/ThirdPartyConstants";
-import { getAssetUrl } from "@appsmith/utils/airgapHelpers";
+import { getAssetUrl } from "ee/utils/airgapHelpers";
 
 const modifiedState: MetaWidgetsReduxState = {
   baowuczcgg: {
@@ -329,6 +331,7 @@ describe("meta widget reducer test", () => {
   it("DELETE_META_WIDGETS", () => {
     const creatorId = "u9ibqgimu2";
     const expectedState: Record<string, unknown> = {};
+
     Object.entries(nestedMetaWidgetInitialState).forEach(
       ([widgetId, widgetProps]) => {
         if (widgetProps.creatorId !== creatorId) {
@@ -419,5 +422,28 @@ describe("meta widget reducer test", () => {
         },
       }),
     ).toEqual(modifiedState);
+  });
+
+  it("should reset to initial state on RESET_EDITOR_REQUEST", () => {
+    const initialState = {
+      "0": { children: ["xyz123"] },
+      xyz123: {
+        bottomRow: 20,
+        topRow: 10,
+        someValue: {
+          apple: "orange",
+          games: {
+            ball: ["football"],
+          },
+        },
+      },
+    };
+
+    const result = reducer(initialState, {
+      type: ReduxActionTypes.RESET_EDITOR_REQUEST,
+      payload: undefined,
+    });
+
+    expect(result).toStrictEqual(reducerInitialState);
   });
 });

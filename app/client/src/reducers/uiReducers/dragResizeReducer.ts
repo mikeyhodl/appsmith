@@ -1,11 +1,12 @@
-import type { ReduxAction } from "@appsmith/constants/ReduxActionConstants";
-import { ReduxActionTypes } from "@appsmith/constants/ReduxActionConstants";
+import type { ReduxAction } from "actions/ReduxActionTypes";
+import { ReduxActionTypes } from "ee/constants/ReduxActionConstants";
 import { MAIN_CONTAINER_WIDGET_ID } from "constants/WidgetConstants";
 import { createImmerReducer } from "utils/ReducerUtils";
 import type { SetSelectedWidgetsPayload } from "../../actions/widgetSelectionActions";
+import { AnvilReduxActionTypes } from "layoutSystems/anvil/integrations/actions/actionTypes";
+import type { AnvilHighlightInfo } from "layoutSystems/anvil/utils/anvilTypes";
 
 const initialState: WidgetDragResizeState = {
-  isDraggingDisabled: false,
   isDragging: false,
   dragDetails: {},
   autoLayoutDragDetails: {},
@@ -16,6 +17,19 @@ const initialState: WidgetDragResizeState = {
   selectedWidgetAncestry: [],
   entityExplorerAncestry: [],
   isAutoCanvasResizing: false,
+  anvil: {
+    highlightShown: undefined,
+    spaceDistribution: {
+      isDistributingSpace: false,
+      widgetsEffected: {
+        section: "",
+        zones: [],
+      },
+    },
+  },
+  isDraggingDisabled: false,
+  blockSelection: false,
+  altFocus: false,
 };
 
 export const widgetDraggingReducer = createImmerReducer(initialState, {
@@ -31,7 +45,9 @@ export const widgetDraggingReducer = createImmerReducer(initialState, {
       draggedOn: string;
     }>,
   ) => {
-    state.dragDetails.draggedOn = action.payload.draggedOn;
+    if (state.dragDetails.draggedOn !== action.payload.draggedOn) {
+      state.dragDetails.draggedOn = action.payload.draggedOn;
+    }
   },
   [ReduxActionTypes.SET_WIDGET_DRAGGING]: (
     state: WidgetDragResizeState,
@@ -39,6 +55,8 @@ export const widgetDraggingReducer = createImmerReducer(initialState, {
       isDragging: boolean;
       dragGroupActualParent: string;
       draggingGroupCenter: DraggingGroupCenter;
+      // TODO: Fix this the next time the file is edited
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       startPoints: any;
       draggedOn?: string;
     }>,
@@ -49,6 +67,7 @@ export const widgetDraggingReducer = createImmerReducer(initialState, {
       draggingGroupCenter: action.payload.draggingGroupCenter,
       dragOffset: action.payload.startPoints,
     };
+
     if (action.payload.draggedOn) {
       state.dragDetails.draggedOn = action.payload.draggedOn;
     }
@@ -57,6 +76,8 @@ export const widgetDraggingReducer = createImmerReducer(initialState, {
     state: WidgetDragResizeState,
     action: ReduxAction<{
       isDragging: boolean;
+      // TODO: Fix this the next time the file is edited
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       newWidgetProps: any;
     }>,
   ) => {
@@ -92,9 +113,21 @@ export const widgetDraggingReducer = createImmerReducer(initialState, {
   },
   [ReduxActionTypes.FOCUS_WIDGET]: (
     state: WidgetDragResizeState,
-    action: ReduxAction<{ widgetId?: string }>,
+    action: ReduxAction<{ widgetId?: string; alt?: boolean }>,
   ) => {
-    state.focusedWidget = action.payload.widgetId;
+    if (state.focusedWidget !== action.payload.widgetId) {
+      state.focusedWidget = action.payload.widgetId;
+    }
+
+    if (state.altFocus !== action.payload.alt) {
+      state.altFocus = !!action.payload.alt;
+    }
+  },
+  [ReduxActionTypes.ALT_FOCUS_WIDGET]: (
+    state: WidgetDragResizeState,
+    action: ReduxAction<boolean>,
+  ) => {
+    state.altFocus = action.payload;
   },
   [ReduxActionTypes.SET_SELECTED_WIDGET_ANCESTRY]: (
     state: WidgetDragResizeState,
@@ -108,33 +141,85 @@ export const widgetDraggingReducer = createImmerReducer(initialState, {
   ) => {
     state.entityExplorerAncestry = action.payload;
   },
+  [ReduxActionTypes.SET_WIDGET_SELECTION_BLOCK]: (
+    state: WidgetDragResizeState,
+    action: ReduxAction<boolean>,
+  ) => {
+    state.blockSelection = action.payload;
+  },
+  //space distribution redux
+  [AnvilReduxActionTypes.ANVIL_SPACE_DISTRIBUTION_START]: (
+    state: WidgetDragResizeState,
+    action: ReduxAction<{
+      section: string;
+      zones: string[];
+    }>,
+  ) => {
+    state.anvil.spaceDistribution.widgetsEffected.section =
+      action.payload.section;
+    state.anvil.spaceDistribution.widgetsEffected.zones = action.payload.zones;
+    state.anvil.spaceDistribution.isDistributingSpace = true;
+  },
+  [AnvilReduxActionTypes.ANVIL_SPACE_DISTRIBUTION_STOP]: (
+    state: WidgetDragResizeState,
+  ) => {
+    state.anvil.spaceDistribution.isDistributingSpace = false;
+    state.anvil.spaceDistribution.widgetsEffected.section = "";
+    state.anvil.spaceDistribution.widgetsEffected.zones = [];
+  },
+  [AnvilReduxActionTypes.ANVIL_SET_HIGHLIGHT_SHOWN]: (
+    state: WidgetDragResizeState,
+    action: ReduxAction<{ highlight?: AnvilHighlightInfo }>,
+  ) => {
+    state.anvil.highlightShown = action.payload.highlight;
+  },
 });
 
 export interface DraggingGroupCenter {
   widgetId?: string;
+  widgetType?: string;
   top?: number;
   left?: number;
 }
+
 export interface DragDetails {
   dragGroupActualParent?: string;
   draggingGroupCenter?: DraggingGroupCenter;
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   newWidget?: any;
   draggedOn?: string;
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   dragOffset?: any;
 }
 
 export interface WidgetDragResizeState {
-  isDraggingDisabled: boolean;
   isDragging: boolean;
   dragDetails: DragDetails;
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   autoLayoutDragDetails: any;
   isResizing: boolean;
+  anvil: {
+    highlightShown?: AnvilHighlightInfo;
+    spaceDistribution: {
+      isDistributingSpace: boolean;
+      widgetsEffected: {
+        section: string;
+        zones: string[];
+      };
+    };
+  };
   lastSelectedWidget?: string;
   focusedWidget?: string;
   selectedWidgetAncestry: string[];
   entityExplorerAncestry: string[];
   selectedWidgets: string[];
   isAutoCanvasResizing: boolean;
+  isDraggingDisabled: boolean;
+  blockSelection: boolean;
+  altFocus: boolean;
 }
 
 export default widgetDraggingReducer;

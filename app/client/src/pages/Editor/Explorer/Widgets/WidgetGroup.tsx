@@ -4,7 +4,7 @@ import Entity from "../Entity";
 import WidgetEntity from "./WidgetEntity";
 import {
   getCurrentApplicationId,
-  getCurrentPageId,
+  getCurrentBasePageId,
   getPagePermissions,
 } from "selectors/editorSelectors";
 import {
@@ -13,19 +13,18 @@ import {
   createMessage,
   EMPTY_WIDGET_BUTTON_TEXT,
   EMPTY_WIDGET_MAIN_TEXT,
-} from "@appsmith/constants/messages";
-import { selectWidgetsForCurrentPage } from "@appsmith/selectors/entitiesSelector";
-import { inGuidedTour } from "selectors/onboardingSelectors";
+} from "ee/constants/messages";
+import { selectWidgetsForCurrentPage } from "ee/selectors/entitiesSelector";
 import {
   getExplorerStatus,
   saveExplorerStatus,
-} from "@appsmith/pages/Editor/Explorer/helpers";
+} from "ee/pages/Editor/Explorer/helpers";
 import { AddEntity, EmptyComponent } from "../common";
 import { noop } from "lodash";
-import { Icon } from "design-system";
+import { Icon } from "@appsmith/ads";
 import { useFeatureFlag } from "utils/hooks/useFeatureFlag";
-import { FEATURE_FLAG } from "@appsmith/entities/FeatureFlag";
-import { getHasManagePagePermission } from "@appsmith/utils/BusinessFeatures/permissionPageHelpers";
+import { FEATURE_FLAG } from "ee/entities/FeatureFlag";
+import { getHasManagePagePermission } from "ee/utils/BusinessFeatures/permissionPageHelpers";
 
 interface ExplorerWidgetGroupProps {
   step: number;
@@ -35,15 +34,12 @@ interface ExplorerWidgetGroupProps {
 
 export const ExplorerWidgetGroup = memo((props: ExplorerWidgetGroupProps) => {
   const applicationId = useSelector(getCurrentApplicationId);
-  const pageId = useSelector(getCurrentPageId) || "";
+  const basePageId = useSelector(getCurrentBasePageId) || "";
   const widgets = useSelector(selectWidgetsForCurrentPage);
-  const guidedTour = useSelector(inGuidedTour);
   let isWidgetsOpen = getExplorerStatus(applicationId, "widgets");
+
   if (isWidgetsOpen === null || isWidgetsOpen === undefined) {
-    isWidgetsOpen = widgets?.children?.length === 0 || guidedTour;
-    saveExplorerStatus(applicationId, "widgets", isWidgetsOpen);
-  } else if (guidedTour) {
-    isWidgetsOpen = guidedTour;
+    isWidgetsOpen = widgets?.children?.length === 0;
     saveExplorerStatus(applicationId, "widgets", isWidgetsOpen);
   }
 
@@ -73,11 +69,11 @@ export const ExplorerWidgetGroup = memo((props: ExplorerWidgetGroupProps) => {
       canEditEntityName={canManagePages}
       className={`group widgets ${props.addWidgetsFn ? "current" : ""}`}
       disabled={!widgets && !!props.searchKeyword}
-      entityId={pageId + "_widgets"}
+      entityId={basePageId + "_widgets"}
       icon={""}
       isDefaultExpanded={isWidgetsOpen}
       isSticky
-      key={pageId + "_widgets"}
+      key={basePageId + "_widgets"}
       name="Widgets"
       onCreate={props.addWidgetsFn}
       onToggle={onWidgetToggle}
@@ -87,9 +83,9 @@ export const ExplorerWidgetGroup = memo((props: ExplorerWidgetGroupProps) => {
     >
       {widgets?.children?.map((child) => (
         <WidgetEntity
+          basePageId={basePageId}
           childWidgets={child.children}
           key={child.widgetId}
-          pageId={pageId}
           searchKeyword={props.searchKeyword}
           step={props.step + 1}
           widgetId={child.widgetId}
@@ -109,7 +105,7 @@ export const ExplorerWidgetGroup = memo((props: ExplorerWidgetGroupProps) => {
       {widgets?.children && widgets?.children?.length > 0 && canManagePages && (
         <AddEntity
           action={props.addWidgetsFn}
-          entityId={pageId + "_widgets_add_new_datasource"}
+          entityId={basePageId + "_widgets_add_new_datasource"}
           icon={<Icon name="plus" />}
           name={createMessage(ADD_WIDGET_BUTTON)}
           step={props.step + 1}
@@ -120,6 +116,8 @@ export const ExplorerWidgetGroup = memo((props: ExplorerWidgetGroupProps) => {
 });
 
 ExplorerWidgetGroup.displayName = "ExplorerWidgetGroup";
+// TODO: Fix this the next time the file is edited
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 (ExplorerWidgetGroup as any).whyDidYouRender = {
   logOnDifferentValues: false,
 };

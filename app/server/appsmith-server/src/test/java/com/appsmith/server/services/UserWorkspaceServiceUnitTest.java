@@ -19,14 +19,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.SpyBean;
 import org.springframework.security.test.context.support.WithUserDetails;
 import org.springframework.test.annotation.DirtiesContext;
-import org.springframework.test.context.junit.jupiter.SpringExtension;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
@@ -42,7 +40,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.doReturn;
 
-@ExtendWith(SpringExtension.class)
 @SpringBootTest
 @DirtiesContext
 @Slf4j
@@ -103,8 +100,7 @@ public class UserWorkspaceServiceUnitTest {
         List<Workspace> workspaceList = new ArrayList<>(4);
         for (int i = 1; i <= 4; i++) {
             Workspace workspace = new Workspace();
-            workspace.setId("org-" + i);
-            workspace.setName(workspace.getId());
+            workspace.setName(UUID.randomUUID().toString());
             workspaceList.add(workspace);
         }
         return Flux.fromIterable(workspaceList)
@@ -194,7 +190,7 @@ public class UserWorkspaceServiceUnitTest {
 
         StepVerifier.create(listMono)
                 .assertNext(workspaceMemberInfoDTOS -> {
-                    assertThat(workspaceMemberInfoDTOS.size()).isEqualTo(1);
+                    assertThat(workspaceMemberInfoDTOS).hasSize(1);
                     assertThat(workspaceMemberInfoDTOS.get(0).getPhotoId()).isEqualTo("sample-photo-id");
                 })
                 .verifyComplete();
@@ -226,8 +222,7 @@ public class UserWorkspaceServiceUnitTest {
 
         StepVerifier.create(mapMono)
                 .assertNext(workspaceMemberInfoDTOSMap -> {
-                    assertThat(workspaceMemberInfoDTOSMap.size())
-                            .isEqualTo(2); // should have 2 entries for 2 workspaces
+                    assertThat(workspaceMemberInfoDTOSMap).hasSize(2); // should have 2 entries for 2 workspaces
                     workspaceMemberInfoDTOSMap.values().forEach(workspaceMemberInfoDTOS -> {
                         // should have one entry for the creator member only, get that
                         MemberInfoDTO workspaceMemberInfoDTO = workspaceMemberInfoDTOS.get(0);
@@ -252,9 +247,9 @@ public class UserWorkspaceServiceUnitTest {
         cleanup();
         createDummyWorkspaces().blockLast();
 
-        StepVerifier.create(userWorkspaceService.getUserWorkspacesByRecentlyUsedOrder())
+        StepVerifier.create(userWorkspaceService.getUserWorkspacesByRecentlyUsedOrder(null))
                 .assertNext(workspaces -> {
-                    assertThat(workspaces.size()).isEqualTo(4);
+                    assertThat(workspaces).hasSize(4);
                     workspaces.forEach(workspace -> {
                         assertThat(workspaceIds.contains(workspace.getId())).isTrue();
                         assertThat(workspace.getTenantId()).isNotEmpty();
@@ -279,9 +274,9 @@ public class UserWorkspaceServiceUnitTest {
         userData.setRecentlyUsedEntityIds(recentlyUsedEntityDTOs);
         doReturn(Mono.just(userData)).when(userDataService).getForCurrentUser();
 
-        StepVerifier.create(userWorkspaceService.getUserWorkspacesByRecentlyUsedOrder())
+        StepVerifier.create(userWorkspaceService.getUserWorkspacesByRecentlyUsedOrder(null))
                 .assertNext(workspaces -> {
-                    assertThat(workspaces.size()).isEqualTo(4);
+                    assertThat(workspaces).hasSize(4);
                     List<String> fetchedWorkspaceIds = new ArrayList<>();
                     workspaces.forEach(workspace -> {
                         fetchedWorkspaceIds.add(workspace.getId());

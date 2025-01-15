@@ -1,4 +1,4 @@
-import type { AppState } from "@appsmith/reducers";
+import type { AppState } from "ee/reducers";
 import {
   selectAllWidgetsInAreaAction,
   setCanvasSelectionStateAction,
@@ -14,14 +14,13 @@ import { throttle } from "lodash";
 import React, { useCallback, useEffect, useMemo, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { getWidget } from "sagas/selectors";
-import { getAppMode } from "@appsmith/selectors/applicationSelectors";
+import { getAppMode } from "ee/selectors/applicationSelectors";
 import { getIsAppSettingsPaneWithNavigationTabOpen } from "selectors/appSettingsPaneSelectors";
 import {
   getIsAutoLayout,
   getIsDraggingForSelection,
 } from "selectors/canvasSelectors";
 import {
-  combinedPreviewModeSelector,
   getCurrentApplicationLayout,
   getCurrentPageId,
 } from "selectors/editorSelectors";
@@ -30,6 +29,8 @@ import { getAbsolutePixels } from "utils/helpers";
 import type { XYCord } from "layoutSystems/common/canvasArenas/ArenaTypes";
 import { useCanvasDragToScroll } from "layoutSystems/common/canvasArenas/useCanvasDragToScroll";
 import { StickyCanvasArena } from "layoutSystems/common/canvasArenas/StickyCanvasArena";
+import { getWidgetSelectionBlock } from "../../../../selectors/ui";
+import { selectCombinedPreviewMode } from "selectors/gitModSelectors";
 
 export interface SelectedArenaDimensions {
   top: number;
@@ -70,7 +71,8 @@ export function CanvasSelectionArena({
     (parentWidget && parentWidget.detachFromLayout)
   );
   const appMode = useSelector(getAppMode);
-  const isPreviewMode = useSelector(combinedPreviewModeSelector);
+  const isPreviewMode = useSelector(selectCombinedPreviewMode);
+  const isWidgetSelectionBlocked = useSelector(getWidgetSelectionBlock);
   const isAppSettingsPaneWithNavigationTabOpen = useSelector(
     getIsAppSettingsPaneWithNavigationTabOpen,
   );
@@ -141,6 +143,7 @@ export function CanvasSelectionArena({
       canDraw: canDrawOnEnter,
       startPoints: canDrawOnEnter ? outOfCanvasStartPositions : undefined,
     };
+
     if (slidingArenaRef.current && stickyCanvasRef.current && canDrawOnEnter) {
       stickyCanvasRef.current.style.zIndex = "2";
       slidingArenaRef.current.style.zIndex = "2";
@@ -158,6 +161,7 @@ export function CanvasSelectionArena({
     }),
     [snapRows, canExtend],
   );
+
   useCanvasDragToScroll(
     slidingArenaRef,
     isCurrentWidgetDrawing || isResizing,
@@ -176,7 +180,11 @@ export function CanvasSelectionArena({
       const scrollParent: Element | null = getNearestParentCanvas(
         slidingArenaRef.current,
       );
+      // TODO: Fix this the next time the file is edited
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const scrollObj: any = {};
+      // TODO: Fix this the next time the file is edited
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const canvasCtx: any = stickyCanvasRef.current.getContext("2d");
       const initRectangle = (): SelectedArenaDimensions => ({
         top: 0,
@@ -216,6 +224,7 @@ export function CanvasSelectionArena({
         ) {
           const snapToNextColumn = selectionRectangle.height < 0;
           const snapToNextRow = selectionRectangle.width < 0;
+
           throttledWidgetSelection(
             selectionDimensions,
             snapToNextColumn,
@@ -234,6 +243,7 @@ export function CanvasSelectionArena({
           const leftOffset = getAbsolutePixels(
             stickyCanvasRef.current.style.left,
           );
+
           canvasCtx.setLineDash([5]);
           canvasCtx.strokeStyle = "rgba(125,188,255,1)";
           canvasCtx.strokeRect(
@@ -257,6 +267,8 @@ export function CanvasSelectionArena({
         document.body.addEventListener("click", onClick, false);
       };
 
+      // TODO: Fix this the next time the file is edited
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const onMouseEnter = (e: any) => {
         if (
           slidingArenaRef.current &&
@@ -271,6 +283,8 @@ export function CanvasSelectionArena({
         }
       };
 
+      // TODO: Fix this the next time the file is edited
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const onClick = (e: any) => {
         if (
           Math.abs(selectionRectangle.height) +
@@ -281,6 +295,7 @@ export function CanvasSelectionArena({
             // cant set this in onMouseUp coz click seems to happen after onMouseUp.
             selectionRectangle = initRectangle();
           }
+
           e.stopPropagation();
         }
       };
@@ -291,6 +306,7 @@ export function CanvasSelectionArena({
           top: 0,
           left: 0,
         };
+
         if (slidingArenaRef.current && startPoints) {
           const { height, left, top, width } =
             slidingArenaRef.current.getBoundingClientRect();
@@ -305,20 +321,24 @@ export function CanvasSelectionArena({
           const xInRange = outOfMaxBounds.x && outOfMinBounds.x;
           const yInRange = outOfMaxBounds.y && outOfMinBounds.y;
           const bufferFromBoundary = 2;
+
           startPositions.left = xInRange
             ? startPoints.x - left
             : outOfMinBounds.x
-            ? width - bufferFromBoundary
-            : bufferFromBoundary;
+              ? width - bufferFromBoundary
+              : bufferFromBoundary;
           startPositions.top = yInRange
             ? startPoints.y - top
             : outOfMinBounds.y
-            ? height - bufferFromBoundary
-            : bufferFromBoundary;
+              ? height - bufferFromBoundary
+              : bufferFromBoundary;
         }
+
         return startPositions;
       };
 
+      // TODO: Fix this the next time the file is edited
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const firstRender = (e: any, fromOuterCanvas = false) => {
         if (
           slidingArenaRef.current &&
@@ -326,8 +346,10 @@ export function CanvasSelectionArena({
           !isMouseDown
         ) {
           isMultiSelect = e.ctrlKey || e.metaKey || e.shiftKey;
+
           if (fromOuterCanvas) {
             const { left, top } = startPositionsForOutCanvasSelection();
+
             selectionRectangle.left = left;
             selectionRectangle.top = top;
           } else {
@@ -336,6 +358,7 @@ export function CanvasSelectionArena({
             selectionRectangle.top =
               e.offsetY - slidingArenaRef.current.offsetTop;
           }
+
           selectionRectangle.width = 0;
           selectionRectangle.height = 0;
           isMouseDown = true;
@@ -347,8 +370,11 @@ export function CanvasSelectionArena({
         }
       };
 
+      // TODO: Fix this the next time the file is edited
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const onMouseDown = (e: any) => {
         const isNotRightClick = !(e.which === 3 || e.button === 2);
+
         if (
           isNotRightClick &&
           slidingArenaRef.current &&
@@ -376,6 +402,8 @@ export function CanvasSelectionArena({
           }, 0);
         }
       };
+      // TODO: Fix this the next time the file is edited
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const onMouseMove = (e: any) => {
         if (isMouseDown && slidingArenaRef.current && stickyCanvasRef.current) {
           // This is to make sure we start selection only after dragging start
@@ -384,6 +412,7 @@ export function CanvasSelectionArena({
             dispatch(setCanvasSelectionStateAction(true, widgetId));
             shouldStartCanvasDragging = false;
           }
+
           selectionRectangle.width =
             e.offsetX -
             slidingArenaRef.current.offsetLeft -
@@ -399,6 +428,7 @@ export function CanvasSelectionArena({
             stickyCanvasRef.current.height,
           );
           const selectionDimensions = getSelectionDimensions();
+
           drawRectangle(selectionDimensions);
           selectWidgetsInit(selectionDimensions, isMultiSelect);
           scrollObj.lastMouseMoveEvent = e;
@@ -409,6 +439,7 @@ export function CanvasSelectionArena({
       const onScroll = () => {
         const { lastMouseMoveEvent, lastScrollHeight, lastScrollTop } =
           scrollObj;
+
         if (
           lastMouseMoveEvent &&
           Number.isInteger(lastScrollHeight) &&
@@ -419,6 +450,7 @@ export function CanvasSelectionArena({
             scrollParent?.scrollHeight +
             scrollParent?.scrollTop -
             (lastScrollHeight + lastScrollTop);
+
           onMouseMove({
             offsetX: lastMouseMoveEvent.offsetX,
             offsetY: lastMouseMoveEvent.offsetY + delta,
@@ -476,9 +508,11 @@ export function CanvasSelectionArena({
           addEventListeners();
         }
       };
+
       if (appMode === APP_MODE.EDIT) {
         init();
       }
+
       return () => {
         removeEventListeners();
       };
@@ -501,6 +535,7 @@ export function CanvasSelectionArena({
     !(
       isDragging ||
       isPreviewMode ||
+      isWidgetSelectionBlocked ||
       isAppSettingsPaneWithNavigationTabOpen ||
       dropDisabled
     );
@@ -518,6 +553,7 @@ export function CanvasSelectionArena({
     }),
     [canExtend, snapColumnSpace, snapRowSpace, snapRows],
   );
+
   return shouldShow ? (
     <StickyCanvasArena
       canvasId={getStickyCanvasName(widgetId)}

@@ -5,10 +5,10 @@ import EditorNavigation, {
 const commonlocators = require("../../../../locators/commonlocators.json");
 const publish = require("../../../../locators/publishWidgetspage.json");
 import {
-  entityExplorer,
   agHelper,
   deployMode,
   propPane,
+  table,
 } from "../../../../support/Objects/ObjectsCore";
 
 describe(
@@ -35,7 +35,7 @@ describe(
       /**
        * @param(Index)  Provide index value to select the row.
        */
-      cy.isSelectRow(1);
+      table.SelectTableRow(1, 0, true, "v2");
       EditorNavigation.SelectEntityByName("Text4", EntityType.Widget, {}, [
         "Container1",
       ]);
@@ -51,7 +51,7 @@ describe(
         cy.EvaluateDataType("string");
         cy.validateEvaluatedValue(tabValue);
         deployMode.DeployApp();
-        cy.isSelectRow(1);
+        table.SelectTableRow(1, 0, true, "v2");
         cy.readTableV2dataPublish("1", "0").then((tabDataP) => {
           const tabValueP = tabDataP;
           cy.get(commonlocators.TextInside).should("have.text", tabValueP);
@@ -60,7 +60,7 @@ describe(
     });
 
     it("2. Text-Table Binding Functionality For Email", function () {
-      cy.isSelectRow(2);
+      table.SelectTableRow(2, 0, true, "v2");
       EditorNavigation.SelectEntityByName("Text4", EntityType.Widget, {}, [
         "Container1",
       ]);
@@ -76,7 +76,7 @@ describe(
         cy.EvaluateDataType("string");
         cy.validateEvaluatedValue(tabValue);
         deployMode.DeployApp();
-        cy.isSelectRow(2);
+        table.SelectTableRow(2, 0, true, "v2");
         cy.readTableV2dataPublish("2", "1").then((tabDataP) => {
           const tabValueP = tabDataP;
           cy.get(commonlocators.TextInside).should("have.text", tabValueP);
@@ -112,6 +112,7 @@ describe(
       EditorNavigation.SelectEntityByName("Table1", EntityType.Widget, {}, [
         "Container3",
       ]);
+      propPane.ExpandIfCollapsedSection("rowselection");
       cy.testJsontext("defaultselectedrow", "2");
       cy.wait("@updateLayout");
       cy.get(commonlocators.TableV2Row)
@@ -135,7 +136,7 @@ describe(
       /**
        * @param(Index)  Provide index value to select the row.
        */
-      cy.isSelectRow(1);
+      table.SelectTableRow(1, 0, true, "v2");
       EditorNavigation.SelectEntityByName("Text4", EntityType.Widget, {}, [
         "Container1",
       ]);
@@ -154,7 +155,7 @@ describe(
         cy.EvaluateDataType("string");
         cy.validateEvaluatedValue(tabValue);
         deployMode.DeployApp();
-        cy.isSelectRow(1);
+        table.SelectTableRow(1, 0, true, "v2");
         cy.readTableV2dataPublish("1", "2").then((tabDataP) => {
           const tabValueP = `\"${tabDataP}\"`;
           cy.get(commonlocators.TextInside).contains(tabValueP);

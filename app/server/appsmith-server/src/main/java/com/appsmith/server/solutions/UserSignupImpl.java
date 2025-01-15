@@ -1,13 +1,13 @@
 package com.appsmith.server.solutions;
 
 import com.appsmith.server.authentication.handlers.AuthenticationSuccessHandler;
-import com.appsmith.server.configurations.CommonConfig;
 import com.appsmith.server.helpers.NetworkUtils;
 import com.appsmith.server.helpers.UserUtils;
 import com.appsmith.server.services.AnalyticsService;
 import com.appsmith.server.services.CaptchaService;
 import com.appsmith.server.services.ConfigService;
 import com.appsmith.server.services.EmailService;
+import com.appsmith.server.services.TenantService;
 import com.appsmith.server.services.UserDataService;
 import com.appsmith.server.services.UserService;
 import com.appsmith.server.solutions.ce.UserSignupCEImpl;
@@ -26,10 +26,10 @@ public class UserSignupImpl extends UserSignupCEImpl implements UserSignup {
             ConfigService configService,
             AnalyticsService analyticsService,
             EnvManager envManager,
-            CommonConfig commonConfig,
             UserUtils userUtils,
             NetworkUtils networkUtils,
-            EmailService emailService) {
+            EmailService emailService,
+            TenantService tenantService) {
 
         super(
                 userService,
@@ -39,9 +39,9 @@ public class UserSignupImpl extends UserSignupCEImpl implements UserSignup {
                 configService,
                 analyticsService,
                 envManager,
-                commonConfig,
                 userUtils,
                 networkUtils,
-                emailService);
+                emailService,
+                tenantService);
     }
 }

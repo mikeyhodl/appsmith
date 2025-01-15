@@ -9,6 +9,7 @@ import { LayoutComponentTypes } from "./anvilTypes";
  */
 export function anvilDSLTransformer(dsl: DSLWidget) {
   const _dsl = dsl; // new reference, we don't want to modify the args directly
+
   // If there isn't a layout object, we need to create one for Anvil
   // Assumptions:
   // If there is no layout object, then we haven't run this function on this DSL yet
@@ -17,24 +18,22 @@ export function anvilDSLTransformer(dsl: DSLWidget) {
     _dsl.layout = [
       {
         layoutId: generateReactKey(),
-        layoutType: LayoutComponentTypes.ALIGNED_LAYOUT_COLUMN,
+        layoutType: LayoutComponentTypes.LAYOUT_COLUMN,
         layout: [],
-        layoutStyle: {
-          border: "none",
-          height: "100%",
-          minHeight: "70vh",
-          padding: "4px 4px 5rem",
-        },
         isDropTarget: true,
         isPermanent: true,
         childTemplate: {
-          layoutId: "",
-          layoutType: LayoutComponentTypes.ALIGNED_WIDGET_ROW,
-          layout: [],
           insertChild: true,
+          isDropTarget: false,
+          isPermanent: false,
+          layout: [],
+          layoutId: "",
+          layoutType: LayoutComponentTypes.WIDGET_ROW,
+          maxChildLimit: 1,
         },
       },
     ];
   }
+
   return _dsl;
 }

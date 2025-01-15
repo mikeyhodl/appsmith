@@ -1,19 +1,17 @@
 package com.appsmith.server.helpers;
 
+import com.appsmith.external.enums.FeatureFlagEnum;
 import com.appsmith.server.constants.FeatureMigrationType;
 import com.appsmith.server.domains.Tenant;
 import com.appsmith.server.domains.TenantConfiguration;
 import com.appsmith.server.featureflags.CachedFeatures;
-import com.appsmith.server.featureflags.FeatureFlagEnum;
 import com.appsmith.server.services.CacheableFeatureFlagHelper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.test.context.junit.jupiter.SpringExtension;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
@@ -23,15 +21,14 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
+import static com.appsmith.external.enums.FeatureFlagEnum.TENANT_TEST_FEATURE;
 import static com.appsmith.server.constants.FeatureMigrationType.DISABLE;
 import static com.appsmith.server.constants.FeatureMigrationType.ENABLE;
 import static com.appsmith.server.constants.MigrationStatus.PENDING;
-import static com.appsmith.server.featureflags.FeatureFlagEnum.TENANT_TEST_FEATURE;
 import static org.assertj.core.api.AssertionsForInterfaceTypes.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 
 @SpringBootTest
-@ExtendWith(SpringExtension.class)
 class FeatureFlagMigrationHelperTest {
 
     @MockBean
@@ -74,7 +71,7 @@ class FeatureFlagMigrationHelperTest {
         StepVerifier.create(getUpdatedFlagsWithPendingMigration)
                 .assertNext(featureFlagEnumFeatureMigrationTypeMap -> {
                     assertThat(featureFlagEnumFeatureMigrationTypeMap).isNotEmpty();
-                    assertThat(featureFlagEnumFeatureMigrationTypeMap.size()).isEqualTo(1);
+                    assertThat(featureFlagEnumFeatureMigrationTypeMap).hasSize(1);
                     assertThat(featureFlagEnumFeatureMigrationTypeMap.get(TENANT_TEST_FEATURE))
                             .isEqualTo(DISABLE);
                 })
@@ -112,7 +109,7 @@ class FeatureFlagMigrationHelperTest {
         StepVerifier.create(getUpdatedFlagsWithPendingMigration)
                 .assertNext(featureFlagEnumFeatureMigrationTypeMap -> {
                     assertThat(featureFlagEnumFeatureMigrationTypeMap).isNotEmpty();
-                    assertThat(featureFlagEnumFeatureMigrationTypeMap.size()).isEqualTo(1);
+                    assertThat(featureFlagEnumFeatureMigrationTypeMap).hasSize(1);
                     assertThat(featureFlagEnumFeatureMigrationTypeMap.get(TENANT_TEST_FEATURE))
                             .isEqualTo(ENABLE);
                 })
@@ -144,7 +141,7 @@ class FeatureFlagMigrationHelperTest {
                 .assertNext(featureFlagEnumFeatureMigrationTypeMap -> {
                     assertThat(featureFlagEnumFeatureMigrationTypeMap).isNotNull();
                     assertThat(featureFlagEnumFeatureMigrationTypeMap).isEmpty();
-                    assertThat(featureFlagEnumFeatureMigrationTypeMap.size()).isEqualTo(0);
+                    assertThat(featureFlagEnumFeatureMigrationTypeMap).hasSize(0);
                 })
                 .verifyComplete();
     }
@@ -182,7 +179,7 @@ class FeatureFlagMigrationHelperTest {
                 .assertNext(featureFlagEnumFeatureMigrationTypeMap -> {
                     assertThat(featureFlagEnumFeatureMigrationTypeMap).isNotNull();
                     assertThat(featureFlagEnumFeatureMigrationTypeMap).isEmpty();
-                    assertThat(featureFlagEnumFeatureMigrationTypeMap.size()).isEqualTo(0);
+                    assertThat(featureFlagEnumFeatureMigrationTypeMap).hasSize(0);
                 })
                 .verifyComplete();
     }
@@ -218,10 +215,8 @@ class FeatureFlagMigrationHelperTest {
         StepVerifier.create(resultMono)
                 .assertNext(result -> {
                     assertThat(result).isTrue();
-                    assertThat(tenantConfiguration
-                                    .getFeaturesWithPendingMigration()
-                                    .size())
-                            .isEqualTo(1);
+                    assertThat(tenantConfiguration.getFeaturesWithPendingMigration())
+                            .hasSize(1);
                     assertThat(tenantConfiguration.getMigrationStatus()).isEqualTo(PENDING);
                 })
                 .verifyComplete();

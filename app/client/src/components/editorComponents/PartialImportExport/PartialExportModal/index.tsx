@@ -1,14 +1,15 @@
+import { PARTIAL_IMPORT_EXPORT, createMessage } from "ee/constants/messages";
+import { getPartialImportExportLoadingState } from "ee/selectors/applicationSelectors";
+// eslint-disable-next-line @typescript-eslint/no-restricted-imports
+import { selectFilesForExplorer } from "ce/selectors/entitiesSelector";
 import {
-  PARTIAL_IMPORT_EXPORT,
-  createMessage,
-} from "@appsmith/constants/messages";
-import { getPartialImportExportLoadingState } from "@appsmith/selectors/applicationSelectors";
-import {
-  selectFilesForExplorer,
   selectLibrariesForExplorer,
   selectWidgetsForCurrentPage,
-} from "@appsmith/selectors/entitiesSelector";
-import { partialExportWidgets } from "actions/widgetActions";
+} from "ee/selectors/entitiesSelector";
+import {
+  openPartialExportModal,
+  partialExportWidgets,
+} from "actions/widgetActions";
 import {
   Button,
   Collapsible,
@@ -20,14 +21,14 @@ import {
   ModalFooter,
   ModalHeader,
   Text,
-} from "design-system";
+} from "@appsmith/ads";
 import { ControlIcons } from "icons/ControlIcons";
 import { MenuIcons } from "icons/MenuIcons";
-import { useAppWideAndOtherDatasource } from "@appsmith/pages/Editor/Explorer/hooks";
+import { useAppWideAndOtherDatasource } from "ee/pages/Editor/Explorer/hooks";
 import React, { useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import type { CanvasStructure } from "reducers/uiReducers/pageCanvasStructureReducer";
-import type { PartialExportParams } from "sagas/WidgetSelectionSagas";
+import type { PartialExportParams } from "sagas/PartialImportExportSagas";
 import { getCurrentPageName } from "selectors/editorSelectors";
 import type { JSLibrary } from "workers/common/JSLibrary";
 import EntityCheckboxSelector from "./EntityCheckboxSelector";
@@ -35,10 +36,6 @@ import JSObjectsNQueriesExport from "./JSObjectsNQueriesExport";
 import { Bar, ScrollableSection } from "./StyledSheet";
 import WidgetsExport from "./WidgetsExport";
 
-interface Props {
-  handleModalClose: () => void;
-  isModalOpen: boolean;
-}
 const selectedParamsInitValue: PartialExportParams = {
   jsObjects: [],
   datasources: [],
@@ -46,7 +43,8 @@ const selectedParamsInitValue: PartialExportParams = {
   widgets: [],
   queries: [],
 };
-const PartiaExportModel = ({ handleModalClose, isModalOpen }: Props) => {
+
+export const PartialExportModal = () => {
   const [customJsLibraries, setCustomJsLibraries] = useState<JSLibrary[]>([]);
   const dispatch = useDispatch();
   const [selectedParams, setSelectedParams] = useState<PartialExportParams>(
@@ -61,6 +59,7 @@ const PartiaExportModel = ({ handleModalClose, isModalOpen }: Props) => {
   );
   const currentPageName = useSelector(getCurrentPageName);
   const [widgetSelectAllChecked, setWidgetSelectAllChecked] = useState(false);
+
   useEffect(() => {
     setCustomJsLibraries(libraries.filter((lib) => !!lib.url));
   }, [libraries]);
@@ -76,6 +75,8 @@ const PartiaExportModel = ({ handleModalClose, isModalOpen }: Props) => {
   }, [selectedParams]);
 
   const entities = useMemo(() => {
+    // TODO: Fix this the next time the file is edited
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const groupedData: Record<string, any> = {};
 
     let currentGroup: unknown = null;
@@ -88,15 +89,20 @@ const PartiaExportModel = ({ handleModalClose, isModalOpen }: Props) => {
         groupedData[currentGroup as string].push(item);
       }
     }
+
     const jsObjects =
       groupedData["JS Objects"] &&
+      // TODO: Fix this the next time the file is edited
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       groupedData["JS Objects"].map((item: any) => item.entity);
+
     delete groupedData["JS Objects"];
 
     return [
       {
         content: jsObjects ? (
           <EntityCheckboxSelector
+            containerTestId="t--partialExportModal-jsObjectsSection"
             entities={jsObjects}
             onEntityChecked={(id, selected) =>
               onEntitySelected("jsObjects", id, selected)
@@ -119,6 +125,7 @@ const PartiaExportModel = ({ handleModalClose, isModalOpen }: Props) => {
         content:
           appWideDS.length > 0 ? (
             <EntityCheckboxSelector
+              containerTestId="t--partialExportModal-datasourcesSection"
               entities={appWideDS}
               onEntityChecked={(id, selected) =>
                 onEntitySelected("datasources", id, selected)
@@ -163,6 +170,7 @@ const PartiaExportModel = ({ handleModalClose, isModalOpen }: Props) => {
         content:
           customJsLibraries.length > 0 ? (
             <EntityCheckboxSelector
+              containerTestId="t--partialExportModal-customJSLibsSection"
               entities={customJsLibraries}
               onEntityChecked={(id, selected) =>
                 onEntitySelected("customJSLibs", id, selected)
@@ -221,13 +229,16 @@ const PartiaExportModel = ({ handleModalClose, isModalOpen }: Props) => {
     selected: boolean,
   ) => {
     const prevSelectedIdsCopy = [...selectedParams[keyToUpdate]];
+
     if (selected) {
       prevSelectedIdsCopy.push(id);
     } else {
       prevSelectedIdsCopy.splice(prevSelectedIdsCopy.indexOf(id), 1);
     }
+
     setSelectedParams((prev: PartialExportParams): PartialExportParams => {
       const toUpdate = { ...prev, [keyToUpdate]: prevSelectedIdsCopy };
+
       return toUpdate;
     });
   };
@@ -239,13 +250,16 @@ const PartiaExportModel = ({ handleModalClose, isModalOpen }: Props) => {
   ) => {
     if (widget.widgetId && ids.includes(widget.widgetId)) {
       finalWidgetIDs.push(widget.widgetId);
+
       return finalWidgetIDs;
     }
+
     if (widget.children) {
       widget.children.forEach((child) => {
         selectOnlyParentIds(child, ids, finalWidgetIDs);
       });
     }
+
     return finalWidgetIDs;
   };
 
@@ -256,10 +270,21 @@ const PartiaExportModel = ({ handleModalClose, isModalOpen }: Props) => {
         widgets: selectOnlyParentIds(canvasWidgets!, selectedParams.widgets),
       }),
     );
+    setSelectedParams(selectedParamsInitValue);
+  };
+
+  const handleModalClose = (open: boolean) => {
+    if (!open) {
+      dispatch(openPartialExportModal(false));
+      setSelectedParams(selectedParamsInitValue);
+    }
   };
 
   return (
-    <Modal onOpenChange={handleModalClose} open={isModalOpen}>
+    <Modal
+      onOpenChange={handleModalClose}
+      open={partialImportExportLoadingState.isExportModalOpen}
+    >
       <ModalContent>
         <ModalHeader>
           <Text className="title" kind="heading-xl">
@@ -270,14 +295,15 @@ const PartiaExportModel = ({ handleModalClose, isModalOpen }: Props) => {
         <Text kind="heading-s" renderAs="h2">
           {createMessage(PARTIAL_IMPORT_EXPORT.export.modalSubHeading)}
         </Text>
-        <ScrollableSection>
+        <ScrollableSection data-testid="t--partialExportModal">
           {entities.map(
             ({ content, icon, onResetClick, shouldShowReset, title }) => (
-              <>
+              <React.Fragment key={title}>
                 <Collapsible className="mt-4" key={title}>
                   <CollapsibleHeader>
                     <div className="w-full flex justify-between">
                       <Text
+                        data-testid="t--partialExportModal-collapsibleHeader"
                         kind="heading-s"
                         style={{
                           display: "flex",
@@ -291,6 +317,7 @@ const PartiaExportModel = ({ handleModalClose, isModalOpen }: Props) => {
                       {shouldShowReset && (
                         <Button
                           className="mr-2"
+                          data-testid={`t--partial-export-modal-reset-${title}`}
                           endIcon="restart-line"
                           kind="tertiary"
                           onClick={onResetClick}
@@ -304,12 +331,13 @@ const PartiaExportModel = ({ handleModalClose, isModalOpen }: Props) => {
                   <CollapsibleContent>{content}</CollapsibleContent>
                 </Collapsible>
                 <Bar />
-              </>
+              </React.Fragment>
             ),
           )}
         </ScrollableSection>
         <ModalFooter>
           <Button
+            data-testid="t-partial-export-entities-btn"
             isDisabled={disableExportCTA}
             isLoading={partialImportExportLoadingState.isExporting}
             onClick={onExportClick}
@@ -322,5 +350,3 @@ const PartiaExportModel = ({ handleModalClose, isModalOpen }: Props) => {
     </Modal>
   );
 };
-
-export default PartiaExportModel;

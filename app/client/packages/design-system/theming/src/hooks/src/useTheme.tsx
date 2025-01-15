@@ -1,22 +1,23 @@
 import Color from "colorjs.io";
-import { useEffect, useState } from "react";
-import { TokensAccessor, defaultTokens } from "../../token";
-import { useFluidSizing, useFluidSpacing, useFluidTypography } from "./";
+import { useMemo } from "react";
+import { TokensAccessor, defaultTokens, tokensConfigs } from "../../token";
 
 import type { ColorMode } from "../../color";
-import type { TokenSource, FontFamily } from "../../token";
-
-const { fluid, ...restDefaultTokens } = defaultTokens;
+import type { TokenSource } from "../../token";
+import { useSizing } from "./useSizing";
+import { useSpacing } from "./useSpacing";
+import { useTypography } from "./useTypography";
+import { useIconSizing } from "./useIconSizing";
+import { useIconDensity } from "./useIconDensity";
 
 const tokensAccessor = new TokensAccessor({
-  ...(restDefaultTokens as TokenSource),
+  ...(defaultTokens as TokenSource),
 });
 
 export interface UseThemeProps {
   seedColor?: string;
   colorMode?: ColorMode;
   borderRadius?: string;
-  fontFamily?: FontFamily;
   userDensity?: number;
   userSizing?: number;
 }
@@ -25,135 +26,97 @@ export function useTheme(props: UseThemeProps = {}) {
   const {
     borderRadius,
     colorMode = "light",
-    fontFamily,
     seedColor,
     userDensity = 1,
     userSizing = 1,
   } = props;
 
-  const { sizing } = useFluidSizing(fluid, userDensity, userSizing);
-  const { innerSpacing, outerSpacing } = useFluidSpacing(
-    fluid,
+  const { sizing } = useSizing(tokensConfigs.sizing, userDensity, userSizing);
+  const { innerSpacing, outerSpacing } = useSpacing(
+    tokensConfigs.outerSpacing,
+    tokensConfigs.innerSpacing,
     userDensity,
     userSizing,
   );
-  const { typography } = useFluidTypography(
-    fluid,
-    fontFamily,
+  const { typography } = useTypography(
+    tokensConfigs.typography,
     userDensity,
     userSizing,
   );
+  const { iconSize } = useIconSizing(tokensConfigs.icon.sizing, userSizing);
+  const { strokeWidth } = useIconDensity(
+    tokensConfigs.icon.density,
+    userDensity,
+  );
 
-  const [theme, setTheme] = useState(tokensAccessor.getAllTokens);
+  const theme = useMemo(() => {
+    // Color mode
+    tokensAccessor.updateColorMode(colorMode);
 
-  useEffect(() => {
-    if (colorMode) {
-      tokensAccessor.updateColorMode(colorMode);
-
-      setTheme((prevState) => {
-        return {
-          ...prevState,
-          ...tokensAccessor.getColors(),
-          colorMode: tokensAccessor.getColorMode(),
-        };
-      });
-    }
-  }, [colorMode]);
-
-  useEffect(() => {
+    // Border radius
     if (borderRadius != null) {
-      tokensAccessor.updateBorderRadius({
-        1: borderRadius,
-      });
-
-      setTheme((prevState) => {
-        return {
-          ...prevState,
-          ...tokensAccessor.getBorderRadius(),
-        };
+      tokensAccessor.updateBorderRadiusElevation({
+        ...defaultTokens.borderRadiusElevation,
+        base: borderRadius,
       });
     }
-  }, [borderRadius]);
 
-  useEffect(() => {
+    // Seed color
     if (seedColor != null) {
-      let color;
-
       try {
-        color = Color.parse(seedColor);
+        Color.parse(seedColor);
+        tokensAccessor.updateSeedColor(seedColor);
       } catch (error) {
         // eslint-disable-next-line no-console
         console.error(error);
-        return; // Prevent further execution if color parsing fails
-      }
-
-      if (color != null) {
-        tokensAccessor.updateSeedColor(seedColor);
-
-        setTheme((prevState) => {
-          return {
-            ...prevState,
-            ...tokensAccessor.getColors(),
-          };
-        });
       }
     }
-  }, [seedColor]);
 
-  useEffect(() => {
-    // Check typography, as fontFamily may be undefined
+    // Typography
     if (typography != null) {
-      tokensAccessor.updateFontFamily(fontFamily);
       tokensAccessor.updateTypography(typography);
-
-      setTheme((prevState) => {
-        return {
-          ...prevState,
-          typography: tokensAccessor.getTypography(),
-          fontFamily: tokensAccessor.getFontFamily(),
-        };
-      });
     }
-  }, [typography, fontFamily]);
 
-  useEffect(() => {
-    if (sizing) {
-      tokensAccessor.updateSizing(sizing);
+    // Sizing
+    tokensAccessor.updateSizing(sizing);
 
-      setTheme((prevState) => {
-        return {
-          ...prevState,
-          ...tokensAccessor.getSizing(),
-        };
-      });
+    // Spacing
+    tokensAccessor.updateOuterSpacing(outerSpacing);
+    tokensAccessor.updateInnerSpacing(innerSpacing);
+
+    // Icon size
+    if (iconSize != null) {
+      tokensAccessor.updateIconSize(iconSize);
     }
-  }, [sizing]);
 
-  useEffect(() => {
-    if (outerSpacing) {
-      tokensAccessor.updateOuterSpacing(outerSpacing);
-
-      setTheme((prevState) => {
-        return {
-          ...prevState,
-          ...tokensAccessor.getOuterSpacing(),
-        };
-      });
+    // Stroke width
+    if (strokeWidth != null) {
+      tokensAccessor.updateStrokeWidth(strokeWidth);
     }
-  }, [outerSpacing]);
 
-  useEffect(() => {
-    if (innerSpacing) {
-      tokensAccessor.updateInnerSpacing(innerSpacing);
+    return {
+      ...tokensAccessor.getAllTokens(),
+      ...tokensAccessor.getColors(),
+      colorMode: tokensAccessor.getColorMode(),
+      ...tokensAccessor.getBorderRadiusElevation(),
+      typography: tokensAccessor.getTypography(),
+      ...tokensAccessor.getSizing(),
+      ...tokensAccessor.getOuterSpacing(),
+      ...tokensAccessor.getInnerSpacing(),
+      ...tokensAccessor.getIconSize(),
+      ...tokensAccessor.getStrokeWidth(),
+    };
+  }, [
+    colorMode,
+    borderRadius,
+    seedColor,
+    typography,
+    sizing,
+    outerSpacing,
+    innerSpacing,
+    iconSize,
+    strokeWidth,
+  ]);
 
-      setTheme((prevState) => {
-        return {
-          ...prevState,
-          ...tokensAccessor.getInnerSpacing(),
-        };
-      });
-    }
-  }, [innerSpacing]);
-
-  return { theme, setTheme };
+  return { theme };
 }

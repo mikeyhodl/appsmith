@@ -1,9 +1,9 @@
 import { createReducer } from "utils/ReducerUtils";
-import type { ReduxAction } from "@appsmith/constants/ReduxActionConstants";
-import { ReduxActionTypes } from "@appsmith/constants/ReduxActionConstants";
+import type { ReduxAction } from "actions/ReduxActionTypes";
+import { ReduxActionTypes } from "ee/constants/ReduxActionConstants";
 import type { Datasource } from "entities/Datasource";
 import _ from "lodash";
-import { ActionExecutionResizerHeight } from "pages/Editor/APIEditor/constants";
+import { ActionExecutionResizerHeight } from "PluginActionEditor/components/PluginActionResponse/constants";
 
 const initialState: DatasourcePaneReduxState = {
   drafts: {},
@@ -14,22 +14,27 @@ const initialState: DatasourcePaneReduxState = {
   collapsibleState: {},
   defaultKeyValueArrayConfig: [],
   responseTabHeight: ActionExecutionResizerHeight,
+  selectedTableName: "",
 };
 
 export interface DatasourcePaneReduxState {
   drafts: Record<string, Datasource>;
   expandDatasourceId: string;
   actionRouteInfo: Partial<{
-    apiId: string;
+    baseApiId: string;
     datasourceId: string;
-    pageId: string;
-    applicationId: string;
+    baseParentEntityId: string;
+    baseApplicationId: string;
   }>;
   newDatasource: string;
   viewMode: boolean;
   collapsibleState: Record<string, boolean>;
   defaultKeyValueArrayConfig: Array<string>;
   responseTabHeight: number;
+
+  // This is the table selected on datasource preview,
+  // this needs to be used when new query is created
+  selectedTableName: string;
 }
 
 const datasourcePaneReducer = createReducer(initialState, {
@@ -55,12 +60,7 @@ const datasourcePaneReducer = createReducer(initialState, {
   }),
   [ReduxActionTypes.STORE_AS_DATASOURCE_UPDATE]: (
     state: DatasourcePaneReduxState,
-    action: ReduxAction<{
-      apiId: string;
-      datasourceId: string;
-      pageId: string;
-      applicationId: string;
-    }>,
+    action: ReduxAction<DatasourcePaneReduxState["actionRouteInfo"]>,
   ) => {
     return {
       ...state,
@@ -157,6 +157,15 @@ const datasourcePaneReducer = createReducer(initialState, {
     return {
       ...state,
       defaultKeyValueArrayConfig: [],
+    };
+  },
+  [ReduxActionTypes.SET_DATASOURCE_PREVIEW_SELECTED_TABLE_NAME]: (
+    state: DatasourcePaneReduxState,
+    action: ReduxAction<{ selectedTableName: string }>,
+  ) => {
+    return {
+      ...state,
+      selectedTableName: action.payload.selectedTableName,
     };
   },
 });

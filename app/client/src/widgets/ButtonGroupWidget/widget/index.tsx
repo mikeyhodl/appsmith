@@ -18,11 +18,12 @@ import type {
   AutocompletionDefinitions,
 } from "WidgetProvider/constants";
 import { FILL_WIDGET_MIN_WIDTH } from "constants/minWidthConstants";
-import { klona as clone } from "klona/full";
 import { ResponsiveBehavior } from "layoutSystems/common/utils/constants";
 import { BlueprintOperationTypes } from "WidgetProvider/constants";
 import IconSVG from "../icon.svg";
+import ThumbnailSVG from "../thumbnail.svg";
 import { WIDGET_TAGS, layoutConfigurations } from "constants/WidgetConstants";
+import { klonaFullWithTelemetry } from "utils/helpers";
 
 class ButtonGroupWidget extends BaseWidget<
   ButtonGroupWidgetProps,
@@ -34,6 +35,7 @@ class ButtonGroupWidget extends BaseWidget<
     return {
       name: "Button Group", // The display name which will be made in uppercase and show in the widgets panel ( can have spaces )
       iconSVG: IconSVG,
+      thumbnailSVG: ThumbnailSVG,
       needsMeta: false, // Defines if this widget adds any meta properties
       isCanvas: false, // Defines if this widget has a canvas within in which we can drop other widgets
       searchTags: ["click", "submit"],
@@ -131,7 +133,13 @@ class ButtonGroupWidget extends BaseWidget<
           {
             type: BlueprintOperationTypes.MODIFY_PROPS,
             fn: (widget: WidgetProps & { children?: WidgetProps[] }) => {
-              const groupButtons = clone(widget.groupButtons);
+              const groupButtons = klonaFullWithTelemetry(
+                widget.groupButtons,
+                "ButtonGroupWidget.groupButtons",
+              );
+
+              // TODO: Fix this the next time the file is edited
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               const dynamicBindingPathList: any[] = get(
                 widget,
                 "dynamicBindingPathList",
@@ -182,10 +190,12 @@ class ButtonGroupWidget extends BaseWidget<
           configuration: (props: ButtonGroupWidgetProps) => {
             let minWidth = 120;
             const buttonLength = Object.keys(props.groupButtons).length;
+
             if (props.orientation === "horizontal") {
               // 120 is the width of the button, 8 is widget padding, 1 is the gap between buttons
               minWidth = 120 * buttonLength + 8 + (buttonLength - 1) * 1;
             }
+
             return {
               minWidth: `${minWidth}px`,
               minHeight: "40px",
@@ -205,10 +215,12 @@ class ButtonGroupWidget extends BaseWidget<
       widgetSize: (props: ButtonGroupWidgetProps) => {
         let minWidth = 120;
         const buttonLength = Object.keys(props.groupButtons).length;
+
         if (props.orientation === "horizontal") {
           // 120 is the width of the button, 8 is widget padding, 1 is the gap between buttons
           minWidth = 120 * buttonLength + 8 + (buttonLength - 1) * 1;
         }
+
         return {
           maxHeight: {},
           maxWidth: {},
@@ -246,6 +258,8 @@ class ButtonGroupWidget extends BaseWidget<
               titlePropertyName: "label",
               panelIdPropertyName: "id",
               updateHook: (
+                // TODO: Fix this the next time the file is edited
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 props: any,
                 propertyPath: string,
                 propertyValue: string,
@@ -298,6 +312,7 @@ class ButtonGroupWidget extends BaseWidget<
                           `${propertyPath.split(".", 2).join(".")}.buttonType`,
                           "",
                         );
+
                         return buttonType !== "MENU";
                       },
                       dependencies: ["groupButtons"],
@@ -312,6 +327,8 @@ class ButtonGroupWidget extends BaseWidget<
                         titlePropertyName: "label",
                         panelIdPropertyName: "id",
                         updateHook: (
+                          // TODO: Fix this the next time the file is edited
+                          // eslint-disable-next-line @typescript-eslint/no-explicit-any
                           props: any,
                           propertyPath: string,
                           propertyValue: string,
@@ -511,6 +528,7 @@ class ButtonGroupWidget extends BaseWidget<
                       `${propertyPath}.buttonType`,
                       "",
                     );
+
                     return buttonType === "MENU";
                   },
                   children: [

@@ -1,6 +1,7 @@
 import { ObjectsRegistry } from "../Objects/Registry";
 import { getWidgetSelector, WIDGET } from "../../locators/WidgetLocators";
 import { AppSidebar, AppSidebarButton } from "./EditorNavigation";
+import { featureFlagIntercept } from "../Objects/FeatureFlags";
 
 type FixedConversionOptions = "DESKTOP" | "MOBILE";
 
@@ -47,52 +48,63 @@ export class AutoLayout {
   private flexMainContainer = ".flex-container-0";
 
   public ConvertToAutoLayoutAndVerify(isNotNewApp = true) {
-    this.VerifyIsFixedLayout();
+    cy.window().then((win) => {
+      featureFlagIntercept({
+        release_layout_conversion_enabled: true,
+      });
 
-    this.agHelper.GetNClick(this.autoConvertButton, 0, true);
+      this.VerifyIsFixedLayout();
 
-    this.agHelper.GetNClick(this.convertDialogButton, 0, true);
+      this.agHelper.GetNClick(this.autoConvertButton, 0, true);
 
-    this.assertHelper.AssertNetworkStatus("@updateApplication");
-    if (isNotNewApp) {
-      this.assertHelper.AssertNetworkStatus("@snapshotSuccess", 201);
-    }
+      this.agHelper.GetNClick(this.convertDialogButton, 0, true);
 
-    this.agHelper.GetNClick(this.refreshAppDialogButton, 0, true);
-    this.agHelper.Sleep(2000); //for page to refresh & all elements to load- trial fix for CI failure
-    this.assertHelper.AssertNetworkStatus("@getWorkspace"); //getWorkspace for Edit page!
+      this.assertHelper.AssertNetworkStatus("@updateApplication");
+      if (isNotNewApp) {
+        this.assertHelper.AssertNetworkStatus("@snapshotSuccess", 201);
+      }
 
-    this.VerifyIsAutoLayout();
+      this.agHelper.GetNClick(this.refreshAppDialogButton, 0, true);
+      this.agHelper.Sleep(2000); //for page to refresh & all elements to load- trial fix for CI failure
+      this.assertHelper.AssertNetworkStatus("@getWorkspace"); //getWorkspace for Edit page!
+
+      this.VerifyIsAutoLayout();
+    });
   }
 
   public ConvertToFixedLayoutAndVerify(
     fixedConversionOption: FixedConversionOptions,
   ) {
-    this.VerifyIsAutoLayout();
+    cy.window().then((win) => {
+      featureFlagIntercept({
+        release_layout_conversion_enabled: true,
+      });
+      this.VerifyIsAutoLayout();
 
-    this.agHelper.GetNClick(this.autoConvertButton, 0, true);
+      this.agHelper.GetNClick(this.autoConvertButton, 0, true);
 
-    this.agHelper.GetNClick(
-      this.fixedModeConversionOptionButton(fixedConversionOption),
-      0,
-      true,
-    );
+      this.agHelper.GetNClick(
+        this.fixedModeConversionOptionButton(fixedConversionOption),
+        0,
+        true,
+      );
 
-    this.agHelper.GetNClick(this.convertDialogButton, 0, true);
+      this.agHelper.GetNClick(this.convertDialogButton, 0, true);
 
-    cy.get("body").then(($body) => {
-      if ($body.find(this.convertAnywaysDialogButton).length) {
-        this.agHelper.GetNClick(this.convertAnywaysDialogButton, 0, true);
-      }
+      cy.get("body").then(($body) => {
+        if ($body.find(this.convertAnywaysDialogButton).length) {
+          this.agHelper.GetNClick(this.convertAnywaysDialogButton, 0, true);
+        }
+      });
+
+      this.assertHelper.AssertNetworkStatus("@updateApplication");
+      this.assertHelper.AssertNetworkStatus("@snapshotSuccess", 201);
+
+      this.agHelper.GetNClick(this.refreshAppDialogButton, 0, true);
+      cy.wait(2000);
+
+      this.VerifyIsFixedLayout();
     });
-
-    this.assertHelper.AssertNetworkStatus("@updateApplication");
-    this.assertHelper.AssertNetworkStatus("@snapshotSuccess", 201);
-
-    this.agHelper.GetNClick(this.refreshAppDialogButton, 0, true);
-    cy.wait(2000);
-
-    this.VerifyIsFixedLayout();
   }
 
   public UseSnapshotFromBanner() {
@@ -193,7 +205,7 @@ export class AutoLayout {
     this.agHelper.GetWidth(this._buttonWidgetSelector);
     cy.get("@eleWidth").then(($initialWidth) => {
       this.propPane.UpdatePropertyFieldValue("Label", "Lengthy Button Label");
-      this.agHelper.Sleep(); //to allow time for widget to resize itself before checking width again!
+      this.agHelper.Sleep(2000); //to allow time for widget to resize itself before checking width again!
       this.agHelper.GetWidth(this._buttonWidgetSelector);
       cy.get("@eleWidth").then((width: any) => {
         //cy.get<number>("@initialWidth").then((initialWidth) => {
@@ -211,8 +223,8 @@ export class AutoLayout {
     // Decrease the length of button label & verify if the component shrinks
     this.agHelper.GetWidth(this._buttonWidgetSelector);
     cy.get("@eleWidth").then(($initialWidth) => {
-      this.propPane.UpdatePropertyFieldValue("Label", "Label");
-      this.agHelper.Sleep(); //to allow time for widget to resize itself before checking width again!
+      this.propPane.UpdatePropertyFieldValue("Label", "Short");
+      this.agHelper.Sleep(2000); //to allow time for widget to resize itself before checking width again!
       this.agHelper.GetWidth(this._buttonWidgetSelector);
       cy.get("@eleWidth").then((width: any) => {
         expect(width).to.be.lessThan(Number($initialWidth));

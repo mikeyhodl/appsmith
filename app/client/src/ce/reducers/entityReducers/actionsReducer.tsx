@@ -1,9 +1,9 @@
 import { createImmerReducer } from "utils/ReducerUtils";
-import type { ReduxAction } from "@appsmith/constants/ReduxActionConstants";
+import type { ReduxAction } from "actions/ReduxActionTypes";
 import {
   ReduxActionTypes,
   ReduxActionErrorTypes,
-} from "@appsmith/constants/ReduxActionConstants";
+} from "ee/constants/ReduxActionConstants";
 import type { ActionResponse } from "api/ActionAPI";
 import type { ExecuteErrorPayload } from "constants/AppsmithActionConstants/ActionConstants";
 import _ from "lodash";
@@ -12,6 +12,7 @@ import type {
   ExecutePluginActionSuccessPayload,
   UpdateActionPropertyActionPayload,
 } from "actions/pluginActionActions";
+import { klona } from "klona";
 
 export interface ActionData {
   isLoading: boolean;
@@ -28,9 +29,10 @@ export interface ActionDataWithMeta extends ActionData {
 }
 
 export type ActionDataState = ActionData[];
+
 export interface PartialActionData {
   isLoading: boolean;
-  config: { id: string };
+  config: { id: string; baseId: string };
   data?: ActionResponse;
 }
 
@@ -45,6 +47,7 @@ export const handlers = {
       const foundAction = draftMetaState.find((currentAction) => {
         return currentAction.config.id === action.id;
       });
+
       return {
         isLoading: false,
         config: action,
@@ -71,6 +74,7 @@ export const handlers = {
 
       action.payload.forEach((actionPayload: Action) => {
         const stateAction = stateActionMap[actionPayload.id];
+
         if (stateAction) {
           result.push({
             data: stateAction.data,
@@ -110,7 +114,11 @@ export const handlers = {
   ) => {
     return draftMetaState.concat([
       {
-        config: { ...action.payload, id: action.payload.name },
+        config: {
+          ...action.payload,
+          baseId: action.payload.name,
+          id: action.payload.name,
+        },
         isLoading: false,
       },
     ]);
@@ -148,6 +156,12 @@ export const handlers = {
       }
     });
   },
+  [ReduxActionTypes.APPEND_ACTION_AFTER_BUILDING_BLOCK_DROP]: (
+    draftMetaState: ActionDataState,
+    action: ReduxAction<{ data: Action }>,
+  ) => {
+    return [...draftMetaState, action.payload.data];
+  },
   [ReduxActionTypes.UPDATE_ACTION_PROPERTY]: (
     draftMetaState: ActionDataState,
     action: ReduxAction<UpdateActionPropertyActionPayload>,
@@ -183,15 +197,17 @@ export const handlers = {
     const foundAction = draftMetaState.find((stateAction) => {
       return stateAction.config.id === action.payload.id;
     });
+
     if (foundAction) {
       foundAction.isLoading = false;
       foundAction.data = action.payload.response;
     } else {
       const partialAction: PartialActionData = {
         isLoading: false,
-        config: { id: action.payload.id },
+        config: { id: action.payload.id, baseId: action.payload.baseId },
         data: action.payload.response,
       };
+
       draftMetaState.push(partialAction);
     }
   },
@@ -242,9 +258,11 @@ export const handlers = {
     action: ReduxAction<{ [id: string]: ActionResponse }>,
   ) => {
     const actionId = Object.keys(action.payload)[0];
+
     draftMetaState.forEach((a) => {
       if (a.config.id === actionId) {
         a.isLoading = false;
+
         if (a.data) _.assign(a.data, action.payload[actionId]);
         else a.data = action.payload[actionId];
       }
@@ -270,21 +288,6 @@ export const handlers = {
       }
     });
   },
-  [ReduxActionTypes.MOVE_ACTION_INIT]: (
-    draftMetaState: ActionDataState,
-    action: ReduxAction<{
-      id: string;
-      destinationPageId: string;
-      name: string;
-    }>,
-  ) => {
-    draftMetaState.forEach((a) => {
-      if (a.config.id === action.payload.id) {
-        a.config.name = action.payload.name;
-        a.config.pageId = action.payload.destinationPageId;
-      }
-    });
-  },
   [ReduxActionTypes.MOVE_ACTION_SUCCESS]: (
     draftMetaState: ActionDataState,
     action: ReduxAction<Action>,
@@ -295,73 +298,16 @@ export const handlers = {
       }
     });
   },
-  [ReduxActionErrorTypes.MOVE_ACTION_ERROR]: (
-    draftMetaState: ActionDataState,
-    action: ReduxAction<{ id: string; originalPageId: string }>,
-  ) => {
-    draftMetaState.forEach((a) => {
-      if (a.config.id === action.payload.id) {
-        a.config.pageId = action.payload.originalPageId;
-      }
-    });
-  },
-  [ReduxActionTypes.COPY_ACTION_INIT]: (
-    draftMetaState: ActionDataState,
-    action: ReduxAction<{
-      id: string;
-      destinationPageId: string;
-      name: string;
-    }>,
-  ) => {
-    return draftMetaState.concat(
-      draftMetaState
-        .filter((a) => a.config.id === action.payload.id)
-        .map((a) => ({
-          ...a,
-          data: undefined,
-          config: {
-            ...a.config,
-            id: "TEMP_COPY_ID",
-            name: action.payload.name,
-            pageId: action.payload.destinationPageId,
-          },
-        })),
-    );
-  },
   [ReduxActionTypes.COPY_ACTION_SUCCESS]: (
     draftMetaState: ActionDataState,
     action: ReduxAction<Action>,
   ) => {
-    draftMetaState.forEach((a) => {
-      if (
-        a.config.pageId === action.payload.pageId &&
-        a.config.name === action.payload.name
-      ) {
-        a.config = action.payload;
-      }
-    });
-  },
-  [ReduxActionErrorTypes.COPY_ACTION_ERROR]: (
-    draftMetaState: ActionDataState,
-    action: ReduxAction<{
-      id: string;
-      destinationPageId: string;
-      name: string;
-    }>,
-  ) => {
-    return draftMetaState.filter((a) => {
-      if (a.config.pageId === action.payload.destinationPageId) {
-        if (
-          a.config.id === action.payload.id ||
-          a.config.id === "TEMP_COPY_ID"
-        ) {
-          return a.config.name !== action.payload.name;
-        }
-        return true;
-      }
-
-      return true;
-    });
+    return draftMetaState.concat([
+      {
+        config: { ...action.payload },
+        isLoading: false,
+      },
+    ]);
   },
   [ReduxActionTypes.SET_ACTION_TO_EXECUTE_ON_PAGELOAD]: (
     draftMetaState: ActionDataState,
@@ -374,6 +320,7 @@ export const handlers = {
     >,
   ) => {
     const actionUpdateSearch = _.keyBy(action.payload, "id");
+
     draftMetaState.forEach((action) => {
       if (action.config.id in actionUpdateSearch) {
         action.config.executeOnLoad =
@@ -388,6 +335,10 @@ export const handlers = {
     draftMetaState.forEach((a) => {
       a.data = undefined;
     });
+  },
+
+  [ReduxActionTypes.RESET_EDITOR_REQUEST]: () => {
+    return klona(initialState);
   },
 };
 

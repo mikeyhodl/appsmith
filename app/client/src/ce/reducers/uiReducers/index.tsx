@@ -1,22 +1,19 @@
-import editorReducer from "@appsmith/reducers/uiReducers/editorReducer";
+import editorReducer from "ee/reducers/uiReducers/editorReducer";
 import errorReducer from "reducers/uiReducers/errorReducer";
 import propertyPaneReducer from "reducers/uiReducers/propertyPaneReducer";
 import appViewReducer from "reducers/uiReducers/appViewReducer";
-import applicationsReducer from "@appsmith/reducers/uiReducers/applicationsReducer";
-import apiPaneReducer from "@appsmith/reducers/uiReducers/apiPaneReducer";
+import applicationsReducer from "ee/reducers/uiReducers/applicationsReducer";
 import datasourcePaneReducer from "reducers/uiReducers/datasourcePaneReducer";
 import authReducer from "reducers/uiReducers/authReducer";
-import workspaceReducer from "@appsmith/reducers/uiReducers/workspaceReducer";
+import workspaceReducer from "ee/reducers/uiReducers/workspaceReducer";
 import templateReducer from "reducers/uiReducers/templateReducer";
+import buildingBlockReducer from "reducers/uiReducers/buildingBlockReducer";
 import usersReducer from "reducers/uiReducers/usersReducer";
 import { widgetDraggingReducer } from "reducers/uiReducers/dragResizeReducer";
-import importedCollectionsReducer from "reducers/uiReducers/importedCollectionsReducer";
-import providersReducer from "reducers/uiReducers/providerReducer";
 import importReducer from "reducers/uiReducers/importReducer";
-import queryPaneReducer from "@appsmith/reducers/uiReducers/queryPaneReducer";
 import helpReducer from "reducers/uiReducers/helpReducer";
-import apiNameReducer from "@appsmith/reducers/uiReducers/apiNameReducer";
-import explorerReducer from "@appsmith/reducers/uiReducers/explorerReducer";
+import apiNameReducer from "ee/reducers/uiReducers/apiNameReducer";
+import explorerReducer from "ee/reducers/uiReducers/explorerReducer";
 import modalActionReducer from "reducers/uiReducers/modalActionReducer";
 import themeReducer from "reducers/uiReducers/themeReducer";
 import datasourceNameReducer from "reducers/uiReducers/datasourceNameReducer";
@@ -26,12 +23,10 @@ import onBoardingReducer from "reducers/uiReducers/onBoardingReducer";
 import globalSearchReducer from "reducers/uiReducers/globalSearchReducer";
 import actionSelectorReducer from "reducers/uiReducers/actionSelectorReducer";
 import releasesReducer from "reducers/uiReducers/releasesReducer";
-import websocketReducer from "reducers/uiReducers/websocketReducer";
 import debuggerReducer from "reducers/uiReducers/debuggerReducer";
 import tourReducer from "reducers/uiReducers/tourReducer";
 import tableFilterPaneReducer from "reducers/uiReducers/tableFilterPaneReducer";
 import jsPaneReducer from "reducers/uiReducers/jsPaneReducer";
-import appCollabReducer from "reducers/uiReducers/appCollabReducer";
 import canvasSelectionReducer from "reducers/uiReducers/canvasSelectionReducer";
 import gitSyncReducer from "reducers/uiReducers/gitSyncReducer";
 import crudInfoModalReducer from "reducers/uiReducers/crudInfoModalReducer";
@@ -40,8 +35,7 @@ import jsObjectNameReducer from "reducers/uiReducers/jsObjectNameReducer";
 import appThemingReducer from "reducers/uiReducers/appThemingReducer";
 import mainCanvasReducer from "reducers/uiReducers/mainCanvasReducer";
 import focusHistoryReducer from "reducers/uiReducers/focusHistoryReducer";
-import { editorContextReducer } from "@appsmith/reducers/uiReducers/editorContextReducer";
-import guidedTourReducer from "reducers/uiReducers/guidedTourReducer";
+import { editorContextReducer } from "ee/reducers/uiReducers/editorContextReducer";
 import libraryReducer from "reducers/uiReducers/libraryReducer";
 import appSettingsPaneReducer from "reducers/uiReducers/appSettingsPaneReducer";
 import autoHeightUIReducer from "reducers/uiReducers/autoHeightReducer";
@@ -49,6 +43,10 @@ import analyticsReducer from "reducers/uiReducers/analyticsReducer";
 import layoutConversionReducer from "reducers/uiReducers/layoutConversionReducer";
 import oneClickBindingReducer from "reducers/uiReducers/oneClickBindingReducer";
 import activeFieldReducer from "reducers/uiReducers/activeFieldEditorReducer";
+import selectedWorkspaceReducer from "ee/reducers/uiReducers/selectedWorkspaceReducer";
+import ideReducer from "reducers/uiReducers/ideReducer";
+import consolidatedPageLoadReducer from "reducers/uiReducers/consolidatedPageLoadReducer";
+import { pluginActionReducer } from "PluginActionEditor/store";
 
 export const uiReducerObject = {
   analytics: analyticsReducer,
@@ -58,16 +56,14 @@ export const uiReducerObject = {
   tableFilterPane: tableFilterPaneReducer,
   appView: appViewReducer,
   applications: applicationsReducer,
-  apiPane: apiPaneReducer,
   auth: authReducer,
   templates: templateReducer,
+  buildingBlocks: buildingBlockReducer,
   workspaces: workspaceReducer,
+  selectedWorkspace: selectedWorkspaceReducer,
   users: usersReducer,
   widgetDragResize: widgetDraggingReducer,
-  importedCollections: importedCollectionsReducer,
-  providers: providersReducer,
   imports: importReducer,
-  queryPane: queryPaneReducer,
   datasourcePane: datasourcePaneReducer,
   datasourceName: datasourceNameReducer,
   help: helpReducer,
@@ -78,17 +74,14 @@ export const uiReducerObject = {
   theme: themeReducer,
   modalAction: modalActionReducer,
   onBoarding: onBoardingReducer,
-  guidedTour: guidedTourReducer,
   globalSearch: globalSearchReducer,
   releases: releasesReducer,
-  websocket: websocketReducer,
   debugger: debuggerReducer,
   tour: tourReducer,
   jsPane: jsPaneReducer,
   jsObjectName: jsObjectNameReducer,
   canvasSelection: canvasSelectionReducer,
   gitSync: gitSyncReducer,
-  appCollab: appCollabReducer,
   crudInfoModal: crudInfoModalReducer,
   widgetReflow: widgetReflowReducer,
   appTheming: appThemingReducer,
@@ -102,4 +95,7 @@ export const uiReducerObject = {
   actionSelector: actionSelectorReducer,
   oneClickBinding: oneClickBindingReducer,
   activeField: activeFieldReducer,
+  ide: ideReducer,
+  consolidatedPageLoad: consolidatedPageLoadReducer,
+  pluginActionEditor: pluginActionReducer,
 };

@@ -15,6 +15,7 @@ import { mockAnvilHighlightInfo } from "mocks/mockHighlightInfo";
 import { mockButtonProps } from "mocks/widgetProps/button";
 import { FlexLayerAlignment } from "layoutSystems/common/utils/constants";
 import { getAnvilLayoutDOMId } from "layoutSystems/common/utils/LayoutElementPositionsObserver/utils";
+import ButtonWidget from "widgets/ButtonWidget/widget";
 
 describe("layoutUtils tests", () => {
   describe("getLayoutId", () => {
@@ -22,17 +23,19 @@ describe("layoutUtils tests", () => {
       const canvasId = "canvasId";
       const layoutId = "layoutId";
       const expectedLayoutId = `layout_${canvasId}_${layoutId}`;
+
       expect(getAnvilLayoutDOMId(canvasId, layoutId)).toBe(expectedLayoutId);
     });
   });
   describe("addChildToLayout", () => {
     it("should add child to layout at provided index", () => {
-      const layout: LayoutComponentProps = generateLayoutComponentMock();
+      const layout: LayoutComponentProps = generateLayoutComponentMock().layout;
       const buttonWidget: BaseWidgetProps = mockButtonProps();
       const children: WidgetLayoutProps[] = [
         {
           widgetId: buttonWidget.widgetId,
           alignment: FlexLayerAlignment.Start,
+          widgetType: ButtonWidget.type,
         },
       ];
       // Add child at rowIndex 1. layout already contains two widgets.
@@ -44,6 +47,7 @@ describe("layoutUtils tests", () => {
         children,
         highlight,
       );
+
       expect(
         extractWidgetIdsFromLayoutProps(updatedLayout).includes(
           buttonWidget.widgetId,
@@ -71,7 +75,7 @@ describe("layoutUtils tests", () => {
   });
   describe("removeChildFromLayout", () => {
     it("should remove child from layout at provided index", () => {
-      const layout: LayoutComponentProps = generateLayoutComponentMock();
+      const layout: LayoutComponentProps = generateLayoutComponentMock().layout;
       const originalLength: number = layout.layout.length;
       const lastWidget: WidgetLayoutProps = layout.layout[
         layout.layout.length - 1
@@ -82,7 +86,9 @@ describe("layoutUtils tests", () => {
         layout,
         lastWidget,
       );
+
       if (!updatedLayout) return;
+
       expect(
         extractWidgetIdsFromLayoutProps(updatedLayout).includes(
           lastWidget.widgetId,
@@ -91,7 +97,8 @@ describe("layoutUtils tests", () => {
       expect(updatedLayout?.layout.length).toEqual(originalLength - 1);
     });
     it("should return undefined if layout is temporary and empty after deletion", () => {
-      const layoutProps: LayoutComponentProps = generateLayoutComponentMock();
+      const layoutProps: LayoutComponentProps =
+        generateLayoutComponentMock().layout;
       const lastWidget: WidgetLayoutProps = layoutProps.layout[
         layoutProps.layout.length - 1
       ] as WidgetLayoutProps;
@@ -101,6 +108,7 @@ describe("layoutUtils tests", () => {
         { ...layoutProps, layout: [lastWidget] },
         lastWidget,
       );
+
       expect(updatedLayout).toBeUndefined();
     });
   });

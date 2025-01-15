@@ -14,6 +14,7 @@ import type {
   WidgetLayoutProps,
 } from "../../anvilTypes";
 import { extractWidgetIdsFromLayoutProps } from "../layoutUtils";
+import ButtonWidget from "widgets/ButtonWidget/widget";
 
 describe("Layouts - additionUtils tests", () => {
   describe("getAffectedLayout", () => {
@@ -21,8 +22,9 @@ describe("Layouts - additionUtils tests", () => {
       const layout: LayoutComponentProps = generateLayoutComponentMock(
         {},
         false,
-      );
+      ).layout;
       const childLayoutOne: LayoutProps = layout.layout[0] as LayoutProps;
+
       expect(
         getAffectedLayout([layout], [layout.layoutId, childLayoutOne.layoutId]),
       ).toEqual(childLayoutOne);
@@ -31,7 +33,8 @@ describe("Layouts - additionUtils tests", () => {
       const layout: LayoutComponentProps = generateLayoutComponentMock(
         {},
         false,
-      );
+      ).layout;
+
       expect(getAffectedLayout([layout], [])).toBeUndefined();
     });
   });
@@ -40,7 +43,7 @@ describe("Layouts - additionUtils tests", () => {
       const layout: LayoutComponentProps = generateLayoutComponentMock(
         {},
         false,
-      );
+      ).layout;
       const childLayoutOne: LayoutProps = layout.layout[0] as LayoutProps;
       const updatedLayout: LayoutProps = {
         ...childLayoutOne,
@@ -63,12 +66,12 @@ describe("Layouts - additionUtils tests", () => {
       const layoutOne: LayoutComponentProps = generateLayoutComponentMock(
         {},
         false,
-      );
+      ).layout;
       // Create another nest layout
       const layoutTwo: LayoutComponentProps = generateLayoutComponentMock(
         {},
         false,
-      );
+      ).layout;
       const childLayoutOne: LayoutProps = layoutTwo.layout[0] as LayoutProps;
       // Update first child layout of layoutTwo to have empty layout property
       const updatedChildLayoutOne: LayoutProps = {
@@ -94,6 +97,7 @@ describe("Layouts - additionUtils tests", () => {
         updatedChildLayoutOne,
         [layoutOne.layoutId, layoutTwo.layoutId, childLayoutOne.layoutId],
       );
+
       expect(
         ((res[0].layout[2] as LayoutProps).layout[0] as LayoutProps).layout
           .length,
@@ -104,20 +108,30 @@ describe("Layouts - additionUtils tests", () => {
     it("should generate a layoutId for the template", () => {
       const template: LayoutComponentProps = generateLayoutComponentMock({
         layoutId: "",
-      });
+      }).layout;
+
       expect(template.layoutId.length).toEqual(0);
       const highlight: AnvilHighlightInfo = mockAnvilHighlightInfo();
       const res: LayoutProps = addWidgetsToTemplate(template, highlight, []);
+
       expect(res.layoutId.length).toBeGreaterThan(0);
     });
     it("should add widgets to the layout json", () => {
-      const template: LayoutComponentProps = generateLayoutComponentMock();
+      const template: LayoutComponentProps =
+        generateLayoutComponentMock().layout;
       const highlight: AnvilHighlightInfo = mockAnvilHighlightInfo();
       const res: LayoutProps = addWidgetsToTemplate(
         { ...template, layout: [] }, // Empty the layout prop of the mock template.
         highlight,
-        [{ widgetId: "1", alignment: FlexLayerAlignment.Start }],
+        [
+          {
+            widgetId: "1",
+            alignment: FlexLayerAlignment.Start,
+            widgetType: ButtonWidget.type,
+          },
+        ],
       );
+
       expect(res.layout.length).toEqual(1);
       expect((res.layout[0] as WidgetLayoutProps).widgetId).toEqual("1");
     });
@@ -130,7 +144,7 @@ describe("Layouts - additionUtils tests", () => {
       const template: LayoutComponentProps = generateLayoutComponentMock(
         {},
         false,
-      );
+      ).layout;
       // Remove insertChild from first child layout.
       const updatedTemplate: LayoutProps = {
         ...template,
@@ -152,8 +166,15 @@ describe("Layouts - additionUtils tests", () => {
       const res: LayoutProps = addWidgetsToTemplate(
         updatedTemplate, // Empty the layout prop of the mock template.
         highlight,
-        [{ widgetId: "1", alignment: FlexLayerAlignment.End }],
+        [
+          {
+            widgetId: "1",
+            alignment: FlexLayerAlignment.End,
+            widgetType: ButtonWidget.type,
+          },
+        ],
       );
+
       /**
        * Row
        *  Row
@@ -172,36 +193,58 @@ describe("Layouts - additionUtils tests", () => {
   });
   describe("prepareWidgetsForAddition", () => {
     it("should return empty array if widgets are not provided", () => {
-      const layout: LayoutComponentProps = generateLayoutComponentMock();
+      const layout: LayoutComponentProps = generateLayoutComponentMock().layout;
       const res: WidgetLayoutProps[] | LayoutProps[] =
         prepareWidgetsForAddition(
+          // TODO: Fix this the next time the file is edited
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           {} as any,
           layout,
           mockAnvilHighlightInfo(),
           [],
         );
+
       expect(res.length).toEqual(0);
     });
     it("should return the list of widgets if Component doesn't have a childTemplate", () => {
-      const layout: LayoutComponentProps = generateLayoutComponentMock();
+      const layout: LayoutComponentProps = generateLayoutComponentMock().layout;
       const res: WidgetLayoutProps[] | LayoutProps[] =
         prepareWidgetsForAddition(
+          // TODO: Fix this the next time the file is edited
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           { getChildTemplate: () => null } as any,
           layout,
           mockAnvilHighlightInfo(),
-          [{ widgetId: "1", alignment: FlexLayerAlignment.Start }],
+          [
+            {
+              widgetId: "1",
+              alignment: FlexLayerAlignment.Start,
+              widgetType: ButtonWidget.type,
+            },
+          ],
         );
+
       expect(res.length).toEqual(1);
     });
     it("should return updated childTemplate if present", () => {
-      const layoutProps: LayoutComponentProps = generateLayoutComponentMock();
+      const layoutProps: LayoutComponentProps =
+        generateLayoutComponentMock().layout;
       const res: WidgetLayoutProps[] | LayoutProps[] =
         prepareWidgetsForAddition(
+          // TODO: Fix this the next time the file is edited
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           { getChildTemplate: () => ({ ...layoutProps, layout: [] }) } as any,
           layoutProps,
           mockAnvilHighlightInfo(),
-          [{ widgetId: "1", alignment: FlexLayerAlignment.Start }],
+          [
+            {
+              widgetId: "1",
+              alignment: FlexLayerAlignment.Start,
+              widgetType: ButtonWidget.type,
+            },
+          ],
         );
+
       expect((res[0] as LayoutProps).layoutId.length).toBeGreaterThan(0);
       expect(
         extractWidgetIdsFromLayoutProps(res[0] as LayoutProps).includes("1"),

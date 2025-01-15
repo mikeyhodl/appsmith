@@ -8,8 +8,10 @@ import {
   deployMode,
   entityExplorer,
 } from "../../../../support/Objects/ObjectsCore";
+import PageList from "../../../../support/Pages/PageList";
+import { EntityItems } from "../../../../support/Pages/AssertHelper";
 
-describe("Page Load tests", { tags: ["@tag.IDE"] }, () => {
+describe("Page Load tests", { tags: ["@tag.IDE", "@tag.PropertyPane"] }, () => {
   afterEach(() => {
     agHelper.SaveLocalStorageCache();
   });
@@ -20,8 +22,10 @@ describe("Page Load tests", { tags: ["@tag.IDE"] }, () => {
 
   before(() => {
     agHelper.AddDsl("PageLoadDsl");
-    cy.CreatePage();
-    cy.get("h2").contains("Drag and drop a widget here");
+    PageList.AddNewPage();
+    cy.get("h2").contains(
+      Cypress.env("MESSAGES").EMPTY_CANVAS_HINTS.DRAG_DROP_WIDGET_HINT(),
+    );
   });
 
   it("1. Published page loads correctly", () => {
@@ -47,7 +51,7 @@ describe("Page Load tests", { tags: ["@tag.IDE"] }, () => {
       "This is Page 2",
     );
     // Test after reload
-    agHelper.RefreshPage("viewPage");
+    agHelper.RefreshPage("getConsolidatedData");
     // Assert active page tab
     cy.get(".t--page-switch-tab")
       .contains("Page2")
@@ -85,6 +89,7 @@ describe("Page Load tests", { tags: ["@tag.IDE"] }, () => {
     entityExplorer.ActionContextMenuByEntityName({
       entityNameinLeftSidebar: "Page1",
       action: "Hide",
+      entityType: EntityItems.Page,
     });
     deployMode.DeployApp();
     // Assert active page DSL

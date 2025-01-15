@@ -1,27 +1,16 @@
 import React, { forwardRef } from "react";
-import type { ButtonRef as HeadlessButtonRef } from "@design-system/headless";
+import type { ForwardedRef } from "react";
 
 import { Button } from "../../Button";
 import type { ButtonProps } from "../../Button";
 
-export type IconButtonProps = Omit<ButtonProps, "iconPosition" | "children"> & {
-  /** Size of the button
-   * @default medium
-   */
-  size?: "small" | "medium" | "large";
-};
+export type IconButtonProps = Omit<ButtonProps, "iconPosition" | "children">;
 
-const _IconButton = (props: IconButtonProps, ref: HeadlessButtonRef) => {
-  const { size = "medium", ...rest } = props;
-
-  return (
-    <Button
-      data-icon-button=""
-      data-size={size ? size : undefined}
-      ref={ref}
-      {...rest}
-    />
-  );
+const _IconButton = (
+  props: IconButtonProps,
+  ref: ForwardedRef<HTMLButtonElement>,
+) => {
+  return <Button data-icon-button="" ref={ref} {...props} />;
 };
 
 export const IconButton = forwardRef(_IconButton);

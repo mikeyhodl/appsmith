@@ -1,6 +1,6 @@
 import { createImmerReducer } from "utils/ReducerUtils";
-import { ReduxActionTypes } from "@appsmith/constants/ReduxActionConstants";
-import type { ReduxAction } from "@appsmith/constants/ReduxActionConstants";
+import { ReduxActionTypes } from "ee/constants/ReduxActionConstants";
+import type { ReduxAction } from "actions/ReduxActionTypes";
 
 export enum AlertType {
   SUCCESS = "SUCCESS",
@@ -21,8 +21,8 @@ export enum CONVERSION_STATES {
   RESTORING_SNAPSHOT_SPINNER = "RESTORING_SNAPSHOT_SPINNER",
 }
 
-export interface SnapShotDetails {
-  lastUpdatedTime: string;
+export interface SnapshotDetails {
+  updatedTime: string;
 }
 
 const initialState: layoutConversionReduxState = {
@@ -38,6 +38,7 @@ const layoutConversionReducer = createImmerReducer(initialState, {
     action: ReduxAction<{ conversionState: CONVERSION_STATES; error: Error }>,
   ) => {
     state.conversionState = action.payload.conversionState;
+
     if (action.payload.error) {
       state.conversionError = action.payload.error;
     }
@@ -58,14 +59,14 @@ const layoutConversionReducer = createImmerReducer(initialState, {
   },
   [ReduxActionTypes.UPDATE_SNAPSHOT_DETAILS]: (
     state: layoutConversionReduxState,
-    action: ReduxAction<SnapShotDetails | undefined>,
+    action: ReduxAction<SnapshotDetails | undefined>,
   ) => {
     state.snapshotDetails = action.payload;
   },
 });
 
 export interface layoutConversionReduxState {
-  snapshotDetails: SnapShotDetails | undefined;
+  snapshotDetails: SnapshotDetails | undefined;
   conversionError: Error | undefined;
   conversionState: CONVERSION_STATES;
   isConverting: boolean;

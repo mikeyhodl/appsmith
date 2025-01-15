@@ -1,70 +1,51 @@
-import type {
-  ApplicationPayload,
-  ReduxAction,
-} from "@appsmith/constants/ReduxActionConstants";
+import { builderURL } from "ee/RouteBuilder";
+import {
+  fetchApplication,
+  showReconnectDatasourceModal,
+} from "ee/actions/applicationActions";
+import type { ApplicationPayload } from "entities/Application";
+import type { ReduxAction } from "actions/ReduxActionTypes";
 import {
   ReduxActionErrorTypes,
   ReduxActionTypes,
-} from "@appsmith/constants/ReduxActionConstants";
+} from "ee/constants/ReduxActionConstants";
+import urlBuilder from "ee/entities/URLRedirect/URLAssembly";
+import { findDefaultPage } from "ee/sagas/ApplicationSagas";
+import { fetchPageDSLSaga } from "ee/sagas/PageSagas";
+import { getCurrentWorkspaceId } from "ee/selectors/selectedWorkspaceSelectors";
+import { isAirgapped } from "ee/utils/airgapHelpers";
+import { fetchJSLibraries } from "actions/JSLibraryActions";
+import { fetchDatasources } from "actions/datasourceActions";
+import { fetchJSCollections } from "actions/jsActionActions";
+import { fetchAllPageEntityCompletion, saveLayout } from "actions/pageActions";
 import {
-  all,
-  put,
-  takeEvery,
-  call,
-  select,
-  take,
-  fork,
-  race,
-  delay,
-} from "redux-saga/effects";
+  executePageLoadActions,
+  fetchActions,
+} from "actions/pluginActionActions";
+import { fetchPluginFormConfigs } from "actions/pluginActions";
+import {
+  getAllTemplates,
+  hideTemplatesModal,
+  setTemplateNotificationSeenAction,
+} from "actions/templateActions";
 import type {
-  ImportTemplateResponse,
   FetchTemplateResponse,
+  ImportTemplateResponse,
   TemplateFiltersResponse,
 } from "api/TemplatesApi";
 import TemplatesAPI from "api/TemplatesApi";
+import { toast } from "@appsmith/ads";
+import { APP_MODE } from "entities/App";
+import { all, call, put, select, take, takeEvery } from "redux-saga/effects";
+import { getCurrentApplicationId } from "selectors/editorSelectors";
 import history from "utils/history";
-import { getDefaultPageId } from "@appsmith/sagas/ApplicationSagas";
-import { getDefaultPageId as selectDefaultPageId } from "sagas/selectors";
-import {
-  getAllTemplates,
-  setTemplateNotificationSeenAction,
-  showStarterBuildingBlockDatasourcePrompt,
-  showTemplatesModal,
-} from "actions/templateActions";
 import {
   getTemplateNotificationSeen,
   setTemplateNotificationSeen,
 } from "utils/storage";
 import { validateResponse } from "./ErrorSagas";
-import { builderURL } from "@appsmith/RouteBuilder";
-import {
-  getCurrentApplicationId,
-  getCurrentPageId,
-  getCurrentPageName,
-} from "selectors/editorSelectors";
-import { getCurrentWorkspaceId } from "@appsmith/selectors/workspaceSelectors";
-import {
-  fetchApplication,
-  showReconnectDatasourceModal,
-} from "@appsmith/actions/applicationActions";
-import { APP_MODE } from "entities/App";
-import {
-  executePageLoadActions,
-  fetchActions,
-} from "actions/pluginActionActions";
-import { fetchJSCollections } from "actions/jsActionActions";
 import { failFastApiCalls } from "./InitSagas";
-import { fetchDatasources } from "actions/datasourceActions";
-import { fetchPluginFormConfigs } from "actions/pluginActions";
-import { fetchAllPageEntityCompletion, saveLayout } from "actions/pageActions";
-import { getAllPageIds } from "./selectors";
-import { fetchPageDSLSaga } from "@appsmith/sagas/PageSagas";
-import { toast } from "design-system";
-import { isAirgapped } from "@appsmith/utils/airgapHelpers";
-import { STARTER_BUILDING_BLOCKS } from "constants/TemplatesConstants";
-import urlBuilder from "@appsmith/entities/URLRedirect/URLAssembly";
-import { fetchJSLibraries } from "actions/JSLibraryActions";
+import { getAllPageIdentities } from "./selectors";
 
 const isAirgappedInstance = isAirgapped();
 
@@ -74,6 +55,7 @@ function* getAllTemplatesSaga() {
       TemplatesAPI.getAllTemplates,
     );
     const isValid: boolean = yield validateResponse(response);
+
     if (isValid) {
       yield put({
         type: ReduxActionTypes.GET_ALL_TEMPLATES_SUCCESS,
@@ -100,13 +82,15 @@ function* importTemplateToWorkspaceSaga(
       action.payload.workspaceId,
     );
     const isValid: boolean = yield validateResponse(response);
+
     if (isValid) {
+      const defaultPage = findDefaultPage(response.data.application.pages);
       const application: ApplicationPayload = {
         ...response.data.application,
-        defaultPageId: getDefaultPageId(
-          response.data.application.pages,
-        ) as string,
+        defaultPageId: defaultPage?.id,
+        defaultBasePageId: defaultPage?.baseId,
       };
+
       yield put({
         type: ReduxActionTypes.IMPORT_TEMPLATE_TO_WORKSPACE_SUCCESS,
         payload: response.data.application,
@@ -123,10 +107,12 @@ function* importTemplateToWorkspaceSaga(
         );
       } else {
         const pageURL = builderURL({
-          pageId: application.defaultPageId,
+          basePageId: application.defaultBasePageId,
         });
+
         history.push(pageURL);
       }
+
       yield put(getAllTemplates());
     }
   } catch (error) {
@@ -146,6 +132,7 @@ function* getSimilarTemplatesSaga(action: ReduxAction<string>) {
       action.payload,
     );
     const isValid: boolean = yield validateResponse(response);
+
     if (isValid) {
       yield put({
         type: ReduxActionTypes.GET_SIMILAR_TEMPLATES_SUCCESS,
@@ -183,6 +170,7 @@ function* getTemplateSaga(action: ReduxAction<string>) {
       action.payload,
     );
     const isValid: boolean = yield validateResponse(response);
+
     if (isValid) {
       yield put({
         type: ReduxActionTypes.GET_TEMPLATE_SUCCESS,
@@ -238,99 +226,6 @@ export function* postPageAdditionSaga(applicationId: string) {
   yield put(fetchAllPageEntityCompletion([executePageLoadActions()]));
 }
 
-function* forkStarterBuildingBlockToApplicationSaga(
-  action: ReduxAction<{
-    pageNames?: string[];
-    templateId: string;
-    templateName: string;
-  }>,
-) {
-  try {
-    // Get page name and id where the starter template was clicked
-    const activePageName: string = yield select(getCurrentPageName);
-    const activePageId: string = yield select(getCurrentPageId);
-    // Get current default page id
-    const defaultPageId: string = yield select(selectDefaultPageId);
-
-    const {
-      applicationId,
-      isValid,
-      templatePageIds,
-    }: {
-      applicationId: string;
-      isValid: boolean;
-      prevPageIds: string[];
-      templatePageIds: string[];
-    } = yield call(apiCallForForkTemplateToApplicaion, action);
-
-    function* deleteExistingEmptyPageInApp(pageId: string) {
-      yield put({
-        type: ReduxActionTypes.DELETE_PAGE_INIT,
-        payload: {
-          id: pageId,
-        },
-      });
-    }
-
-    function* renameStarterTemplatePageToDefault(pageId: string) {
-      yield put({
-        type: ReduxActionTypes.UPDATE_PAGE_INIT,
-        payload: {
-          id: pageId,
-          name: activePageName,
-          isHidden: false,
-        },
-      });
-    }
-    if (isValid) {
-      // If the page where the starter template was clicked is the default page
-      if (activePageId === defaultPageId) {
-        // 1. Set the template page as home page
-        yield put({
-          type: ReduxActionTypes.SET_DEFAULT_APPLICATION_PAGE_INIT,
-          payload: {
-            id: templatePageIds[0],
-            applicationId,
-          },
-        });
-        yield race([
-          take(ReduxActionTypes.SET_DEFAULT_APPLICATION_PAGE_SUCCESS),
-          take(ReduxActionErrorTypes.SET_DEFAULT_APPLICATION_PAGE_ERROR),
-        ]);
-      }
-
-      // 2. Delete the existing page
-      yield fork(deleteExistingEmptyPageInApp, activePageId);
-
-      // 3. Rename the template page to clicked from page
-      yield fork(renameStarterTemplatePageToDefault, templatePageIds[0]);
-
-      // 4. Wait for page update and delete to complete
-      yield race([
-        take(ReduxActionTypes.UPDATE_PAGE_SUCCESS),
-        take(ReduxActionErrorTypes.UPDATE_PAGE_ERROR),
-      ]);
-
-      // 5. Complete the page addition flow
-      yield put({
-        type: ReduxActionTypes.IMPORT_STARTER_TEMPLATE_TO_APPLICATION_SUCCESS,
-      });
-
-      // Show datasource prompt after 3 seconds
-      yield delay(STARTER_BUILDING_BLOCKS.DATASOURCE_PROMPT_DELAY);
-      yield put(showStarterBuildingBlockDatasourcePrompt(templatePageIds[0]));
-    } else {
-      yield put({
-        type: ReduxActionErrorTypes.IMPORT_STARTER_BUILDING_BLOCK_TO_APPLICATION_ERROR,
-      });
-    }
-  } catch (error) {
-    yield put({
-      type: ReduxActionErrorTypes.IMPORT_STARTER_BUILDING_BLOCK_TO_APPLICATION_ERROR,
-    });
-  }
-}
-
 function* forkTemplateToApplicationSaga(
   action: ReduxAction<{
     pageNames?: string[];
@@ -344,8 +239,9 @@ function* forkTemplateToApplicationSaga(
     }: {
       isValid: boolean;
     } = yield call(apiCallForForkTemplateToApplicaion, action);
+
     if (isValid) {
-      yield put(showTemplatesModal(false));
+      yield put(hideTemplatesModal());
       yield put(getAllTemplates());
 
       toast.show(
@@ -377,7 +273,9 @@ function* apiCallForForkTemplateToApplicaion(
     : undefined;
   const applicationId: string = yield select(getCurrentApplicationId);
   const workspaceId: string = yield select(getCurrentWorkspaceId);
-  const prevPageIds: string[] = yield select(getAllPageIds);
+  const prevPages: { pageId: string; basePageId: string }[] =
+    yield select(getAllPageIdentities);
+  const prevPageIds = prevPages.map((page) => page.pageId);
   const response: ImportTemplateResponse = yield call(
     TemplatesAPI.importTemplateToApplication,
     action.payload.templateId,
@@ -385,6 +283,7 @@ function* apiCallForForkTemplateToApplicaion(
     workspaceId,
     pagesToImport,
   );
+
   // To fetch the new set of pages after merging the template into the existing application
   yield put(
     fetchApplication({
@@ -393,12 +292,15 @@ function* apiCallForForkTemplateToApplicaion(
     }),
   );
   const isValid: boolean = yield validateResponse(response);
+
   if (isValid) {
     yield call(postPageAdditionSaga, applicationId);
-    const pages: string[] = yield select(getAllPageIds);
-    const templatePageIds: string[] = pages.filter(
-      (pageId) => !prevPageIds.includes(pageId),
-    );
+    const pages: { pageId: string; basePageId: string }[] =
+      yield select(getAllPageIdentities);
+    const templatePageIds: string[] = pages
+      .filter((page) => !prevPageIds.includes(page.pageId))
+      .map((page) => page.pageId);
+
     const pageDSLs: unknown = yield all(
       templatePageIds.map((pageId: string) => {
         return call(fetchPageDSLSaga, pageId);
@@ -414,19 +316,21 @@ function* apiCallForForkTemplateToApplicaion(
       type: ReduxActionTypes.UPDATE_PAGE_LIST,
       payload: pageDSLs,
     });
+
     if (response.data.isPartialImport) {
       yield put(
         showReconnectDatasourceModal({
           application: response.data.application,
           unConfiguredDatasourceList: response.data.unConfiguredDatasourceList,
           workspaceId,
-          pageId: pages[0],
+          pageId: pages[0].pageId,
         }),
       );
     }
+
     history.push(
       builderURL({
-        pageId: pages[0],
+        basePageId: pages[0].basePageId,
       }),
     );
     yield take(ReduxActionTypes.UPDATE_CANVAS_STRUCTURE);
@@ -435,8 +339,10 @@ function* apiCallForForkTemplateToApplicaion(
       type: ReduxActionTypes.IMPORT_TEMPLATE_TO_APPLICATION_SUCCESS,
       payload: response.data.application,
     });
+
     return { isValid, applicationId, templatePageIds, prevPageIds };
   }
+
   return { isValid };
 }
 
@@ -446,6 +352,7 @@ function* getTemplateFiltersSaga() {
       TemplatesAPI.getTemplateFilters,
     );
     const isValid: boolean = yield validateResponse(response);
+
     if (isValid) {
       yield put({
         type: ReduxActionTypes.GET_TEMPLATE_FILTERS_SUCCESS,
@@ -481,23 +388,25 @@ function* forkTemplateToApplicationViaOnboardingFlowSaga(
     );
 
     const isValid: boolean = yield validateResponse(response);
+
     if (isValid) {
       const application = response.data.application;
+
       urlBuilder.updateURLParams(
         {
           applicationSlug: application.slug,
           applicationVersion: application.applicationVersion,
-          applicationId: application.id,
+          baseApplicationId: application.baseId,
         },
         application.pages.map((page) => ({
           pageSlug: page.slug,
           customSlug: page.customSlug,
-          pageId: page.id,
+          basePageId: page.baseId,
         })),
       );
       history.push(
         builderURL({
-          pageId: application.pages[0].id,
+          basePageId: application.pages[0].id,
         }),
       );
 
@@ -506,6 +415,7 @@ function* forkTemplateToApplicationViaOnboardingFlowSaga(
       const importedTemplatePages = application.pages.filter(
         (page) => !page.isDefault,
       );
+
       yield put({
         type: ReduxActionTypes.SET_DEFAULT_APPLICATION_PAGE_INIT,
         payload: {
@@ -578,10 +488,6 @@ export default function* watchActionSagas() {
       takeEvery(
         ReduxActionTypes.GET_TEMPLATE_FILTERS_INIT,
         getTemplateFiltersSaga,
-      ),
-      takeEvery(
-        ReduxActionTypes.IMPORT_STARTER_BUILDING_BLOCK_TO_APPLICATION_INIT,
-        forkStarterBuildingBlockToApplicationSaga,
       ),
       takeEvery(
         ReduxActionTypes.IMPORT_TEMPLATE_TO_APPLICATION_ONBOARDING_FLOW,

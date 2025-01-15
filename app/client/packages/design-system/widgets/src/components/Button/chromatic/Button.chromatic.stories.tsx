@@ -1,14 +1,10 @@
 import React from "react";
-import { importRemixIcon } from "design-system-old";
 import type { Meta, StoryObj } from "@storybook/react";
 import { StoryGrid, DataAttrWrapper } from "@design-system/storybook";
-import { Button, BUTTON_VARIANTS, COLORS } from "@design-system/widgets";
+import { Button, BUTTON_VARIANTS, COLORS } from "@appsmith/wds";
+import { objectKeys } from "@appsmith/utils";
 
-const icon = importRemixIcon(
-  async () => import("remixicon-react/StarFillIcon"),
-);
-
-const variants = Object.values(BUTTON_VARIANTS);
+const variants = objectKeys(BUTTON_VARIANTS);
 const colors = Object.values(COLORS);
 
 const meta: Meta<typeof Button> = {
@@ -23,8 +19,8 @@ type Story = StoryObj<typeof Button>;
 const states = [
   "",
   "data-hovered",
-  "data-active",
-  "data-focused",
+  "data-pressed",
+  "data-focus-visible",
   "aria-disabled",
 ];
 
@@ -43,8 +39,8 @@ export const LightMode: Story = {
           )),
         ),
       )}
-      <Button icon={icon}>Button with Start Icon</Button>
-      <Button icon={icon} iconPosition="end">
+      <Button icon="star">Button with Start Icon</Button>
+      <Button icon="star" iconPosition="end">
         Button with End Icon
       </Button>
       <Button isLoading>Loading...</Button>

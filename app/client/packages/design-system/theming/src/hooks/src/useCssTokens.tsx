@@ -1,24 +1,24 @@
 import { css } from "@emotion/css";
-import { useEffect, useState } from "react";
-import { cssRule, getTypographyClassName } from "../../utils";
+import { useMemo } from "react";
+import { objectKeys } from "@appsmith/utils";
 
 import type { Theme } from "../../theme";
-import type { FontFamily, ThemeToken, Typography } from "../../token";
+import type { ThemeToken, Typography } from "../../token";
+import { cssRule, getTypographyClassName } from "../../utils";
 
-const fontFamilyCss = (fontFamily?: FontFamily) => {
+const fontFamilyCss = () => {
   const fontFamilyCss =
-    fontFamily && fontFamily !== "System Default"
-      ? `${fontFamily}, sans-serif`
-      : "-apple-system, 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Ubuntu', sans-serif";
+    "-apple-system, 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Ubuntu', sans-serif";
 
   return `font-family: ${fontFamilyCss}; --font-family: ${fontFamilyCss}`;
 };
 
 const getTypographyCss = (typography: Typography) => {
   return css`
-    ${Object.keys(typography).reduce((prev, key) => {
+    ${objectKeys(typography).reduce((prev, key) => {
       const currentKey = key as keyof Typography;
       const { after, before, fontSize, lineHeight } = typography[currentKey];
+
       return (
         prev +
         `
@@ -36,6 +36,10 @@ const getTypographyCss = (typography: Typography) => {
             margin-top: ${after.marginTop};
           }
         }
+        --${currentKey}-font-size: ${fontSize};
+        --${currentKey}-line-height: ${lineHeight};
+        --${currentKey}-margin-start: ${after.marginTop};
+        --${currentKey}-margin-end: ${before.marginBottom};
       `
       );
     }, "")}
@@ -50,64 +54,40 @@ const getColorCss = (color: ThemeToken["color"]) => {
   `;
 };
 
-interface UseCssTokensProps extends Theme {
-  width: number | null;
-}
+export function useCssTokens(props: Theme) {
+  const { color, colorMode, typography, ...restTokens } = props;
 
-export function useCssTokens(props: UseCssTokensProps) {
-  const { color, colorMode, fontFamily, typography, width, ...restTokens } =
-    props;
-
-  const [colorClassName, setColorClassName] = useState<string>();
-  const [colorModeClassName, setColorModeClassName] = useState<string>();
-  const [fontFamilyClassName, setFontFamilyClassName] = useState<string>();
-  const [typographyClassName, setTypographyClassName] = useState<string>();
-  const [widthClassName, setWidthClassName] = useState<string>();
-  const [providerClassName, setProviderClassName] = useState<string>();
-
-  useEffect(() => {
+  const colorClassName = useMemo(() => {
     if (color != null) {
-      setColorClassName(css`
+      return css`
         ${getColorCss(color)}
-      `);
+      `;
     }
   }, [color]);
 
-  useEffect(() => {
+  const typographyClassName = useMemo(() => {
     if (typography != null) {
-      setTypographyClassName(css`
+      return css`
         ${getTypographyCss(typography)}
-      `);
+      `;
     }
   }, [typography]);
 
-  useEffect(() => {
-    if (fontFamily != null) {
-      setFontFamilyClassName(css`
-        ${fontFamilyCss(fontFamily)}
-      `);
-    }
-  }, [fontFamily]);
+  const fontFamilyClassName = css`
+    ${fontFamilyCss()}
+  `;
 
-  useEffect(() => {
-    setProviderClassName(css`
+  const providerClassName = useMemo(() => {
+    return css`
       ${cssRule(restTokens)};
-    `);
+    `;
   }, [restTokens]);
 
-  useEffect(() => {
-    if (width != null) {
-      setWidthClassName(css`
-        --provider-width: ${width}px;
-      `);
-    }
-  }, [width]);
-
-  useEffect(() => {
+  const colorModeClassName = useMemo(() => {
     if (colorMode != null) {
-      setColorModeClassName(css`
+      return css`
         color-scheme: ${colorMode};
-      `);
+      `;
     }
   }, [colorMode]);
 
@@ -116,7 +96,6 @@ export function useCssTokens(props: UseCssTokensProps) {
     colorModeClassName,
     fontFamilyClassName,
     typographyClassName,
-    widthClassName,
     providerClassName,
   };
 }

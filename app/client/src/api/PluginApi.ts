@@ -1,59 +1,31 @@
 import Api from "api/Api";
 import type { AxiosPromise } from "axios";
 import type { ApiResponse } from "api/ApiResponses";
-import type { PluginPackageName, PluginType } from "entities/Action";
 import type { DependencyMap } from "utils/DynamicBindingUtils";
-
-export type PluginId = string;
-export type GenerateCRUDEnabledPluginMap = Record<PluginId, PluginPackageName>;
-
-export enum UIComponentTypes {
-  DbEditorForm = "DbEditorForm",
-  UQIDbEditorForm = "UQIDbEditorForm",
-  ApiEditorForm = "ApiEditorForm",
-  RapidApiEditorForm = "RapidApiEditorForm",
-  JsEditorForm = "JsEditorForm",
-}
-
-export enum DatasourceComponentTypes {
-  RestAPIDatasourceForm = "RestAPIDatasourceForm",
-  AutoForm = "AutoForm",
-}
-export interface Plugin {
-  id: string;
-  name: string;
-  type: PluginType;
-  packageName: PluginPackageName;
-  iconLocation?: string;
-  uiComponent: UIComponentTypes;
-  datasourceComponent: DatasourceComponentTypes;
-  allowUserDatasources?: boolean;
-  templates: Record<string, string>;
-  responseType?: "TABLE" | "JSON";
-  documentationLink?: string;
-  generateCRUDPageComponent?: string;
-}
+import { FILE_UPLOAD_TRIGGER_TIMEOUT_MS } from "ee/constants/ApiConstants";
+import type { DefaultPlugin, Plugin } from "entities/Plugin";
 
 export interface PluginFormPayload {
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   form: any[];
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   editor: any[];
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   setting: any[];
   dependencies: DependencyMap;
   formButton: string[];
-}
-
-export interface DefaultPlugin {
-  id: string;
-  name: string;
-  packageName: string;
-  iconLocation?: string;
-  allowUserDatasources?: boolean;
 }
 
 class PluginsApi extends Api {
   static url = "v1/plugins";
   static defaultDynamicTriggerURL(datasourceId: string): string {
     return `/v1/datasources/${datasourceId}/trigger`;
+  }
+  static dynamicTriggerURLForInternalPlugins(pluginId: string): string {
+    return `/${PluginsApi.url}/${pluginId}/trigger`;
   }
   static async fetchPlugins(
     workspaceId: string,
@@ -70,6 +42,8 @@ class PluginsApi extends Api {
   // Definition to fetch the dynamic data via the URL passed in the config
   static async fetchDynamicFormValues(
     url: string,
+    // TODO: Fix this the next time the file is edited
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     body: Record<string, any>,
   ): Promise<AxiosPromise<ApiResponse>> {
     return Api.post(url, body);
@@ -79,6 +53,39 @@ class PluginsApi extends Api {
     AxiosPromise<ApiResponse<DefaultPlugin[]>>
   > {
     return Api.get(PluginsApi.url + `/default/icons`);
+  }
+
+  static async uploadFiles(
+    pluginId: string,
+    files: File[],
+    // TODO: Fix this the next time the file is edited
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    params?: Record<string, any>,
+  ): Promise<AxiosPromise<ApiResponse>> {
+    const url = this.dynamicTriggerURLForInternalPlugins(pluginId);
+    const formData = new FormData();
+
+    files.forEach((file) => {
+      formData.append("files", file);
+    });
+
+    if (params) {
+      Object.keys(params).forEach((key) => {
+        formData.append(key, params[key]);
+      });
+    }
+
+    return Api.post(
+      url,
+      formData,
+      {},
+      {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+        timeout: FILE_UPLOAD_TRIGGER_TIMEOUT_MS,
+      },
+    );
   }
 }
 

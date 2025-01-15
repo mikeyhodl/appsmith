@@ -1,63 +1,45 @@
 import React from "react";
-
+import { deriveAlignedColumnHighlights } from "../../utils/layouts/highlights/alignedColumnHighlights";
 import BaseLayoutComponent from "../BaseLayoutComponent";
 import {
   type DeriveHighlightsFn,
-  type LayoutComponentProps,
   LayoutComponentTypes,
   type LayoutProps,
 } from "layoutSystems/anvil/utils/anvilTypes";
-import { FlexLayout } from "./FlexLayout";
-import { deriveColumnHighlights } from "layoutSystems/anvil/utils/layouts/highlights/columnHighlights";
+import type { FlexLayoutProps } from "./FlexLayout";
+import { MainCanvasWrapper } from "./MainCanvasWrapper";
 
 class LayoutColumn extends BaseLayoutComponent {
-  constructor(props: LayoutComponentProps) {
-    super(props);
-    this.state = {
-      order: [...props.layoutOrder, props.layoutId],
-    };
-  }
-
   static type: LayoutComponentTypes = LayoutComponentTypes.LAYOUT_COLUMN;
 
-  static deriveHighlights: DeriveHighlightsFn = deriveColumnHighlights;
+  static deriveHighlights: DeriveHighlightsFn = deriveAlignedColumnHighlights;
 
   static getChildTemplate(props: LayoutProps): LayoutProps | null {
     if (props.childTemplate || props.childTemplate === null)
       return props.childTemplate;
+
     return {
       insertChild: true,
       layoutId: "",
-      layoutType: LayoutComponentTypes.WIDGET_ROW,
+      layoutType: LayoutComponentTypes.ALIGNED_WIDGET_ROW,
       layout: [],
     };
   }
 
-  render() {
-    const {
-      canvasId,
-      isDropTarget,
-      layoutId,
-      layoutIndex,
-      layoutStyle,
-      parentDropTarget,
-      renderMode,
-    } = this.props;
+  getFlexLayoutProps(): Omit<FlexLayoutProps, "children"> {
+    return {
+      ...super.getFlexLayoutProps(),
+      height: "100%",
+      gap: "spacing-4",
+      direction: "column",
+    };
+  }
 
+  renderViewMode(): JSX.Element {
     return (
-      <FlexLayout
-        canvasId={canvasId}
-        direction="column"
-        isDropTarget={!!isDropTarget}
-        layoutId={layoutId}
-        layoutIndex={layoutIndex}
-        parentDropTarget={parentDropTarget}
-        renderMode={renderMode}
-        {...(layoutStyle || {})}
-      >
-        {this.renderDraggingArena()}
-        {this.renderChildLayouts()}
-      </FlexLayout>
+      <MainCanvasWrapper {...this.getFlexLayoutProps()}>
+        {super.renderChildren()}
+      </MainCanvasWrapper>
     );
   }
 }

@@ -1,6 +1,6 @@
 import type { DataTreeEntity } from "entities/DataTree/dataTreeTypes";
-import { isDataTreeEntity } from "@appsmith/workers/Evaluation/evaluationUtils";
-import { entityFns } from "@appsmith/workers/Evaluation/fns";
+import { isDataTreeEntity } from "ee/workers/Evaluation/evaluationUtils";
+import { getEntityFunctions } from "ee/workers/Evaluation/fns";
 import setters from "workers/Evaluation/setters";
 
 export default function isEntityFunction(
@@ -12,10 +12,13 @@ export default function isEntityFunction(
 
   if (setters.has(entityName, propertyName)) return true;
 
+  const entityFns = getEntityFunctions();
+
   return entityFns.find((entityFn) => {
     const entityFnpropertyName = entityFn.path
       ? entityFn.path.split(".")[1]
       : entityFn.name;
+
     return (
       entityFnpropertyName === propertyName &&
       entityFn.qualifier(entity as DataTreeEntity)

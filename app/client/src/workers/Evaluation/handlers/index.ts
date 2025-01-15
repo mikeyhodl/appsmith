@@ -2,12 +2,13 @@ import noop from "lodash/noop";
 import type {
   EVAL_WORKER_ASYNC_ACTION,
   EVAL_WORKER_SYNC_ACTION,
-} from "@appsmith/workers/Evaluation/evalWorkerActions";
-import { EVAL_WORKER_ACTIONS } from "@appsmith/workers/Evaluation/evalWorkerActions";
+} from "ee/workers/Evaluation/evalWorkerActions";
+import { EVAL_WORKER_ACTIONS } from "ee/workers/Evaluation/evalWorkerActions";
 import type { EvalWorkerSyncRequest, EvalWorkerASyncRequest } from "../types";
 import evalActionBindings from "./evalActionBindings";
 import evalExpression from "./evalExpression";
-import evalTree, {
+import {
+  evalTree,
   clearCache,
   evalTreeTransmissionErrorHandler,
 } from "./evalTree";
@@ -21,13 +22,16 @@ import setupEvaluationEnvironment, {
 import validateProperty from "./validateProperty";
 import updateActionData from "./updateActionData";
 import type { TransmissionErrorHandler } from "../fns/utils/Messenger";
+import { evalTreeWithChanges } from "../evalTreeWithChanges";
 
 const syncHandlerMap: Record<
   EVAL_WORKER_SYNC_ACTION,
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (req: EvalWorkerSyncRequest) => any
 > = {
   [EVAL_WORKER_ACTIONS.EVAL_ACTION_BINDINGS]: evalActionBindings,
-  [EVAL_WORKER_ACTIONS.EVAL_TREE]: evalTree,
+  [EVAL_WORKER_ACTIONS.EVAL_TREE_WITH_CHANGES]: evalTreeWithChanges,
   [EVAL_WORKER_ACTIONS.UNDO]: undo,
   [EVAL_WORKER_ACTIONS.REDO]: redo,
   [EVAL_WORKER_ACTIONS.UPDATE_REPLAY_OBJECT]: updateReplayObject,
@@ -43,8 +47,11 @@ const syncHandlerMap: Record<
 
 const asyncHandlerMap: Record<
   EVAL_WORKER_ASYNC_ACTION,
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (req: EvalWorkerASyncRequest) => any
 > = {
+  [EVAL_WORKER_ACTIONS.EVAL_TREE]: evalTree,
   [EVAL_WORKER_ACTIONS.EVAL_TRIGGER]: evalTrigger,
   [EVAL_WORKER_ACTIONS.EVAL_EXPRESSION]: evalExpression,
   [EVAL_WORKER_ACTIONS.LOAD_LIBRARIES]: loadLibraries,

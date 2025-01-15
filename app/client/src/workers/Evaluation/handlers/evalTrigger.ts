@@ -1,6 +1,7 @@
 import { dataTreeEvaluator } from "./evalTree";
 import type { EvalWorkerASyncRequest } from "../types";
 import ExecutionMetaData from "../fns/utils/ExecutionMetaData";
+import { evaluateAndPushResponse } from "../evalTreeWithChanges";
 
 export default async function (request: EvalWorkerASyncRequest) {
   const { data } = request;
@@ -12,26 +13,33 @@ export default async function (request: EvalWorkerASyncRequest) {
     triggerMeta,
     unEvalTree,
   } = data;
+
   if (!dataTreeEvaluator) {
     return { triggers: [], errors: [] };
   }
 
   ExecutionMetaData.setExecutionMetaData({ triggerMeta, eventType });
 
-  const { evalOrder, unEvalUpdates } = dataTreeEvaluator.setupUpdateTree(
-    unEvalTree.unEvalTree,
-    unEvalTree.configTree,
-  );
+  if (!triggerMeta.onPageLoad) {
+    const { evalOrder, unEvalUpdates } = dataTreeEvaluator.setupUpdateTree(
+      unEvalTree.unEvalTree,
+      unEvalTree.configTree,
+      undefined,
+      //TODO: the evalTrigger can be optimised to not diff all JS actions
+      { isAllAffected: true, ids: [] },
+    );
 
-  const { contextTree } = dataTreeEvaluator.evalAndValidateSubTree(
-    evalOrder,
-    unEvalTree.configTree,
-    unEvalUpdates,
-  );
+    evaluateAndPushResponse(
+      dataTreeEvaluator,
+      { evalOrder, unEvalUpdates, jsUpdates: {} },
+      [],
+      [],
+    );
+  }
 
   return dataTreeEvaluator.evaluateTriggers(
     dynamicTrigger,
-    contextTree,
+    dataTreeEvaluator.getEvalTree(),
     unEvalTree.configTree,
     callbackData,
     {

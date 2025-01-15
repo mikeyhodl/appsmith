@@ -1,25 +1,26 @@
 import React from "react";
-import { Button, Tooltip } from "design-system";
+import { Button, Tooltip } from "@appsmith/ads";
 import {
   EDITOR_HEADER,
   SHARE_BUTTON_TOOLTIP,
   SHARE_BUTTON_TOOLTIP_WITH_USER,
   createMessage,
-} from "@appsmith/constants/messages";
+} from "ee/constants/messages";
 import { getCurrentUser } from "selectors/usersSelectors";
-import { getAllUsers } from "@appsmith/selectors/workspaceSelectors";
 import { useSelector } from "react-redux";
+import { getAllUsersOfWorkspace } from "ee/selectors/selectedWorkspaceSelectors";
 
 export const EditorShareButton = ({
   setShowModal,
 }: {
   setShowModal: (val: boolean) => void;
 }) => {
-  const sharedUserList = useSelector(getAllUsers);
+  const sharedUserList = useSelector(getAllUsersOfWorkspace);
   const currentUser = useSelector(getCurrentUser);
   const filteredSharedUserList = sharedUserList.filter(
     (user) => user.username !== currentUser?.username,
   );
+
   return (
     <Tooltip
       content={

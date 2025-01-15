@@ -14,6 +14,7 @@ export class DarkModeTheme implements ColorModeTheme {
   private readonly seedIsGreen: boolean;
   private readonly seedIsRed: boolean;
   private readonly seedIsVeryDark: boolean;
+  private readonly seedIsVeryLight: boolean;
   private readonly seedIsYellow: boolean;
 
   constructor(color: ColorTypes) {
@@ -26,9 +27,11 @@ export class DarkModeTheme implements ColorModeTheme {
       isGreen,
       isRed,
       isVeryDark,
+      isVeryLight,
       isYellow,
       lightness,
     } = new ColorsAccessor(color);
+
     this.seedColor = seedColor;
     this.seedLightness = lightness;
     this.seedChroma = chroma;
@@ -38,6 +41,7 @@ export class DarkModeTheme implements ColorModeTheme {
     this.seedIsGreen = isGreen;
     this.seedIsRed = isRed;
     this.seedIsVeryDark = isVeryDark;
+    this.seedIsVeryLight = isVeryLight;
     this.seedIsYellow = isYellow;
   }
 
@@ -58,6 +62,9 @@ export class DarkModeTheme implements ColorModeTheme {
       bgNeutralSubtle: this.bgNeutralSubtle.to("sRGB").toString(),
       bgNeutralSubtleHover: this.bgNeutralSubtleHover.to("sRGB").toString(),
       bgNeutralSubtleActive: this.bgNeutralSubtleActive.to("sRGB").toString(),
+      bgNeutralSoft: this.bgNeutralSoft.to("sRGB").toString(),
+      bgNeutralSoftHover: this.bgNeutralSoftHover.to("sRGB").toString(),
+      bgNeutralSoftActive: this.bgNeutralSoftActive.to("sRGB").toString(),
       bgPositive: this.bgPositive.to("sRGB").toString(),
       bgPositiveHover: this.bgPositiveHover.to("sRGB").toString(),
       bgPositiveActive: this.bgPositiveActive.to("sRGB").toString(),
@@ -80,6 +87,10 @@ export class DarkModeTheme implements ColorModeTheme {
       bgElevation1: this.bgElevation1.to("sRGB").toString(),
       bgElevation2: this.bgElevation2.to("sRGB").toString(),
       bgElevation3: this.bgElevation3.to("sRGB").toString(),
+
+      shadowElevation1: this.shadowElevation1.to("sRGB").toString(),
+      shadowElevation2: this.shadowElevation2.to("sRGB").toString(),
+      shadowElevation3: this.shadowElevation3.to("sRGB").toString(),
 
       fg: this.fg.to("sRGB").toString(),
       fgAccent: this.fgAccent.to("sRGB").toString(),
@@ -111,9 +122,15 @@ export class DarkModeTheme implements ColorModeTheme {
 
       bdOnAccent: this.bdOnAccent.to("sRGB").toString(),
       bdOnNeutral: this.bdOnNeutral.to("sRGB").toString(),
+      bdOnNeutralSubtle: this.bdOnNeutralSubtle.to("sRGB").toString(),
+      bdOnNeutralSubtleHover: this.bdOnNeutralSubtleHover.to("sRGB").toString(),
       bdOnPositive: this.bdOnPositive.to("sRGB").toString(),
       bdOnNegative: this.bdOnNegative.to("sRGB").toString(),
       bdOnWarning: this.bdOnWarning.to("sRGB").toString(),
+
+      bdElevation1: this.bdElevation1.to("sRGB").toString(),
+      bdElevation2: this.bdElevation2.to("sRGB").toString(),
+      bdElevation3: this.bdElevation3.to("sRGB").toString(),
     };
   };
 
@@ -134,8 +151,12 @@ export class DarkModeTheme implements ColorModeTheme {
       color.oklch.c = 0;
     }
 
-    if (!this.seedIsAchromatic) {
-      color.oklch.c = 0.064;
+    if (!this.seedIsAchromatic && this.seedIsCold) {
+      color.oklch.c = 0.029;
+    }
+
+    if (!this.seedIsAchromatic && !this.seedIsCold) {
+      color.oklch.c = 0.012;
     }
 
     return color;
@@ -290,11 +311,6 @@ export class DarkModeTheme implements ColorModeTheme {
     // Low chroma, but not 0, if possible, to produce harmony with accents in the UI
     const color = this.bgAccent.clone();
 
-    // For darker accents it helps to increase neutral's lightness a little, so it's visible against bg
-    if (this.bgAccent.oklch.l < 0.5) {
-      color.oklch.l += 0.05;
-    }
-
     if (this.seedIsAchromatic) {
       color.oklch.c = 0;
     }
@@ -307,14 +323,30 @@ export class DarkModeTheme implements ColorModeTheme {
       color.oklch.c = 0.01;
     }
 
+    if (color.oklch.l > 0.8) {
+      color.oklch.l -= 0.32;
+    }
+
+    if (color.oklch.l > 0.6 && color.oklch.l <= 0.8) {
+      color.oklch.l -= 0.27;
+    }
+
+    if (color.oklch.l > 0.45 && color.oklch.l <= 0.6) {
+      color.oklch.l -= 0.2;
+    }
+
     return color;
   }
 
   private get bgNeutralOpacity() {
+    // Overlay behind modal dialogue
     const color = this.bgNeutral.clone();
 
-    color.oklch.l = 0.15;
-    color.alpha = 0.5;
+    color.alpha = 0.7;
+
+    if (color.oklch.l > 0.12) {
+      color.oklch.l = 0.12;
+    }
 
     return color;
   }
@@ -366,20 +398,20 @@ export class DarkModeTheme implements ColorModeTheme {
   }
 
   private get bgNeutralSubtle() {
-    const color = this.seedColor.clone();
+    const color = this.bgAccentSubtle.clone();
 
     // Adjusted version of bgAccentSubtle (less or no chroma)
-    if (this.seedLightness > 0.25) {
-      color.oklch.l = 0.25;
+    if (this.seedLightness > 0.29) {
+      color.oklch.l = 0.29;
     }
 
     // If the color is too dark it won't be visible against bg.
-    if (this.seedLightness < 0.2) {
-      color.oklch.l = 0.2;
+    if (this.seedLightness < 0.22) {
+      color.oklch.l = 0.22;
     }
 
-    if (this.seedChroma > 0.025) {
-      color.oklch.c = 0.025;
+    if (this.seedChroma > 0.005) {
+      color.oklch.c = 0.005;
     }
 
     if (this.seedIsAchromatic) {
@@ -405,6 +437,30 @@ export class DarkModeTheme implements ColorModeTheme {
     return color;
   }
 
+  private get bgNeutralSoft() {
+    const color = this.bgNeutralSubtle.clone();
+
+    color.oklch.l -= 0.03;
+
+    return color;
+  }
+
+  private get bgNeutralSoftHover() {
+    const color = this.bgNeutralSoft.clone();
+
+    color.oklch.l += 0.02;
+
+    return color;
+  }
+
+  private get bgNeutralSoftActive() {
+    const color = this.bgNeutralSoft.clone();
+
+    color.oklch.l -= 0.015;
+
+    return color;
+  }
+
   private get bgPositive() {
     // Positive background, green.
     const color = new Color("oklch", [0.62, 0.17, 145]);
@@ -414,6 +470,7 @@ export class DarkModeTheme implements ColorModeTheme {
       if (this.seedHue < 145) {
         color.oklch.h = 155;
       }
+
       if (this.seedHue >= 145) {
         color.oklch.h = 135;
       }
@@ -474,6 +531,7 @@ export class DarkModeTheme implements ColorModeTheme {
       if (this.seedHue < 27) {
         color.oklch.h = 32;
       }
+
       if (this.seedHue >= 27) {
         color.oklch.h = 22;
       }
@@ -534,6 +592,7 @@ export class DarkModeTheme implements ColorModeTheme {
       if (this.seedHue < 85) {
         color.oklch.h = 95;
       }
+
       if (this.seedHue >= 85) {
         color.oklch.h = 70;
       }
@@ -592,7 +651,7 @@ export class DarkModeTheme implements ColorModeTheme {
   private get bgElevation1() {
     const color = this.bg.clone();
 
-    color.oklch.l += 0.07;
+    color.oklch.l += 0.03;
 
     return color;
   }
@@ -600,7 +659,7 @@ export class DarkModeTheme implements ColorModeTheme {
   private get bgElevation2() {
     const color = this.bgElevation1.clone();
 
-    color.oklch.l += 0.04;
+    color.oklch.l += 0.025;
 
     return color;
   }
@@ -608,7 +667,45 @@ export class DarkModeTheme implements ColorModeTheme {
   private get bgElevation3() {
     const color = this.bgElevation2.clone();
 
-    color.oklch.l += 0.02;
+    color.oklch.l += 0.03;
+
+    return color;
+  }
+
+  /*
+   * Shadow colors
+   */
+
+  private get shadowElevation1() {
+    const color = this.seedColor.clone();
+
+    color.oklch.l = 0.15;
+
+    color.alpha = 0.35;
+
+    if (color.oklch.c > 0.06) {
+      color.oklch.c = 0.06;
+    }
+
+    return color;
+  }
+
+  private get shadowElevation2() {
+    const color = this.shadowElevation1.clone();
+
+    color.oklch.l += 0.01;
+
+    color.alpha = 0.25;
+
+    return color;
+  }
+
+  private get shadowElevation3() {
+    const color = this.shadowElevation2.clone();
+
+    color.oklch.l += 0.005;
+
+    color.alpha = 0.4;
 
     return color;
   }
@@ -623,7 +720,7 @@ export class DarkModeTheme implements ColorModeTheme {
     // This ensures harmonious combination with main accents and neutrals.
     const color = this.seedColor.clone();
 
-    color.oklch.l = 0.965;
+    color.oklch.l = 0.935;
 
     // If seed color didn't have substantial amount of chroma make sure fg is achromatic.
     if (this.seedIsAchromatic) {
@@ -631,7 +728,7 @@ export class DarkModeTheme implements ColorModeTheme {
     }
 
     if (!this.seedIsAchromatic) {
-      color.oklch.c = 0.024;
+      color.oklch.c = 0.012;
     }
 
     return color;
@@ -643,7 +740,7 @@ export class DarkModeTheme implements ColorModeTheme {
 
     // For light content on dark background APCA contrast is negative. −60 is “The minimum level recommended for content text that is not body, column, or block text. In other words, text you want people to read.” Failure to reach this contrast level is most likely due to low lightness. Lightness and chroma are set to ones that reach the threshold universally regardless of hue.
     if (this.bg.contrastAPCA(this.seedColor) >= -60) {
-      color.oklch.l = 0.79;
+      color.oklch.l = 0.82;
 
       if (this.seedIsAchromatic) {
         color.oklch.c = 0;
@@ -658,25 +755,10 @@ export class DarkModeTheme implements ColorModeTheme {
   }
 
   private get fgNeutral() {
-    // Desatured version of the seed for harmonious combination with backgrounds and accents.
-    const color = this.fgAccent.clone();
+    // Neutral foreground. Slightly less prominent than main fg
+    const color = this.fg.clone();
 
-    // Minimal contrast that we set for fgAccent (60) is too low for a gray color
-    if (this.bg.contrastAPCA(this.fgAccent) < 75) {
-      color.oklch.l += 0.04;
-    }
-
-    if (this.seedIsAchromatic) {
-      color.oklch.c = 0;
-    }
-
-    if (this.seedIsCold && !this.seedIsAchromatic) {
-      color.oklch.c = 0.03;
-    }
-
-    if (!this.seedIsCold && !this.seedIsAchromatic) {
-      color.oklch.c = 0.01;
-    }
+    color.oklch.l -= 0.1;
 
     return color;
   }
@@ -684,7 +766,7 @@ export class DarkModeTheme implements ColorModeTheme {
   private get fgNeutralSubtle() {
     const color = this.fgNeutral.clone();
 
-    color.oklch.l -= 0.15;
+    color.oklch.l -= 0.3;
 
     return color;
   }
@@ -710,6 +792,7 @@ export class DarkModeTheme implements ColorModeTheme {
   private get fgNegative() {
     // Negative foreground is produced from the initially adjusted background color (see above). Additional tweaks are applied to make sure it's distinct from fgAccent when seed is red.
     const color = this.bgNegative.clone();
+
     color.oklch.l += 0.05;
     color.oklch.c += 0.1;
     color.oklch.h -= 10;
@@ -751,8 +834,17 @@ export class DarkModeTheme implements ColorModeTheme {
     }
 
     // Light and dark derivatives of the seed
-    tint.oklch.l = 0.94;
-    shade.oklch.l = 0.27;
+    tint.oklch.l = 0.92;
+    shade.oklch.l = 0.23;
+
+    // Chroma limits for tint and shade
+    if (tint.oklch.c >= 0.025) {
+      tint.oklch.c = 0.025;
+    }
+
+    if (shade.oklch.c >= 0.04) {
+      shade.oklch.c = 0.04;
+    }
 
     // Check which of them has better contrast with bgAccent
     if (-this.bgAccent.contrastAPCA(tint) < this.bgAccent.contrastAPCA(shade)) {
@@ -866,17 +958,23 @@ export class DarkModeTheme implements ColorModeTheme {
   private get bdAccent() {
     const color = this.seedColor.clone();
 
-    // For light content on dark background APCA contrast is negative. −15 is “The absolute minimum for any non-text that needs to be discernible and differentiable, but does not apply to semantic non-text such as icons”. In practice, thin borders are perceptually too subtle when using this as a threshould. −25 is used as the required minimum instead. Failure to reach this contrast level is most likely due to high lightness. Lightness and chroma are set to ones that reach the threshold universally regardless of hue.
-    if (this.bg.contrastAPCA(this.seedColor) >= -25) {
-      if (this.seedIsAchromatic) {
-        color.oklch.l = 0.82;
-        color.oklch.c = 0;
-      }
+    if (this.seedIsCold) {
+      color.oklch.l = 0.42;
+      color.oklch.c = 0.07;
+    }
 
-      if (!this.seedIsAchromatic) {
-        color.oklch.l = 0.75;
-        color.oklch.c = 0.15;
-      }
+    if (!this.seedIsCold) {
+      color.oklch.l = 0.38;
+      color.oklch.c = 0.05;
+    }
+
+    if (this.seedIsAchromatic) {
+      color.oklch.c = 0;
+    }
+
+    // For light content on dark background APCA contrast is negative. −15 is “The absolute minimum for any non-text that needs to be discernible and differentiable, but does not apply to semantic non-text such as icons”.
+    if (this.bg.contrastAPCA(this.seedColor) >= -15) {
+      color.oklch.l += 0.05;
     }
 
     return color;
@@ -885,6 +983,8 @@ export class DarkModeTheme implements ColorModeTheme {
   private get bdFocus() {
     // Keyboard focus outline
     const color = this.bdAccent.clone();
+
+    color.oklch.l = 0.8;
 
     // Achromatic seeds still produce colorful focus; this is good for accessibility even though it affects visual style
     if (this.seedChroma < 0.12) {
@@ -896,16 +996,18 @@ export class DarkModeTheme implements ColorModeTheme {
 
   private get bdNeutral() {
     // Desatured version of the seed for harmonious combination with backgrounds and accents.
+    // Used in checkbox, radio button
     const color = this.bdAccent.clone();
 
-    color.oklch.c = 0.035;
+    color.oklch.l = 0.4;
+    color.oklch.c = 0.012;
 
     if (this.seedIsAchromatic) {
       color.oklch.c = 0;
     }
 
-    if (this.bg.contrastAPCA(color) > -25) {
-      color.oklch.l += 0.15;
+    if (this.bg.contrastAPCA(color) >= -15) {
+      color.oklch.l += 0.05;
     }
 
     return color;
@@ -932,8 +1034,12 @@ export class DarkModeTheme implements ColorModeTheme {
   private get bdPositive() {
     const color = this.bgPositive.clone();
 
-    color.oklch.l += 0.05;
-    color.oklch.c += 0.05;
+    color.oklch.l = 0.41;
+    color.oklch.c = 0.05;
+
+    if (this.bg.contrastAPCA(color) >= -15) {
+      color.oklch.l += 0.05;
+    }
 
     return color;
   }
@@ -952,13 +1058,16 @@ export class DarkModeTheme implements ColorModeTheme {
     // Negative (red) border. Produced out of bgNegative. Additional compensations are applied if seed is within red range.
     const color = this.bgNegative.clone();
 
+    color.oklch.l = 0.46;
+    color.oklch.c = 0.1;
+
     if (
       this.bdAccent.oklch.l > 0.5 &&
       this.bdAccent.oklch.c > 0.15 &&
       this.bdAccent.oklch.h < 27 &&
       this.bdAccent.oklch.h >= 5
     ) {
-      color.oklch.l += 0.18;
+      color.oklch.l += 0.03;
     }
 
     if (
@@ -967,8 +1076,11 @@ export class DarkModeTheme implements ColorModeTheme {
       this.bdAccent.oklch.h >= 27 &&
       this.bdAccent.oklch.h < 50
     ) {
-      color.oklch.l += 0.05;
       color.oklch.h -= 5;
+    }
+
+    if (this.bg.contrastAPCA(color) >= -15) {
+      color.oklch.l += 0.05;
     }
 
     return color;
@@ -978,10 +1090,10 @@ export class DarkModeTheme implements ColorModeTheme {
     const color = this.bdNegative.clone();
 
     // Lightness of bdNegative is known, no additional checks like in bdNeutralHover
-    color.oklch.l = color.oklch.l + 0.15;
+    color.oklch.l = color.oklch.l + 0.1;
 
-    if (this.bdNegative.oklch.c < 0.19) {
-      color.oklch.c = 0.19;
+    if (this.bdNegative.oklch.c < 0.1) {
+      color.oklch.c = 0.1;
     }
 
     return color;
@@ -990,13 +1102,16 @@ export class DarkModeTheme implements ColorModeTheme {
   private get bdWarning() {
     const color = this.bgWarning.clone();
 
+    color.oklch.l = 0.48;
+    color.oklch.c = 0.12;
+
     if (
       this.bdAccent.oklch.l > 0.5 &&
       this.bdAccent.oklch.c > 0.15 &&
       this.bdAccent.oklch.h < 85 &&
       this.bdAccent.oklch.h >= 60
     ) {
-      color.oklch.l += 0.18;
+      color.oklch.l += 0.03;
     }
 
     if (
@@ -1005,8 +1120,11 @@ export class DarkModeTheme implements ColorModeTheme {
       this.bdAccent.oklch.h >= 85 &&
       this.bdAccent.oklch.h < 110
     ) {
-      color.oklch.l += 0.05;
       color.oklch.h -= 5;
+    }
+
+    if (this.bg.contrastAPCA(color) >= -15) {
+      color.oklch.l += 0.05;
     }
 
     return color;
@@ -1069,6 +1187,24 @@ export class DarkModeTheme implements ColorModeTheme {
     return color;
   }
 
+  private get bdOnNeutralSubtle() {
+    // Border on bgNeutralSubtle, low contrast indicator of interactivity in TextInput and similar
+    const color = this.bgNeutralSubtle.clone();
+
+    color.oklch.l += 0.04;
+
+    return color;
+  }
+
+  private get bdOnNeutralSubtleHover() {
+    // Outline on the input field shown on hover
+    const color = this.bdOnNeutralSubtle.clone();
+
+    color.oklch.l += 0.08;
+
+    return color;
+  }
+
   private get bdOnPositive() {
     // Separator on bgPositive, low contrast to not pull attention from actual separated content elements
     const color = this.bgPositive.clone();
@@ -1095,6 +1231,40 @@ export class DarkModeTheme implements ColorModeTheme {
 
     // Lightness of bgWarning is known, no additional checks like in bdOnAccent / bdOnNeutral
     color.oklch.l -= 0.25;
+
+    return color;
+  }
+
+  /*
+   * Elevation border colors
+   */
+
+  private get bdElevation1() {
+    const color = this.bdNeutral.clone();
+
+    if (this.seedIsVeryLight) {
+      color.oklch.l = 0.13;
+    }
+
+    if (!this.seedIsVeryLight) {
+      color.oklch.l -= 0.75;
+    }
+
+    return color;
+  }
+
+  private get bdElevation2() {
+    const color = this.bdElevation1.clone();
+
+    color.oklch.l += 0.015;
+
+    return color;
+  }
+
+  private get bdElevation3() {
+    const color = this.bdElevation2.clone();
+
+    color.oklch.l += 0.035;
 
     return color;
   }

@@ -9,7 +9,7 @@ const testString = "test";
 
 describe(
   "datasource unsaved changes popup shows even without changes",
-  { tags: ["@tag.Datasource"] },
+  { tags: ["@tag.Datasource", "@tag.Git", "@tag.AccessControl"] },
   function () {
     // In case of postgres and other plugins, host address and port key values are initialized by default making form dirty
     it("1. Bug 18664: Create postgres datasource, save it and edit it and go back, now unsaved changes popup should not be shown", () => {
@@ -20,7 +20,7 @@ describe(
         // because I do not need to fill the datasource form and use the same default data
         _.dataSources.CreatePlugIn("PostgreSQL");
         dsName = "Postgres" + uid;
-        _.agHelper.RenameWithInPane(dsName, false);
+        _.agHelper.RenameDatasource(dsName);
         _.dataSources.SaveDatasource();
         _.agHelper.Sleep();
         _.dataSources.EditDatasource();
@@ -39,7 +39,7 @@ describe(
         // because I do not need to fill the datasource form and use the same default data
         _.dataSources.CreatePlugIn("Authenticated API");
         dsName = "AuthDS" + uid;
-        _.agHelper.RenameWithInPane(dsName, false);
+        _.agHelper.RenameDatasource(dsName);
         _.dataSources.FillAuthAPIUrl();
         _.dataSources.SaveDatasource();
         _.agHelper.Sleep();
@@ -62,7 +62,7 @@ describe(
         // because I do not need to fill the datasource form and use the same default data
         _.dataSources.CreatePlugIn("MongoDB");
         dsName = "Mongo" + uid;
-        _.agHelper.RenameWithInPane(dsName, false);
+        _.agHelper.RenameDatasource(dsName);
         _.dataSources.FillMongoDSForm();
         _.dataSources.SaveDatasource();
         _.agHelper.Sleep();
@@ -86,7 +86,7 @@ describe(
         // because I do not need to fill the datasource form and use the same default data
         _.dataSources.CreatePlugIn("MongoDB");
         dsName = "Mongo" + uid;
-        _.agHelper.RenameWithInPane(dsName, false);
+        _.agHelper.RenameDatasource(dsName);
         _.dataSources.FillMongoDSForm();
         _.dataSources.SaveDatasource();
         _.agHelper.Sleep();
@@ -110,7 +110,7 @@ describe(
         // because I do not need to fill the datasource form and use the same default data
         _.dataSources.CreatePlugIn("MongoDB");
         dsName = "Mongo" + uid;
-        _.agHelper.RenameWithInPane(dsName, false);
+        _.agHelper.RenameDatasource(dsName);
         _.dataSources.FillMongoDSForm();
         _.dataSources.SaveDatasource();
         _.agHelper.Sleep();
@@ -133,7 +133,7 @@ describe(
         // because I do not need to fill the datasource form and use the same default data
         _.dataSources.CreatePlugIn("MongoDB");
         dsName = "Mongo" + uid;
-        _.agHelper.RenameWithInPane(dsName, false);
+        _.agHelper.RenameDatasource(dsName);
         _.dataSources.FillMongoDSForm();
         _.dataSources.SaveDatasource();
         _.agHelper.Sleep();
@@ -141,7 +141,7 @@ describe(
         // Edit datasource, change connection string uri param and click on back button
         _.dataSources.EditDatasource();
 
-        _.agHelper.UpdateInputValue(_.dataSources._host(), "jargons");
+        _.agHelper.ClearNType(_.dataSources._host(), "jargons");
 
         // Assert that popup is visible
         _.dataSources.cancelDSEditAndAssertModalPopUp(true, false);
@@ -167,9 +167,8 @@ describe(
 
     it("7. Bug 19801: Create new Auth DS, refresh the page without saving, we should not see discard popup", () => {
       _.dataSources.NavigateToDSCreateNew();
-      _.agHelper.GenerateUUID();
       // using CreatePlugIn function instead of CreateDatasource,
-      // because I do not need to fill the datasource form and use the same default data
+      // because we do not need to fill the datasource form for this case
       _.dataSources.CreatePlugIn("Authenticated API");
       _.agHelper.RefreshPage();
       _.agHelper.AssertElementAbsence(_.dataSources._datasourceModalSave);

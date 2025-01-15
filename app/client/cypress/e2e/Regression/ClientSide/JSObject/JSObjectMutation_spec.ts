@@ -1,10 +1,12 @@
 import { getWidgetSelector } from "../../../../locators/WidgetLocators";
+import { locators } from "../../../../support/Objects/ObjectsCore";
 import * as _ from "../../../../support/Objects/ObjectsCore";
 import EditorNavigation, {
   EntityType,
 } from "../../../../support/Pages/EditorNavigation";
+const commonlocators = require("../../../../locators/commonlocators.json");
 
-describe("JSObject testing", { tags: ["@tag.JS"] }, () => {
+describe("JSObject testing", { tags: ["@tag.JS", "@tag.Binding"] }, () => {
   before(() => {
     _.homePage.NavigateToHome();
     _.homePage.ImportApp("JSObjectMutationTestApp.json");
@@ -95,7 +97,7 @@ describe("JSObject testing", { tags: ["@tag.JS"] }, () => {
   });
 
   it("6. Bug 27978 Check assignment should not get overridden by evaluation", () => {
-    _.entityExplorer.DragNDropWidget(_.draggableWidgets.TEXT, 400, 400);
+    _.entityExplorer.DragDropWidgetNVerify(_.draggableWidgets.TEXT, 400, 400);
     _.propPane.TypeTextIntoField(
       "Text",
       `{{JSObject1.data.length ? 'id-' + JSObject1.data[0].id : 'Not Set' }}`,
@@ -128,6 +130,7 @@ describe("JSObject testing", { tags: ["@tag.JS"] }, () => {
       toRun: false,
       shouldCreateNewJSObj: true,
     });
+    _.agHelper.GetNAssertContains(_.jsEditor._funcDropdownValue, "getData");
     _.jsEditor.SelectFunctionDropdown("myFun1");
     _.jsEditor.RunJSObj();
     EditorNavigation.SelectEntityByName("Text2", EntityType.Widget);

@@ -9,14 +9,15 @@
           "description": "Select the authentication type to use",
           "configProperty": "datasourceConfiguration.authentication.authenticationType",
           "controlType": "DROP_DOWN",
-          "initialValue" : "bearerToken",
+          "initialValue": "bearerToken",
           "setFirstOptionAsDefault": true,
           "options": [
             {
               "label": "Bearer token",
               "value": "bearerToken"
             }
-          ]
+          ],
+          "hidden": true
         },
         {
           "label": "API Key",
@@ -38,5 +39,5 @@
       ]
     }
   ],
-  "formButton" : ["TEST", "CANCEL", "SAVE"]
+  "formButton": ["TEST", "CANCEL", "SAVE"]
 }

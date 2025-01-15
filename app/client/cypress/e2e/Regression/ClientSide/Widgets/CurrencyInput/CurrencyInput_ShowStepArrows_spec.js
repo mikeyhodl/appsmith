@@ -1,10 +1,11 @@
 const widgetsPage = require("../../../../../locators/Widgets.json");
+const { agHelper } = require("../../../../../support/Objects/ObjectsCore");
 
 const widgetName = "currencyinputwidget";
 
 describe(
   "Currency Widget showStepArrows Functionality - ",
-  { tags: ["@tag.Widget", "@tag.CurrencyInput"] },
+  { tags: ["@tag.Widget", "@tag.CurrencyInput", "@tag.Binding"] },
   function () {
     it("1. Validate that For new currency input widgets being dragged, the value for showStepArrows should be set to false", () => {
       cy.dragAndDropToCanvas(widgetName, { x: 300, y: 400 });
@@ -17,7 +18,7 @@ describe(
 
     it("2. Validate that currency input widget, stepArrows should be visible when showStepArrows is set to true", () => {
       // Enable showStepArrows to true
-      cy.togglebar(widgetsPage.showStepArrowsToggleCheckBox);
+      agHelper.CheckUncheck(widgetsPage.showStepArrowsToggleCheckBox);
 
       cy.get(widgetsPage.inputStepArrows).should("exist"); // step arrows should be visible
     });

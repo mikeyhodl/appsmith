@@ -259,62 +259,6 @@ describe("defaultOptionValueValidation - ", () => {
       ).toEqual(expected);
     });
   });
-
-  it("Should get tested with options when serverSideFiltering is false ", () => {
-    const input = "YELLOW";
-
-    expect(
-      defaultOptionValueValidation(
-        input,
-        {
-          options: [
-            { label: "Blue", value: "BLUE" },
-            { label: "Green", value: "GREEN" },
-          ],
-          serverSideFiltering: false,
-        } as SelectWidgetProps,
-        _,
-      ),
-    ).toEqual({
-      isValid: false,
-      parsed: "YELLOW",
-      messages: [
-        {
-          name: "ValidationError",
-          message:
-            "Default value is missing in options. Please update the value.",
-        },
-      ],
-    });
-  });
-
-  it("Should get tested with options when serverSideFiltering is true ", () => {
-    const input = "YELLOW";
-
-    expect(
-      defaultOptionValueValidation(
-        input,
-        {
-          options: [
-            { label: "Blue", value: "BLUE" },
-            { label: "Green", value: "GREEN" },
-          ],
-          serverSideFiltering: true,
-        } as SelectWidgetProps,
-        _,
-      ),
-    ).toEqual({
-      isValid: false,
-      parsed: "YELLOW",
-      messages: [
-        {
-          name: "ValidationError",
-          message:
-            "Default value is missing in options. Please use {label : <string | num>, value : < string | num>} format to show default for server side data.",
-        },
-      ],
-    });
-  });
 });
 
 describe("labelKeyValidation", () => {
@@ -449,6 +393,8 @@ describe("valueKeyValidation", () => {
     expect(
       valueKeyValidation(
         "test",
+        // TODO: Fix this the next time the file is edited
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         { sourceData: [{ test: 1 }, { test: 2 }] } as any as SelectWidgetProps,
         _ as LoDashStatic,
       ),
@@ -470,6 +416,8 @@ describe("valueKeyValidation", () => {
           d,
           {
             sourceData: [{ test: 1 }, { test: 2 }],
+            // TODO: Fix this the next time the file is edited
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
           } as any as SelectWidgetProps,
           _ as LoDashStatic,
         ),
@@ -494,6 +442,8 @@ describe("valueKeyValidation", () => {
           d,
           {
             sourceData: [{ test: 1 }, { test: 2 }],
+            // TODO: Fix this the next time the file is edited
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
           } as any as SelectWidgetProps,
           _ as LoDashStatic,
         ),
@@ -515,6 +465,8 @@ describe("valueKeyValidation", () => {
         ["blue", "blue", "yellow"],
         {
           sourceData: [{ test: 1 }, { test: 2 }],
+          // TODO: Fix this the next time the file is edited
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } as any as SelectWidgetProps,
         _ as LoDashStatic,
       ),
@@ -534,6 +486,8 @@ describe("valueKeyValidation", () => {
         "yellow",
         {
           sourceData: [{ test: 1 }, { test: 2 }],
+          // TODO: Fix this the next time the file is edited
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } as any as SelectWidgetProps,
         _ as LoDashStatic,
       ),
@@ -552,6 +506,8 @@ describe("valueKeyValidation", () => {
     expect(
       valueKeyValidation(
         true,
+        // TODO: Fix this the next time the file is edited
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         { sourceData: [{ test: 1 }, { test: 2 }] } as any as SelectWidgetProps,
         _ as LoDashStatic,
       ),
@@ -571,6 +527,8 @@ describe("valueKeyValidation", () => {
     expect(
       valueKeyValidation(
         1,
+        // TODO: Fix this the next time the file is edited
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         { sourceData: [{ test: 1 }, { test: 2 }] } as any as SelectWidgetProps,
         _ as LoDashStatic,
       ),
@@ -590,6 +548,8 @@ describe("valueKeyValidation", () => {
     expect(
       valueKeyValidation(
         {},
+        // TODO: Fix this the next time the file is edited
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         { sourceData: [{ test: 1 }, { test: 2 }] } as any as SelectWidgetProps,
         _ as LoDashStatic,
       ),

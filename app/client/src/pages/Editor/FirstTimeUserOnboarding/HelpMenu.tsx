@@ -1,18 +1,13 @@
 import React from "react";
-import { Text, Button } from "design-system";
-import { getAppsmithConfigs } from "@appsmith/configs";
-import {
-  APPSMITH_DISPLAY_VERSION,
-  createMessage,
-} from "@appsmith/constants/messages";
+import { Text, Button } from "@appsmith/ads";
+import { getAppsmithConfigs } from "ee/configs";
+import { APPSMITH_DISPLAY_VERSION, createMessage } from "ee/constants/messages";
 import moment from "moment";
 import styled from "styled-components";
-import { triggerWelcomeTour } from "./Utils";
-import { useDispatch, useSelector } from "react-redux";
+import { useSelector } from "react-redux";
 import { getCurrentUser } from "selectors/usersSelectors";
 import { IntercomConsent } from "../HelpButton";
 import classNames from "classnames";
-import AnalyticsUtil from "utils/AnalyticsUtil";
 import { DOCS_BASE_URL } from "constants/ThirdPartyConstants";
 const { appVersion, cloudHosting, intercomAppID } = getAppsmithConfigs();
 
@@ -58,7 +53,6 @@ function HelpMenu(props: {
   setShowIntercomConsent: (val: boolean) => void;
   showIntercomConsent: boolean;
 }) {
-  const dispatch = useDispatch();
   const user = useSelector(getCurrentUser);
 
   return (
@@ -79,28 +73,21 @@ function HelpMenu(props: {
             Help & Resources
           </Text>
           <div className="flex flex-wrap gap-2 mt-2">
-            <Button
-              data-testid="editor-welcome-tour"
-              kind="secondary"
-              onClick={() => {
-                triggerWelcomeTour(dispatch);
-                AnalyticsUtil.logEvent("SIGNPOSTING_WELCOME_TOUR_CLICK");
-              }}
-              startIcon={"guide"}
-            >
-              Try guided tour
-            </Button>
             {HELP_MENU_ITEMS.map((item) => {
               return (
                 <Button
                   key={item.label}
                   kind="secondary"
+                  // TODO: Fix this the next time the file is edited
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
                   onClick={(e: any) => {
                     if (item.link) {
                       window.open(item.link, "_blank");
                     }
+
                     if (item.id === "intercom-trigger") {
                       e?.preventDefault();
+
                       if (intercomAppID && window.Intercom) {
                         if (user?.isIntercomConsentGiven || cloudHosting) {
                           window.Intercom("show");

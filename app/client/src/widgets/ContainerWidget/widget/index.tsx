@@ -10,7 +10,7 @@ import { compact, get, map, sortBy } from "lodash";
 import WidgetsMultiSelectBox from "layoutSystems/fixedlayout/common/widgetGrouping/WidgetsMultiSelectBox";
 import type { SetterConfig, Stylesheet } from "entities/AppTheming";
 import { getSnappedGrid } from "sagas/WidgetOperationUtils";
-import { ReduxActionTypes } from "@appsmith/constants/ReduxActionConstants";
+import { ReduxActionTypes } from "ee/constants/ReduxActionConstants";
 import {
   isAutoHeightEnabledForWidget,
   DefaultAutocompleteDefinitions,
@@ -27,6 +27,7 @@ import {
 } from "WidgetProvider/constants";
 import { WIDGET_TAGS } from "constants/WidgetConstants";
 import IconSVG from "../icon.svg";
+import ThumbnailSVG from "../thumbnail.svg";
 import { ButtonBoxShadowTypes } from "components/constants";
 import { Colors } from "constants/Colors";
 import { FILL_WIDGET_MIN_WIDTH } from "constants/minWidthConstants";
@@ -58,6 +59,7 @@ export class ContainerWidget extends BaseWidget<
     return {
       name: "Container",
       iconSVG: IconSVG,
+      thumbnailSVG: ThumbnailSVG,
       tags: [WIDGET_TAGS.LAYOUT],
       isCanvas: true,
       searchTags: ["div", "parent", "group"],
@@ -291,8 +293,7 @@ export class ContainerWidget extends BaseWidget<
           {
             propertyName: "borderRadius",
             label: "Border radius",
-            helpText:
-              "Rounds the corners of the icon button's outer border edge",
+            helpText: "Rounds the corners of the widgets's outer border edge",
             controlType: "BORDER_RADIUS_OPTIONS",
             isJSConvertible: true,
             isBindProperty: true,
@@ -321,6 +322,8 @@ export class ContainerWidget extends BaseWidget<
   static getDefaultPropertiesMap(): Record<string, string> {
     return {};
   }
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   static getMetaPropertiesMap(): Record<string, any> {
     return {};
   }
@@ -382,7 +385,11 @@ export class ContainerWidget extends BaseWidget<
       this.props.positioning !== Positioning.Vertical;
 
     return (
-      <ContainerComponent {...props} noScroll={isAutoHeightEnabled}>
+      <ContainerComponent
+        key={props.widgetId}
+        {...props}
+        noScroll={isAutoHeightEnabled}
+      >
         <WidgetsMultiSelectBox
           {...this.getSnapSpaces()}
           noContainerOffset={!!props.noContainerOffset}

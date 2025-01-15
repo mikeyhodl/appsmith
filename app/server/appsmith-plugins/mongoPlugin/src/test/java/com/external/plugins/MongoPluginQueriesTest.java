@@ -394,7 +394,7 @@ public class MongoPluginQueriesTest {
         DatasourceConfiguration dsConfig = createDatasourceConfiguration();
         Mono<DatasourceStructure> structureMono = pluginExecutor
                 .datasourceCreate(dsConfig)
-                .flatMap(connection -> pluginExecutor.getStructure(connection, dsConfig, null, null));
+                .flatMap(connection -> pluginExecutor.getStructure(connection, dsConfig, null));
 
         StepVerifier.create(structureMono)
                 .assertNext(structure -> {
@@ -651,6 +651,26 @@ public class MongoPluginQueriesTest {
                                     (Map<String, Object>) aggregateTemplate.getConfiguration(),
                                     AGGREGATE_PIPELINES,
                                     STRING_TYPE));
+                })
+                .verifyComplete();
+    }
+
+    @Test
+    public void testStructure_should_return_collections_in_order() {
+        DatasourceConfiguration dsConfig = createDatasourceConfiguration();
+        Mono<DatasourceStructure> structureMono = pluginExecutor
+                .datasourceCreate(dsConfig)
+                .flatMap(connection -> pluginExecutor.getStructure(connection, dsConfig, null));
+
+        StepVerifier.create(structureMono)
+                .assertNext(structure -> {
+                    assertNotNull(structure);
+                    assertEquals(3, structure.getTables().size());
+
+                    // Check that the tables are sorted in ascending order
+                    assertEquals("address", structure.getTables().get(0).getName());
+                    assertEquals("teams", structure.getTables().get(1).getName());
+                    assertEquals("users", structure.getTables().get(2).getName());
                 })
                 .verifyComplete();
     }

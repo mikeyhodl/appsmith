@@ -2,20 +2,35 @@ import React from "react";
 import type { ControlProps } from "./BaseControl";
 import BaseControl from "./BaseControl";
 import { generateReactKey } from "utils/generators";
-import { getNextEntityName } from "utils/AppsmithUtils";
 import orderBy from "lodash/orderBy";
 import isString from "lodash/isString";
 import isUndefined from "lodash/isUndefined";
-import { Button } from "design-system";
+import { Button, Flex } from "@appsmith/ads";
 import { ButtonPlacementTypes } from "components/constants";
 import { DraggableListControl } from "pages/Editor/PropertyPane/DraggableListControl";
 import { DraggableListCard } from "components/propertyControls/DraggableListCard";
+import {
+  createMessage,
+  BUTTON_WIDGET_DEFAULT_LABEL,
+} from "ee/constants/messages";
 
 interface State {
   focusedIndex: number | null;
 }
 
-class ButtonListControl extends BaseControl<ControlProps, State> {
+interface MenuItem {
+  id: string;
+  label: string;
+  isDisabled: boolean;
+  isVisible: boolean;
+  widgetId: string;
+  itemType: "SEPARATOR" | "BUTTON";
+}
+
+class ButtonListControl extends BaseControl<
+  ControlProps & { allowSeparators?: boolean; allowSpatialGrouping?: boolean },
+  State
+> {
   constructor(props: ControlProps) {
     super(props);
 
@@ -35,13 +50,7 @@ class ButtonListControl extends BaseControl<ControlProps, State> {
   }
 
   getMenuItems = () => {
-    const menuItems: Array<{
-      id: string;
-      label: string;
-      isDisabled: boolean;
-      isVisible: boolean;
-      widgetId: string;
-    }> =
+    const menuItems: MenuItem[] =
       isString(this.props.propertyValue) ||
       isUndefined(this.props.propertyValue)
         ? []
@@ -50,20 +59,27 @@ class ButtonListControl extends BaseControl<ControlProps, State> {
     return orderBy(menuItems, ["index"], ["asc"]);
   };
 
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   updateItems = (items: Array<Record<string, any>>) => {
+    // TODO: Fix this the next time the file is edited
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const menuItems = items.reduce((obj: any, each: any, index: number) => {
       obj[each.id] = {
         ...each,
         index,
       };
+
       return obj;
     }, {});
+
     this.updateProperty(this.props.propertyName, menuItems);
   };
 
   onEdit = (index: number) => {
     const menuItems = this.getMenuItems();
     const targetMenuItem = menuItems[index];
+
     this.props.openNextPanel({
       index,
       ...targetMenuItem,
@@ -72,6 +88,10 @@ class ButtonListControl extends BaseControl<ControlProps, State> {
   };
 
   render() {
+    const hasSeparator = this.getMenuItems().some(
+      (item: MenuItem) => item.itemType === "SEPARATOR",
+    );
+
     return (
       <div className="flex flex-col gap-1">
         <DraggableListControl
@@ -82,6 +102,8 @@ class ButtonListControl extends BaseControl<ControlProps, State> {
           items={this.getMenuItems()}
           onEdit={this.onEdit}
           propertyPath={this.props.dataTreePath}
+          // TODO: Fix this the next time the file is edited
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           renderComponent={(props: any) =>
             DraggableListCard({
               ...props,
@@ -95,15 +117,27 @@ class ButtonListControl extends BaseControl<ControlProps, State> {
           updateOption={this.updateOption}
         />
 
-        <Button
-          className="self-end"
-          kind="tertiary"
-          onClick={this.addOption}
-          size="sm"
-          startIcon="plus"
-        >
-          Add new button
-        </Button>
+        <Flex gap="spaces-3" justifyContent="end">
+          {(this.props.allowSeparators ||
+            (this.props.allowSpatialGrouping && !hasSeparator)) && (
+            <Button
+              className="self-end"
+              kind="tertiary"
+              onClick={() => this.addOption({ isSeparator: true })}
+              size="sm"
+            >
+              Add separator
+            </Button>
+          )}
+          <Button
+            className="self-end"
+            kind="secondary"
+            onClick={() => this.addOption({ isSeparator: false })}
+            size="sm"
+          >
+            Add button
+          </Button>
+        </Flex>
       </div>
     );
   }
@@ -118,64 +152,76 @@ class ButtonListControl extends BaseControl<ControlProps, State> {
           isVisible: isVisible,
         };
       }
+
       return item;
     });
+
     this.updateProperty(this.props.propertyName, updatedMenuItems);
   };
 
   deleteOption = (index: number) => {
     const menuItemsArray = this.getMenuItems();
+
     if (menuItemsArray.length === 1) return;
+
+    // TODO: Fix this the next time the file is edited
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const updatedArray = menuItemsArray.filter((eachItem: any, i: number) => {
       return i !== index;
     });
     const updatedObj = updatedArray.reduce(
+      // TODO: Fix this the next time the file is edited
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (obj: any, each: any, index: number) => {
         obj[each.id] = {
           ...each,
           index,
         };
+
         return obj;
       },
       {},
     );
+
     this.updateProperty(this.props.propertyName, updatedObj);
   };
 
   updateOption = (index: number, updatedLabel: string) => {
     const menuItemsArray = this.getMenuItems();
     const itemId = menuItemsArray[index].id;
+
     this.updateProperty(
       `${this.props.propertyName}.${itemId}.label`,
       updatedLabel,
     );
   };
 
-  addOption = () => {
+  addOption = ({ isSeparator }: { isSeparator?: boolean }) => {
     let groupButtons = this.props.propertyValue;
     const groupButtonsArray = this.getMenuItems();
     const newGroupButtonId = generateReactKey({ prefix: "groupButton" });
-    const newGroupButtonLabel = getNextEntityName(
-      "Group Button ",
-      groupButtonsArray.map((groupButton: any) => groupButton.label),
-    );
 
     groupButtons = {
       ...groupButtons,
       [newGroupButtonId]: {
         id: newGroupButtonId,
         index: groupButtonsArray.length,
-        label: newGroupButtonLabel,
+        label: isSeparator
+          ? "Separator"
+          : createMessage(BUTTON_WIDGET_DEFAULT_LABEL),
         widgetId: generateReactKey(),
         isDisabled: false,
+        itemType: isSeparator ? "SEPARATOR" : "BUTTON",
+        isSeparator,
         isVisible: true,
+        variant: "filled",
       },
     };
 
     if (this.props.widgetProperties.type === "BUTTON_GROUP_WIDGET") {
-      /**
+      /**c
        * These properties are required for "BUTTON_GROUP_WIDGET" but not for
-       * "WDS_BUTTON_GROUP_WIDGET"
+       * "WDS_TOOLBAR_BUTTONS_GROUP_WIDGET"
        */
       const optionalButtonGroupItemProperties = {
         menuItems: {},
@@ -189,6 +235,37 @@ class ButtonListControl extends BaseControl<ControlProps, State> {
         ...groupButtons[newGroupButtonId],
         ...optionalButtonGroupItemProperties,
       };
+    }
+
+    if (this.props.widgetProperties.type === "WDS_INLINE_BUTTONS_WIDGET") {
+      // if buttonVariant and buttonColor values ar present in session storage, then we should use those values
+      const buttonVariantSessionValue = sessionStorage.getItem(
+        "WDS_INLINE_BUTTONS_WIDGET.buttonVariant",
+      );
+      const buttonColorSessionValue = sessionStorage.getItem(
+        "WDS_INLINE_BUTTONS_WIDGET.buttonColor",
+      );
+
+      groupButtons[newGroupButtonId] = {
+        ...groupButtons[newGroupButtonId],
+        buttonVariant: buttonVariantSessionValue || "filled",
+        buttonColor: buttonColorSessionValue || "accent",
+      };
+
+      // if the widget is a WDS_INLINE_BUTTONS_WIDGET, and button already have filled button variant in groupButtons,
+      // then we should add a secondary button ( outlined button ) instead of simple button
+      const filledButtonVariant = groupButtonsArray.find(
+        // TODO: Fix this the next time the file is edited
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (groupButton: any) => groupButton.buttonVariant === "filled",
+      );
+
+      if (filledButtonVariant) {
+        groupButtons[newGroupButtonId] = {
+          ...groupButtons[newGroupButtonId],
+          buttonVariant: buttonVariantSessionValue || "outlined",
+        };
+      }
     }
 
     this.updateProperty(this.props.propertyName, groupButtons);

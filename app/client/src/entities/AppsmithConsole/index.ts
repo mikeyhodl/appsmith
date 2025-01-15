@@ -1,20 +1,12 @@
-import type { ReduxAction } from "@appsmith/constants/ReduxActionConstants";
+import type { ReduxAction } from "actions/ReduxActionTypes";
 import type LOG_TYPE from "./logtype";
 import type { PropertyEvaluationErrorType } from "utils/DynamicBindingUtils";
-import type { PluginType } from "entities/Action";
-import type { HTTP_METHOD } from "constants/ApiEditorConstants/CommonApiConstants";
-
-export enum ENTITY_TYPE {
-  ACTION = "ACTION",
-  DATASOURCE = "DATASOURCE",
-  WIDGET = "WIDGET",
-  JSACTION = "JSACTION",
-}
-
-export enum PLATFORM_ERROR {
-  PLUGIN_EXECUTION = "PLUGIN_EXECUTION",
-  JS_FUNCTION_EXECUTION = "JS_FUNCTION_EXECUTION",
-}
+import type { PluginType } from "entities/Plugin";
+import type { HTTP_METHOD } from "PluginActionEditor/constants/CommonApiConstants";
+import type {
+  ENTITY_TYPE,
+  PLATFORM_ERROR,
+} from "ee/entities/AppsmithConsole/utils";
 
 export type Methods =
   | "log"
@@ -31,6 +23,8 @@ export type Methods =
 
 export interface LogObject {
   method: Methods | "result";
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   data: any[];
   timestamp: string;
   id: string;
@@ -96,6 +90,8 @@ export interface LogActionPayload {
   // Number of times this log has been repeated
   occurrenceCount?: number;
   // Deconstructed data of the log, this includes the whole nested objects/arrays/strings etc.
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   logData?: any[];
   // messages associated with this event
   messages?: Array<Message>;
@@ -104,11 +100,19 @@ export interface LogActionPayload {
   // "where" source entity and propertyPsath.
   source?: SourceEntity;
   // Snapshot KV pair of scope variables or state associated with this event.
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   state?: Record<string, any>;
   // Any other data required for analytics
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   analytics?: Record<string, any>;
   // plugin error details if any (only for plugin errors).
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   pluginErrorDetails?: any;
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   meta?: Record<string, any>;
 }
 

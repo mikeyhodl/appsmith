@@ -16,20 +16,22 @@ import {
 import { canTranslateToUI, getActionBlocks } from "@shared/ast";
 import {
   getActions,
-  getJSCollections,
+  getAllJSCollections,
+  getJSModuleInstancesData,
   getModuleInstances,
   getPlugins,
-} from "@appsmith/selectors/entitiesSelector";
+} from "ee/selectors/entitiesSelector";
 import store from "store";
-import keyBy from "lodash/keyBy";
 import { getCurrentPageId } from "selectors/editorSelectors";
 import { getApiQueriesAndJSActionOptionsWithChildren } from "components/editorComponents/ActionCreator/helpers";
-import { selectEvaluationVersion } from "@appsmith/selectors/applicationSelectors";
+import { selectEvaluationVersion } from "ee/selectors/applicationSelectors";
 import type {
   ModuleInstance,
   ModuleInstanceDataState,
-} from "@appsmith/constants/ModuleInstanceConstants";
-import { MODULE_TYPE } from "@appsmith/constants/ModuleConstants";
+} from "ee/constants/ModuleInstanceConstants";
+import { MODULE_TYPE } from "ee/constants/ModuleConstants";
+import type { JSAction } from "entities/JSCollection";
+import { getAllModules } from "ee/selectors/modulesSelector";
 
 class ActionSelectorControl extends BaseControl<ControlProps> {
   componentRef = React.createRef<HTMLDivElement>();
@@ -62,7 +64,9 @@ class ActionSelectorControl extends BaseControl<ControlProps> {
 
   handleValueUpdate = (newValue: string, isUpdatedViaKeyboard = false) => {
     const { propertyName, propertyValue } = this.props;
+
     if (!propertyValue && !newValue) return;
+
     this.updateProperty(propertyName, newValue, isUpdatedViaKeyboard);
   };
 
@@ -80,6 +84,8 @@ class ActionSelectorControl extends BaseControl<ControlProps> {
         action={label}
         additionalAutoComplete={this.props.additionalAutoComplete}
         additionalControlData={
+          // TODO: Fix this the next time the file is edited
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           this.props.additionalControlData as Record<string, any>
         }
         dataTreePath={dataTreePath}
@@ -97,26 +103,32 @@ class ActionSelectorControl extends BaseControl<ControlProps> {
     return "ACTION_SELECTOR";
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  static canDisplayValueInUI(config: ControlData, value: any): boolean {
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  static canDisplayValueInUI(_: ControlData, value: any): boolean {
     const state = store.getState();
     const actions = getActions(state);
-    const jsActions = getJSCollections(state);
+    const jsCollections = getAllJSCollections(state);
     const codeFromProperty = getCodeFromMoustache(value?.trim() || "");
     const evaluationVersion = selectEvaluationVersion(state);
     const moduleInstances = getModuleInstances(state);
+    const queryModuleInstances = [] as ModuleInstanceDataState;
+    const jsModuleInstances = getJSModuleInstancesData(state);
+    const modules = getAllModules(state);
 
-    const queryModuleInstances = !!moduleInstances
-      ? (Object.values(moduleInstances).map((moduleInstance) => {
-          const instance = moduleInstance as ModuleInstance;
-          if (instance.type === MODULE_TYPE.QUERY) {
-            return {
-              config: instance,
-              data: undefined,
-            };
-          }
-        }) as unknown as ModuleInstanceDataState)
-      : [];
+    if (!!moduleInstances) {
+      for (const moduleInstance of Object.values(moduleInstances)) {
+        const instance = moduleInstance as ModuleInstance;
+
+        if (instance.type === MODULE_TYPE.QUERY) {
+          queryModuleInstances.push({
+            config: instance,
+            data: undefined,
+            isLoading: false,
+          });
+        }
+      }
+    }
 
     const actionsArray: string[] = [];
     const jsActionsArray: string[] = [];
@@ -127,9 +139,9 @@ class ActionSelectorControl extends BaseControl<ControlProps> {
       actionsArray.push(action.config.name + ".clear");
     });
 
-    jsActions.forEach((jsAction) =>
-      jsAction.config.actions.forEach((action) => {
-        jsActionsArray.push(jsAction.config.name + "." + action.name);
+    jsCollections.forEach((jsCollection) =>
+      jsCollection.config.actions.forEach((action: JSAction) => {
+        jsActionsArray.push(jsCollection.config.name + "." + action.name);
       }),
     );
 
@@ -146,14 +158,13 @@ class ActionSelectorControl extends BaseControl<ControlProps> {
 
     const pageId = getCurrentPageId(state);
     const plugins = getPlugins(state);
-    const pluginGroups: any = keyBy(plugins, "id");
 
     // this function gets all the Queries/API's/JS Objects and attaches it to actionList
     const fieldOptions = getApiQueriesAndJSActionOptionsWithChildren(
       pageId,
-      pluginGroups,
+      plugins,
       actions,
-      jsActions,
+      jsCollections,
       () => {
         return;
       },
@@ -161,16 +172,20 @@ class ActionSelectorControl extends BaseControl<ControlProps> {
         return;
       },
       queryModuleInstances,
+      jsModuleInstances,
+      modules,
     );
 
     try {
       const blocks = getActionBlocks(codeFromProperty, evaluationVersion);
+
       for (const codeBlock of blocks) {
         codeToAction(codeBlock, fieldOptions, true, true);
       }
     } catch (e) {
       return false;
     }
+
     return true;
   }
 }

@@ -22,7 +22,7 @@ import static java.lang.Boolean.TRUE;
 @Slf4j
 @RequiredArgsConstructor
 @Component
-@Observed(name = "Server startup")
+@Observed(name = "serverStartup")
 public class InstanceConfig implements ApplicationListener<ApplicationReadyEvent> {
 
     private final ConfigService configService;
@@ -52,8 +52,7 @@ public class InstanceConfig implements ApplicationListener<ApplicationReadyEvent
                     log.debug("Instance registration failed with error: \n{}", errorSignal.getMessage());
                     return Mono.empty();
                 })
-                .then(instanceConfigHelper.performRtsHealthCheck())
-                .doFinally(ignored -> instanceConfigHelper.printReady());
+                .then(instanceConfigHelper.performRtsHealthCheck());
 
         Mono<?> startupProcess = instanceConfigHelper
                 .checkMongoDBVersion()

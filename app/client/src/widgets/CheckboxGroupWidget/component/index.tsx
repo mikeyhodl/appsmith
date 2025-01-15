@@ -42,10 +42,10 @@ const InputContainer = styled.div<ThemeProp & InputContainerProps>`
     !!optionAlignment
       ? optionAlignment
       : optionCount > 1
-      ? `space-between`
-      : inline
-      ? `flex-start`
-      : `center`};
+        ? `space-between`
+        : inline
+          ? `flex-start`
+          : `center`};
   width: 100%;
   flex-grow: 1;
   height: 100%;
@@ -100,6 +100,7 @@ function SelectAll(props: SelectAllProps) {
     inline,
     onChange,
   } = props;
+
   return (
     <StyledCheckbox
       accentColor={accentColor}
@@ -151,6 +152,7 @@ export interface CheckboxGroupComponentProps extends ComponentProps {
   borderRadius: string;
   minWidth?: number;
 }
+
 function CheckboxGroupComponent(props: CheckboxGroupComponentProps) {
   const {
     accentColor,
@@ -183,10 +185,11 @@ function CheckboxGroupComponent(props: CheckboxGroupComponentProps) {
   const selectAllState = selectAllChecked
     ? SelectAllStates.CHECKED
     : selectAllIndeterminate
-    ? SelectAllStates.INDETERMINATE
-    : SelectAllStates.UNCHECKED;
+      ? SelectAllStates.INDETERMINATE
+      : SelectAllStates.UNCHECKED;
 
   let optionCount = (options || []).length;
+
   if (isSelectAll) {
     optionCount += 1;
   }

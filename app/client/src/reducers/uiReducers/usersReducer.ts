@@ -1,15 +1,16 @@
 import _ from "lodash";
 import { createReducer } from "utils/ReducerUtils";
-import type { ReduxAction } from "@appsmith/constants/ReduxActionConstants";
+import type { ReduxAction } from "actions/ReduxActionTypes";
 import {
   ReduxActionTypes,
   ReduxActionErrorTypes,
-} from "@appsmith/constants/ReduxActionConstants";
+} from "ee/constants/ReduxActionConstants";
 
 import type { User } from "constants/userConstants";
 import { DefaultCurrentUserDetails } from "constants/userConstants";
-import type { FeatureFlags } from "@appsmith/entities/FeatureFlag";
-import { DEFAULT_FEATURE_FLAG_VALUE } from "@appsmith/entities/FeatureFlag";
+import type { FeatureFlags } from "ee/entities/FeatureFlag";
+import { DEFAULT_FEATURE_FLAG_VALUE } from "ee/entities/FeatureFlag";
+import type { OverriddenFeatureFlags } from "utils/hooks/useFeatureFlagOverride";
 
 const initialState: UsersReduxState = {
   loadingStates: {
@@ -23,6 +24,7 @@ const initialState: UsersReduxState = {
   currentUser: undefined,
   featureFlag: {
     data: DEFAULT_FEATURE_FLAG_VALUE,
+    overriddenFlags: {},
     isFetched: false,
     isFetching: true,
   },
@@ -42,29 +44,19 @@ const usersReducer = createReducer(initialState, {
       fetchingUser: true,
     },
   }),
-  [ReduxActionTypes.PROP_PANE_MOVED]: (
-    state: UsersReduxState,
-    action: ReduxAction<PropertyPanePositionConfig>,
-  ) => ({
-    ...state,
-    propPanePreferences: {
-      isMoved: true,
-      position: {
-        ...action.payload.position,
-      },
-    },
-  }),
   [ReduxActionTypes.FETCH_USER_DETAILS_SUCCESS]: (
     state: UsersReduxState,
     action: ReduxAction<User>,
   ) => {
     const users = [...state.users];
     const userIndex = _.findIndex(users, { username: action.payload.username });
+
     if (userIndex > -1) {
       users[userIndex] = action.payload;
     } else {
       users.push(action.payload);
     }
+
     return {
       ...state,
       loadingStates: {
@@ -81,11 +73,13 @@ const usersReducer = createReducer(initialState, {
   ) => {
     const users = [...state.users];
     const userIndex = _.findIndex(users, { username: action.payload.username });
+
     if (userIndex > -1) {
       users[userIndex] = action.payload;
     } else {
       users.push(action.payload);
     }
+
     return {
       ...state,
       loadingStates: {
@@ -114,11 +108,13 @@ const usersReducer = createReducer(initialState, {
   ) => {
     const users = [...state.list];
     const userIndex = _.findIndex(users, { username: action.payload.username });
+
     if (userIndex > -1) {
       users[userIndex] = action.payload;
     } else {
       users.push(action.payload);
     }
+
     return {
       ...state,
       loadingStates: {
@@ -139,13 +135,6 @@ const usersReducer = createReducer(initialState, {
   [ReduxActionErrorTypes.FETCH_USER_ERROR]: (state: UsersReduxState) => ({
     ...state,
     loadingStates: { ...state.loadingStates, fetchingUser: false },
-  }),
-  [ReduxActionTypes.SET_CURRENT_USER_SUCCESS]: (
-    state: UsersReduxState,
-    action: ReduxAction<User>,
-  ) => ({
-    ...state,
-    current: action.payload,
   }),
   [ReduxActionTypes.LOGOUT_USER_SUCCESS]: (
     state: UsersReduxState,
@@ -191,6 +180,29 @@ const usersReducer = createReducer(initialState, {
       data: action.payload,
       isFetched: true,
       isFetching: false,
+    },
+  }),
+  [ReduxActionTypes.FETCH_OVERRIDDEN_FEATURE_FLAGS]: (
+    state: UsersReduxState,
+    action: ReduxAction<FeatureFlags>,
+  ) => ({
+    ...state,
+    featureFlag: {
+      ...state.featureFlag,
+      overriddenFlags: action.payload,
+    },
+  }),
+  [ReduxActionTypes.UPDATE_OVERRIDDEN_FEATURE_FLAGS]: (
+    state: UsersReduxState,
+    action: ReduxAction<FeatureFlags>,
+  ) => ({
+    ...state,
+    featureFlag: {
+      ...state.featureFlag,
+      overriddenFlags: {
+        ...state.featureFlag.overriddenFlags,
+        ...action.payload,
+      },
     },
   }),
   [ReduxActionErrorTypes.FETCH_FEATURE_FLAGS_ERROR]: (
@@ -264,6 +276,7 @@ export interface UsersReduxState {
     isFetched: boolean;
     data: FeatureFlags;
     isFetching: boolean;
+    overriddenFlags: OverriddenFeatureFlags;
   };
   productAlert: ProductAlertState;
 }

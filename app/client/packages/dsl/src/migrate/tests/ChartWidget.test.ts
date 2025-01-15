@@ -3,6 +3,7 @@ import { migrateDefaultValuesForCustomEChart } from "../migrations/085-migrate-d
 import { migrateAddShowHideDataPointLabels } from "../migrations/083-migrate-add-show-hide-data-point-labels";
 import { migrateChartWidgetLabelOrientationStaggerOption } from "../migrations/082-migrate-chart-widget-label-orientation-stagger-option";
 import type { DSLWidget } from "../types";
+import { migrateChartwidgetCustomEchartConfig } from "../migrations/087-migrate-chart-widget-customechartdata";
 
 type ChartWidgetProps = any;
 
@@ -45,6 +46,7 @@ describe("Migrate Label Orientation from type stagger to auto", () => {
     const outputDSL = migrateChartWidgetLabelOrientationStaggerOption(inputDSL);
     const outputChartWidgetDSL = (outputDSL.children &&
       outputDSL.children[0]) as ChartWidgetProps;
+
     expect(outputChartWidgetDSL.labelOrientation).toEqual("auto");
   });
 });
@@ -55,6 +57,7 @@ describe("Migrate Label show/hide property with respect to chart's allow scroll 
 
     const dsl = JSON.parse(JSON.stringify(inputDSL));
     const chartDSL = (dsl.children ?? [])[0];
+
     chartDSL.allowScroll = allowScroll;
 
     expect(dsl.showDataPointLabel).toBeUndefined();
@@ -72,6 +75,7 @@ describe("Migrate Label show/hide property with respect to chart's allow scroll 
 
     const dsl = JSON.parse(JSON.stringify(inputDSL));
     const chartDSL = (dsl.children ?? [])[0];
+
     chartDSL.allowScroll = allowScroll;
 
     expect(dsl.showDataPointLabel).toBeUndefined();
@@ -89,13 +93,39 @@ describe("Migrate Label show/hide property with respect to chart's allow scroll 
 describe("Migrate Default Custom EChart configuration", () => {
   it("adds echart custom chart default configuration to existing charts", () => {
     const inputChartWidgetDSL = inputDSL.children?.[0] as ChartWidgetProps;
+
     expect(inputChartWidgetDSL.customEChartConfig).not.toBeDefined();
 
     const outputDSL = migrateDefaultValuesForCustomEChart(inputDSL);
     const outputChartWidgetDSL = outputDSL.children?.[0] as ChartWidgetProps;
+
     expect(outputChartWidgetDSL.customEChartConfig).toBeDefined();
     expect(
       Object.keys(outputChartWidgetDSL.customEChartConfig).length,
     ).toBeGreaterThan(0);
+  });
+});
+
+describe("Migrate customEcChartConfig", () => {
+  it("test that customEChartConfig is migrated for matching cases", () => {
+    const chartWidgetDSL = inputDSL.children?.[0] as ChartWidgetProps;
+
+    const widgetName = chartWidgetDSL.widgetName;
+
+    chartWidgetDSL.customEChartConfig = `{{ ((chartType) => ( \n${widgetName}.chartData\n))(${widgetName}.chartType); }}`;
+
+    migrateChartwidgetCustomEchartConfig(inputDSL);
+
+    expect(chartWidgetDSL.customEChartConfig).toEqual(
+      `{{ ((chartType) => ( \n${widgetName}.chartData\n))(${widgetName}.chartType) }}`,
+    );
+
+    chartWidgetDSL.customEChartConfig = `{{ ((chartType) => ( \n${widgetName}.chartData\n))(${widgetName}.chartType); }} something`;
+
+    migrateChartwidgetCustomEchartConfig(inputDSL);
+
+    expect(chartWidgetDSL.customEChartConfig).toEqual(
+      `{{ ((chartType) => ( \n${widgetName}.chartData\n))(${widgetName}.chartType); }} something`,
+    );
   });
 });

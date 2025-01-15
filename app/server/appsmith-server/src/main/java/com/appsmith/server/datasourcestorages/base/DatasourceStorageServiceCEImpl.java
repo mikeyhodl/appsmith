@@ -58,7 +58,16 @@ public class DatasourceStorageServiceCEImpl implements DatasourceStorageServiceC
     @Override
     public Mono<DatasourceStorage> create(DatasourceStorage datasourceStorage) {
         return this.checkDuplicateDatasourceStorage(datasourceStorage)
-                .then(this.validateAndSaveDatasourceStorageToRepository(datasourceStorage))
+                .then(validateAndSaveDatasourceStorageToRepository(datasourceStorage, false))
+                .flatMap(this::populateHintMessages) // For REST API datasource create flow.
+                .flatMap(savedDatasourceStorage -> analyticsService.sendCreateEvent(
+                        savedDatasourceStorage, getAnalyticsProperties(savedDatasourceStorage)));
+    }
+
+    @Override
+    public Mono<DatasourceStorage> create(DatasourceStorage datasourceStorage, boolean isDryOps) {
+        return this.checkDuplicateDatasourceStorage(datasourceStorage)
+                .then(validateAndSaveDatasourceStorageToRepository(datasourceStorage, isDryOps))
                 .flatMap(this::populateHintMessages) // For REST API datasource create flow.
                 .flatMap(savedDatasourceStorage -> analyticsService.sendCreateEvent(
                         savedDatasourceStorage, getAnalyticsProperties(savedDatasourceStorage)));
@@ -127,6 +136,15 @@ public class DatasourceStorageServiceCEImpl implements DatasourceStorageServiceC
     @Override
     public Mono<DatasourceStorage> updateDatasourceStorage(
             DatasourceStorage datasourceStorage, String activeEnvironmentId, Boolean isUserRefreshedUpdate) {
+        return updateDatasourceStorage(datasourceStorage, activeEnvironmentId, isUserRefreshedUpdate, false);
+    }
+
+    @Override
+    public Mono<DatasourceStorage> updateDatasourceStorage(
+            DatasourceStorage datasourceStorage,
+            String activeEnvironmentId,
+            Boolean isUserRefreshedUpdate,
+            boolean isDryOps) {
         String datasourceId = datasourceStorage.getDatasourceId();
         String environmentId = datasourceStorage.getEnvironmentId();
 
@@ -143,7 +161,8 @@ public class DatasourceStorageServiceCEImpl implements DatasourceStorageServiceC
                     }
                     return dbStorage;
                 })
-                .flatMap(this::validateAndSaveDatasourceStorageToRepository)
+                .flatMap(datasourceStorage1 ->
+                        validateAndSaveDatasourceStorageToRepository(datasourceStorage1, isDryOps))
                 .flatMap(savedDatasourceStorage -> {
                     Map<String, Object> analyticsProperties = getAnalyticsProperties(savedDatasourceStorage);
                     Boolean isUserInvokedUpdate = TRUE.equals(isUserRefreshedUpdate) ? TRUE : FALSE;
@@ -152,6 +171,16 @@ public class DatasourceStorageServiceCEImpl implements DatasourceStorageServiceC
                     return analyticsService.sendUpdateEvent(savedDatasourceStorage, analyticsProperties);
                 })
                 .flatMap(this::populateHintMessages);
+    }
+
+    public Mono<DatasourceStorage> executePreSaveActions(DatasourceStorage datasourceStorage) {
+        Mono<Plugin> pluginMono = pluginService.findById(datasourceStorage.getPluginId());
+        Mono<PluginExecutor> pluginExecutorMono = pluginExecutorHelper
+                .getPluginExecutor(pluginMono)
+                .switchIfEmpty(Mono.error(new AppsmithException(
+                        AppsmithError.NO_RESOURCE_FOUND, FieldName.PLUGIN, datasourceStorage.getPluginId())));
+
+        return pluginExecutorMono.flatMap(pluginExecutor -> pluginExecutor.preSaveHook(datasourceStorage));
     }
 
     @Override
@@ -201,19 +230,19 @@ public class DatasourceStorageServiceCEImpl implements DatasourceStorageServiceC
                 });
     }
 
-    private Mono<DatasourceStorage> validateAndSaveDatasourceStorageToRepository(DatasourceStorage datasourceStorage) {
+    private Mono<DatasourceStorage> validateAndSaveDatasourceStorageToRepository(
+            DatasourceStorage datasourceStorage, boolean isDryOps) {
 
         return Mono.just(datasourceStorage)
                 .map(this::sanitizeDatasourceStorage)
                 .flatMap(datasourceStorage1 -> validateDatasourceStorage(datasourceStorage1))
+                .flatMap(this::executePreSaveActions)
                 .flatMap(unsavedDatasourceStorage -> {
-                    return repository.save(unsavedDatasourceStorage).map(datasourceStorage1 -> {
-                        // datasourceStorage.pluginName is a transient field. It was set by validateDatasource method
-                        // object from db will have pluginName=null so set it manually from the unsaved
-                        // datasourceStorage obj
-                        datasourceStorage1.setPluginName(unsavedDatasourceStorage.getPluginName());
-                        return datasourceStorage1;
-                    });
+                    if (isDryOps) {
+                        unsavedDatasourceStorage.updateForBulkWriteOperation();
+                        return Mono.just(unsavedDatasourceStorage);
+                    }
+                    return repository.save(unsavedDatasourceStorage).thenReturn(unsavedDatasourceStorage);
                 });
     }
 
@@ -240,7 +269,12 @@ public class DatasourceStorageServiceCEImpl implements DatasourceStorageServiceC
 
     @Override
     public Mono<DatasourceStorage> populateHintMessages(DatasourceStorage datasourceStorage) {
+        return this.populateHintMessages(datasourceStorage, null);
+    }
 
+    @Override
+    public Mono<DatasourceStorage> populateHintMessages(
+            DatasourceStorage datasourceStorage, Map<String, Plugin> pluginsMap) {
         if (datasourceStorage == null) {
             /*
              * - Not throwing an exception here because we do not throw an error in case of missing datasourceStorage.
@@ -257,7 +291,13 @@ public class DatasourceStorageServiceCEImpl implements DatasourceStorageServiceC
             return Mono.just(datasourceStorage);
         }
 
-        final Mono<Plugin> pluginMono = pluginService.findById(datasourceStorage.getPluginId());
+        Mono<Plugin> pluginMono;
+        if (pluginsMap == null) {
+            pluginMono = pluginService.findById(datasourceStorage.getPluginId());
+        } else {
+            pluginMono = Mono.justOrEmpty(pluginsMap.get(datasourceStorage.getPluginId()));
+        }
+
         Mono<PluginExecutor> pluginExecutorMono = pluginExecutorHelper
                 .getPluginExecutor(pluginMono)
                 .switchIfEmpty(Mono.error(new AppsmithException(

@@ -138,6 +138,7 @@ public class FirestorePlugin extends BasePlugin {
                 DatasourceConfiguration datasourceConfiguration,
                 ActionConfiguration actionConfiguration) {
 
+            log.debug(Thread.currentThread().getName() + ": executeParameterized() called for Firestore plugin.");
             Object smartSubstitutionObject = actionConfiguration.getFormData().getOrDefault(SMART_SUBSTITUTION, TRUE);
             Boolean smartJsonSubstitution = TRUE;
             if (smartSubstitutionObject instanceof Boolean) {
@@ -244,6 +245,8 @@ public class FirestorePlugin extends BasePlugin {
                         }
 
                         try {
+                            log.debug(Thread.currentThread().getName()
+                                    + ": objectMapper.readValue invoked from Firestore plugin.");
                             return Mono.just(objectMapper.readValue(strBody, HashMap.class));
                         } catch (IOException e) {
                             return Mono.error(new AppsmithPluginException(
@@ -315,6 +318,8 @@ public class FirestorePlugin extends BasePlugin {
                     })
                     // Now set the request in the result to be returned to the server
                     .map(result -> {
+                        log.debug(Thread.currentThread().getName()
+                                + ": setting the request in action execution result from Firestore plugin.");
                         ActionExecutionRequest request = new ActionExecutionRequest();
                         request.setProperties(requestData);
                         request.setQuery(query);
@@ -465,11 +470,9 @@ public class FirestorePlugin extends BasePlugin {
                              */
                             if (targetKeyValuePair.get(key) == null) {
                                 String nextKey = singlePathList.get(i + 1);
-                                targetKeyValuePair.put(key, new HashMap<>() {
-                                    {
-                                        put(nextKey, null);
-                                    }
-                                });
+                                final Map<String, ?> pair = new HashMap<>();
+                                pair.put(nextKey, null);
+                                targetKeyValuePair.put(key, pair);
                             }
 
                             /*
@@ -503,6 +506,7 @@ public class FirestorePlugin extends BasePlugin {
                 Map<String, Object> mapBody,
                 String query,
                 List<RequestParamDTO> requestParams) {
+            log.debug(Thread.currentThread().getName() + ": handleDocumentLevelMethod() called for Firestore plugin.");
             return Mono.just(method)
                     // Get the actual Java method to be called.
                     .flatMap(method1 -> {
@@ -580,7 +584,6 @@ public class FirestorePlugin extends BasePlugin {
                             return Mono.error(e);
                         }
                         result.setIsExecutionSuccess(true);
-                        log.debug("In the Firestore Plugin, got action execution result");
                         return Mono.just(result);
                     });
         }
@@ -596,7 +599,8 @@ public class FirestorePlugin extends BasePlugin {
                 List<RequestParamDTO> requestParams,
                 Set<String> hintMessages,
                 ActionConfiguration actionConfiguration) {
-
+            log.debug(
+                    Thread.currentThread().getName() + ": handleCollectionLevelMethod() called for Firestore plugin.");
             final CollectionReference collection = connection.collection(path);
 
             if (method == Method.GET_COLLECTION) {
@@ -685,32 +689,9 @@ public class FirestorePlugin extends BasePlugin {
             }
 
             return Mono.just(query)
-                    // Apply ordering, if provided.
-                    .map(query1 -> {
-                        Query q = query1;
-                        final List<Object> startAfterValues = new ArrayList<>();
-                        final List<Object> endBeforeValues = new ArrayList<>();
-                        for (final String field : orderings) {
-                            q = q.orderBy(
-                                    field.replaceAll("^-", ""),
-                                    field.startsWith("-") ? Query.Direction.DESCENDING : Query.Direction.ASCENDING);
-                            if (startAfter != null) {
-                                startAfterValues.add(startAfter.get(field));
-                            }
-                            if (endBefore != null) {
-                                endBeforeValues.add(endBefore.get(field));
-                            }
-                        }
-                        if (PaginationField.NEXT.equals(paginationField) && !CollectionUtils.isEmpty(startAfter)) {
-                            q = q.startAfter(startAfterValues.toArray());
-                        } else if (PaginationField.PREV.equals(paginationField)
-                                && !CollectionUtils.isEmpty(endBefore)) {
-                            q = q.endBefore(endBeforeValues.toArray());
-                        }
-                        return q;
-                    })
                     // Apply where condition, if provided.
-                    .flatMap(query1 -> {
+                    .flatMap(q -> {
+                        Query query1 = q;
                         if (!isWhereMethodUsed(formData)) {
                             return Mono.just(query1);
                         }
@@ -744,6 +725,30 @@ public class FirestorePlugin extends BasePlugin {
 
                         return Mono.just(query1);
                     })
+                    // Apply ordering, if provided.
+                    .map(query1 -> {
+                        Query q = query1;
+                        final List<Object> startAfterValues = new ArrayList<>();
+                        final List<Object> endBeforeValues = new ArrayList<>();
+                        for (final String field : orderings) {
+                            q = q.orderBy(
+                                    field.replaceAll("^-", ""),
+                                    field.startsWith("-") ? Query.Direction.DESCENDING : Query.Direction.ASCENDING);
+                            if (startAfter != null) {
+                                startAfterValues.add(startAfter.get(field));
+                            }
+                            if (endBefore != null) {
+                                endBeforeValues.add(endBefore.get(field));
+                            }
+                        }
+                        if (PaginationField.NEXT.equals(paginationField) && !CollectionUtils.isEmpty(startAfter)) {
+                            q = q.startAfter(startAfterValues.toArray());
+                        } else if (PaginationField.PREV.equals(paginationField)
+                                && !CollectionUtils.isEmpty(endBefore)) {
+                            q = q.endBefore(endBeforeValues.toArray());
+                        }
+                        return q;
+                    })
                     // Apply limit, always provided, since without it, we can inadvertently end up processing too much
                     // data.
                     .map(query1 -> {
@@ -774,7 +779,6 @@ public class FirestorePlugin extends BasePlugin {
                             return Mono.error(e);
                         }
                         result.setIsExecutionSuccess(true);
-                        log.debug("In the Firestore Plugin, got action execution result for get collection");
                         return Mono.just(result);
                     });
         }
@@ -825,7 +829,6 @@ public class FirestorePlugin extends BasePlugin {
                             return Mono.error(e);
                         }
                         result.setIsExecutionSuccess(true);
-                        log.debug("In the Firestore Plugin, got action execution result for add to collection");
                         return Mono.just(result);
                     });
         }
@@ -893,6 +896,7 @@ public class FirestorePlugin extends BasePlugin {
 
         @Override
         public Mono<Firestore> datasourceCreate(DatasourceConfiguration datasourceConfiguration) {
+            log.debug(Thread.currentThread().getName() + ": datasourceCreate() called for Firestore plugin.");
             final DBAuth authentication = (DBAuth) datasourceConfiguration.getAuthentication();
 
             final Set<String> errors = validateDatasource(datasourceConfiguration);
@@ -908,6 +912,8 @@ public class FirestorePlugin extends BasePlugin {
             InputStream serviceAccount = new ByteArrayInputStream(clientJson.getBytes());
 
             return Mono.fromSupplier(() -> {
+                        log.debug(Thread.currentThread().getName()
+                                + ": instantiating googlecredentials object from Firestore plugin.");
                         GoogleCredentials credentials;
                         try {
                             credentials = GoogleCredentials.fromStream(serviceAccount);
@@ -938,12 +944,12 @@ public class FirestorePlugin extends BasePlugin {
 
         @Override
         public Mono<DatasourceTestResult> testDatasource(DatasourceConfiguration datasourceConfiguration) {
-
+            log.debug(Thread.currentThread().getName() + ": testDatasource() called for Firestore plugin.");
             return datasourceCreate(datasourceConfiguration).flatMap(connection -> {
                 try {
                     connection.listCollections();
                 } catch (FirestoreException e) {
-                    log.debug("Invalid datasource configuration : {}", e.getMessage());
+                    log.error("Invalid datasource configuration: " + e.getMessage());
                     if (e.getMessage().contains("Metadata operations require admin authentication")) {
                         DatasourceTestResult datasourceTestResult = new DatasourceTestResult();
                         datasourceTestResult.setMessages(new HashSet<>(
@@ -965,6 +971,7 @@ public class FirestorePlugin extends BasePlugin {
 
         @Override
         public Set<String> validateDatasource(DatasourceConfiguration datasourceConfiguration) {
+            log.debug(Thread.currentThread().getName() + ": validateDatasource() called for Firestore plugin.");
             final DBAuth authentication = (DBAuth) datasourceConfiguration.getAuthentication();
 
             Set<String> invalids = new HashSet<>();
@@ -992,7 +999,10 @@ public class FirestorePlugin extends BasePlugin {
         @Override
         public Mono<DatasourceStructure> getStructure(
                 Firestore connection, DatasourceConfiguration datasourceConfiguration) {
+            log.debug(Thread.currentThread().getName() + ": getStructure() called for Firestore plugin.");
             return Mono.fromSupplier(() -> {
+                        log.debug(Thread.currentThread().getName()
+                                + ": invoking connection.listCollections() from Firestore plugin.");
                         Iterable<CollectionReference> collectionReferences = connection.listCollections();
 
                         List<DatasourceStructure.Table> tables = StreamSupport.stream(

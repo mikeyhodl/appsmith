@@ -1,20 +1,19 @@
 package com.appsmith.server.helpers;
 
+import com.appsmith.external.dtos.ModifiedResources;
 import com.appsmith.external.models.ActionDTO;
 import com.appsmith.external.models.Datasource;
 import com.appsmith.server.constants.FieldName;
 import com.appsmith.server.domains.Application;
-import com.appsmith.server.domains.ApplicationDetail;
 import com.appsmith.server.dtos.ApplicationJson;
+import com.appsmith.server.dtos.ArtifactExchangeJson;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.InvalidDataAccessApiUsageException;
 import org.springframework.data.mongodb.MongoTransactionException;
 import org.springframework.transaction.TransactionException;
-import org.springframework.util.CollectionUtils;
 
 import java.time.Instant;
 import java.util.Map;
-import java.util.Set;
 
 import static com.appsmith.external.helpers.AppsmithBeanUtils.copyNestedNonNullProperties;
 
@@ -80,35 +79,13 @@ public class ImportExportUtils {
         return "";
     }
 
-    /**
-     * This function sets the current applicationDetail properties to null if the user wants to discard the changes
-     * and accept from the git repo which doesn't contain these.
-     * @param importedApplicationDetail
-     * @param existingApplicationDetail
-     */
-    private static void setPropertiesToApplicationDetail(
-            ApplicationDetail importedApplicationDetail, ApplicationDetail existingApplicationDetail) {
-        // If the initial commit to git doesn't contain these keys and if we want to discard the changes,
-        // the function copyNestedNonNullProperties ignore these properties and the changes are not discarded
-        if (importedApplicationDetail != null && existingApplicationDetail != null) {
-            if (importedApplicationDetail.getAppPositioning() == null) {
-                existingApplicationDetail.setAppPositioning(null);
-            }
-
-            if (importedApplicationDetail.getNavigationSetting() == null) {
-                existingApplicationDetail.setNavigationSetting(null);
-            }
-        }
-    }
-
     public static void setPropertiesToExistingApplication(
             Application importedApplication, Application existingApplication) {
         importedApplication.setId(existingApplication.getId());
 
-        ApplicationDetail importedUnpublishedAppDetail = importedApplication.getUnpublishedApplicationDetail();
-        ApplicationDetail importedPublishedAppDetail = importedApplication.getPublishedApplicationDetail();
-        ApplicationDetail existingUnpublishedAppDetail = existingApplication.getUnpublishedApplicationDetail();
-        ApplicationDetail existingPublishedAppDetail = existingApplication.getPublishedApplicationDetail();
+        // Since we don't want to merge the ApplicationDetailObjects we would just assign the imported values directly
+        existingApplication.setPublishedApplicationDetail(importedApplication.getPublishedApplicationDetail());
+        existingApplication.setUnpublishedApplicationDetail(importedApplication.getUnpublishedApplicationDetail());
 
         // For the existing application we don't need to default
         // value of the flag
@@ -121,21 +98,12 @@ public class ImportExportUtils {
         // These properties are not present in the application when it is created, hence the initial commit
         // to git doesn't contain these keys and if we want to discard the changes, the function
         // copyNestedNonNullProperties ignore these properties and the changes are not discarded
-        if (importedUnpublishedAppDetail == null) {
-            existingApplication.setUnpublishedApplicationDetail(null);
-        }
-        if (importedPublishedAppDetail == null) {
-            existingApplication.setPublishedApplicationDetail(null);
-        }
         if (importedApplication.getPublishedAppLayout() == null) {
             existingApplication.setPublishedAppLayout(null);
         }
         if (importedApplication.getUnpublishedAppLayout() == null) {
             existingApplication.setUnpublishedAppLayout(null);
         }
-
-        setPropertiesToApplicationDetail(importedUnpublishedAppDetail, existingUnpublishedAppDetail);
-        setPropertiesToApplicationDetail(importedPublishedAppDetail, existingPublishedAppDetail);
 
         copyNestedNonNullProperties(importedApplication, existingApplication);
     }
@@ -153,15 +121,20 @@ public class ImportExportUtils {
     }
 
     public static boolean isPageNameInUpdatedList(ApplicationJson applicationJson, String pageName) {
-        Map<String, Set<String>> updatedResources = applicationJson.getUpdatedResources();
-        if (updatedResources == null) {
+        ModifiedResources modifiedResources = applicationJson.getModifiedResources();
+        if (modifiedResources == null) {
             return false;
         }
-        Set<String> updatedPageNames = updatedResources.get(FieldName.PAGE_LIST);
-        if (CollectionUtils.isEmpty(updatedPageNames)) {
+        return pageName != null && modifiedResources.isResourceUpdated(FieldName.PAGE_LIST, pageName);
+    }
+
+    public static boolean isContextNameInUpdatedList(
+            ArtifactExchangeJson artifactExchangeJson, String contextName, String contextPath) {
+        ModifiedResources modifiedResources = artifactExchangeJson.getModifiedResources();
+        if (modifiedResources == null) {
             return false;
         }
-        return pageName != null && updatedPageNames.contains(pageName);
+        return contextName != null && modifiedResources.isResourceUpdated(contextPath, contextName);
     }
 
     public static boolean isDatasourceUpdatedSinceLastCommit(

@@ -1,4 +1,4 @@
-import { ReduxActionTypes } from "@appsmith/constants/ReduxActionConstants";
+import { ReduxActionTypes } from "ee/constants/ReduxActionConstants";
 import {
   FlexVerticalAlignment,
   LayoutDirection,
@@ -39,6 +39,7 @@ import {
 import type { WidgetProps } from "widgets/BaseWidget";
 import { BlueprintOperationTypes } from "WidgetProvider/constants";
 import IconSVG from "../icon.svg";
+import ThumbnailSVG from "../thumbnail.svg";
 import { renderAppsmithCanvas } from "layoutSystems/CanvasFactory";
 
 export function selectedTabValidation(
@@ -50,6 +51,7 @@ export function selectedTabValidation(
     id: string;
   }> = props.tabsObj ? Object.values(props.tabsObj) : props.tabs || [];
   const tabNames = tabs.map((i: { label: string; id: string }) => i.label);
+
   return {
     isValid: value === "" ? true : tabNames.includes(value as string),
     parsed: value,
@@ -71,6 +73,7 @@ class TabsWidget extends BaseWidget<
     return {
       name: "Tabs",
       iconSVG: IconSVG,
+      thumbnailSVG: ThumbnailSVG,
       tags: [WIDGET_TAGS.LAYOUT],
       needsMeta: true,
       isCanvas: true,
@@ -164,12 +167,17 @@ class TabsWidget extends BaseWidget<
                 widget.children || []
               ).reduce((idsObj, eachChild) => {
                 idsObj = { ...idsObj, [eachChild.tabId]: eachChild.widgetId };
+
                 return idsObj;
               }, {});
+              // TODO: Fix this the next time the file is edited
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               const tabsObj = tabs.reduce((obj: any, tab: any) => {
                 const newTab = { ...tab };
+
                 newTab.widgetId = tabIds[newTab.id];
                 obj[newTab.id] = newTab;
+
                 return obj;
               }, {});
               const updatePropertyMap = [
@@ -179,6 +187,7 @@ class TabsWidget extends BaseWidget<
                   propertyValue: tabsObj,
                 },
               ];
+
               return updatePropertyMap;
             },
           },
@@ -202,6 +211,7 @@ class TabsWidget extends BaseWidget<
         if (props.shouldShowTabs === true) {
           offset += 4;
         }
+
         return offset;
       },
     };
@@ -264,9 +274,11 @@ class TabsWidget extends BaseWidget<
             ) => {
               const propertyPathSplit = propertyPath.split(".");
               const property = propertyPathSplit.pop();
+
               if (property === "label") {
                 const itemId = propertyPathSplit.pop() || "";
                 const item = props.tabsObj[itemId];
+
                 if (item) {
                   return [
                     {
@@ -280,6 +292,7 @@ class TabsWidget extends BaseWidget<
                   ];
                 }
               }
+
               return [];
             },
             panelConfig: {
@@ -287,6 +300,8 @@ class TabsWidget extends BaseWidget<
               titlePropertyName: "label",
               panelIdPropertyName: "id",
               updateHook: (
+                // TODO: Fix this the next time the file is edited
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 props: any,
                 propertyPath: string,
                 propertyValue: string,
@@ -490,11 +505,13 @@ class TabsWidget extends BaseWidget<
 
   callDynamicHeightUpdates = () => {
     const { checkContainersForAutoHeight } = this.context;
+
     checkContainersForAutoHeight && checkContainersForAutoHeight();
   };
 
   callPositionUpdates = (tabWidgetId: string) => {
     const { updatePositionsOnTabChange } = this.context;
+
     updatePositionsOnTabChange &&
       updatePositionsOnTabChange(this.props.widgetId, tabWidgetId);
   };
@@ -532,6 +549,8 @@ class TabsWidget extends BaseWidget<
     };
   }
 
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   static getMetaPropertiesMap(): Record<string, any> {
     return {
       selectedTabWidgetId: undefined,
@@ -582,12 +601,14 @@ class TabsWidget extends BaseWidget<
         return selectedTabWidgetId === item.widgetId;
       })[0],
     };
+
     if (!childWidgetData) {
       return null;
     }
 
     childWidgetData.canExtend = this.props.shouldScrollContents;
     const { componentHeight, componentWidth } = this.props;
+
     childWidgetData.rightColumn = componentWidth;
     childWidgetData.isVisible = this.props.isVisible;
     childWidgetData.bottomRow = this.props.shouldScrollContents
@@ -602,6 +623,7 @@ class TabsWidget extends BaseWidget<
       this.props.layoutSystemType == LayoutSystemTypes.AUTO
         ? Positioning.Vertical
         : Positioning.Fixed;
+
     childWidgetData.positioning = positioning;
     childWidgetData.useAutoLayout = positioning !== Positioning.Fixed;
     childWidgetData.direction =
@@ -610,17 +632,20 @@ class TabsWidget extends BaseWidget<
         : LayoutDirection.Horizontal;
     childWidgetData.alignment = selectedTabProps?.alignment;
     childWidgetData.spacing = selectedTabProps?.spacing;
+
     return renderAppsmithCanvas(childWidgetData as WidgetProps);
   };
 
   private getSelectedTabWidgetId() {
     let selectedTabWidgetId = this.props.selectedTabWidgetId;
+
     if (this.props.children) {
       selectedTabWidgetId =
-        this.props.children.find(
-          (tab) => this.props.selectedWidgetAncestry?.includes(tab.widgetId),
+        this.props.children.find((tab) =>
+          this.props.selectedWidgetAncestry?.includes(tab.widgetId),
         )?.widgetId ?? this.props.selectedTabWidgetId;
     }
+
     return selectedTabWidgetId;
   }
 
@@ -637,6 +662,7 @@ class TabsWidget extends BaseWidget<
 
   getVisibleTabs = () => {
     const tabs = Object.values(this.props.tabsObj || {});
+
     if (tabs.length) {
       return tabs
         .filter(
@@ -644,6 +670,7 @@ class TabsWidget extends BaseWidget<
         )
         .sort((tab1, tab2) => tab1.index - tab2.index);
     }
+
     return [];
   };
 

@@ -1,18 +1,15 @@
 import {
+  ADD_PATH,
   ADMIN_SETTINGS_PATH,
-  GEN_TEMPLATE_FORM_ROUTE,
-  GEN_TEMPLATE_URL,
   getViewerCustomPath,
   getViewerPath,
   TEMPLATES_PATH,
 } from "constants/routes";
 import { APP_MODE } from "entities/App";
-import urlBuilder from "@appsmith/entities/URLRedirect/URLAssembly";
-import type { URLBuilderParams } from "@appsmith/entities/URLRedirect/URLAssembly";
-import type {
-  ApplicationPayload,
-  Page,
-} from "@appsmith/constants/ReduxActionConstants";
+import urlBuilder from "ee/entities/URLRedirect/URLAssembly";
+import type { URLBuilderParams } from "ee/entities/URLRedirect/URLAssembly";
+import type { Page } from "entities/Page";
+import type { ApplicationPayload } from "entities/Application";
 
 export const fillPathname = (
   pathname: string,
@@ -20,11 +17,11 @@ export const fillPathname = (
   page: Page,
 ) => {
   const replaceValue = page.customSlug
-    ? getViewerCustomPath(page.customSlug, page.pageId)
-    : getViewerPath(application.slug, page.slug, page.pageId);
+    ? getViewerCustomPath(page.customSlug, page.basePageId)
+    : getViewerPath(application.slug, page.slug, page.basePageId);
 
   return pathname.replace(
-    `/applications/${application.id}/pages/${page.pageId}`,
+    `/applications/${application.baseId}/pages/${page.basePageId}`,
     replaceValue,
   );
 };
@@ -46,16 +43,21 @@ export const datasourcesEditorIdURL = (
   });
 };
 
+export interface WithAddView {
+  add?: boolean;
+}
+
 export const jsCollectionIdURL = (
-  props: URLBuilderParams & {
-    collectionId: string;
-    // Pass a function name to set the cursor directly on the function
-    functionName?: string;
-  },
+  props: URLBuilderParams &
+    WithAddView & {
+      baseCollectionId: string;
+      // Pass a function name to set the cursor directly on the function
+      functionName?: string;
+    },
 ): string => {
   return urlBuilder.build({
     ...props,
-    suffix: `jsObjects/${props.collectionId}`,
+    suffix: `jsObjects/${props.baseCollectionId}${props.add ? ADD_PATH : ""}`,
     hash: props.functionName,
   });
 };
@@ -64,6 +66,7 @@ export const integrationEditorURL = (
   props: URLBuilderParams & { selectedTab: string },
 ): string => {
   const suffixPath = props.suffix ? `/${props.suffix}` : "";
+
   return urlBuilder.build({
     ...props,
     suffix: `datasources/${props.selectedTab}${suffixPath}`,
@@ -71,39 +74,25 @@ export const integrationEditorURL = (
 };
 
 export const queryEditorIdURL = (
-  props: URLBuilderParams & {
-    queryId: string;
-  },
+  props: URLBuilderParams &
+    WithAddView & {
+      baseQueryId: string;
+    },
 ): string =>
   urlBuilder.build({
     ...props,
-    suffix: `queries/${props.queryId}`,
+    suffix: `queries/${props.baseQueryId}${props.add ? ADD_PATH : ""}`,
   });
 
 export const apiEditorIdURL = (
-  props: URLBuilderParams & {
-    apiId: string;
-  },
+  props: URLBuilderParams &
+    WithAddView & {
+      baseApiId: string;
+    },
 ): string =>
   urlBuilder.build({
     ...props,
-    suffix: `api/${props.apiId}`,
-  });
-
-export const curlImportPageURL = (props: URLBuilderParams): string =>
-  urlBuilder.build({
-    ...props,
-    suffix: "api/curl/curl-import",
-  });
-
-export const providerTemplatesURL = (
-  props: URLBuilderParams & {
-    providerId: string;
-  },
-): string =>
-  urlBuilder.build({
-    ...props,
-    suffix: `api/provider/${props.providerId}`,
+    suffix: `api/${props.baseApiId}${props.add ? ADD_PATH : ""}`,
   });
 
 export const saasEditorDatasourceIdURL = (
@@ -118,20 +107,17 @@ export const saasEditorDatasourceIdURL = (
   });
 
 export const saasEditorApiIdURL = (
-  props: URLBuilderParams & {
-    pluginPackageName: string;
-    apiId: string;
-  },
+  props: URLBuilderParams &
+    WithAddView & {
+      pluginPackageName: string;
+      baseApiId: string;
+    },
 ): string =>
   urlBuilder.build({
     ...props,
-    suffix: `saas/${props.pluginPackageName}/api/${props.apiId}`,
-  });
-
-export const generateTemplateFormURL = (props: URLBuilderParams): string =>
-  urlBuilder.build({
-    ...props,
-    suffix: `${GEN_TEMPLATE_URL}${GEN_TEMPLATE_FORM_ROUTE}`,
+    suffix: `saas/${props.pluginPackageName}/api/${props.baseApiId}${
+      props.add ? ADD_PATH : ""
+    }`,
   });
 
 export const onboardingCheckListUrl = (props: URLBuilderParams): string =>
@@ -143,13 +129,21 @@ export const onboardingCheckListUrl = (props: URLBuilderParams): string =>
 export const builderURL = (props: URLBuilderParams): string => {
   return urlBuilder.build(props);
 };
+export const globalAddURL = (props: URLBuilderParams): string => {
+  return urlBuilder.build({
+    ...props,
+    suffix: "add",
+  });
+};
 
 export const widgetURL = (
-  props: URLBuilderParams & { selectedWidgets: string[] },
+  props: URLBuilderParams & WithAddView & { selectedWidgets: string[] },
 ) => {
   return urlBuilder.build({
     ...props,
-    suffix: `widgets/${props.selectedWidgets.join(",")}`,
+    suffix: `widgets/${props.selectedWidgets.join(",")}${
+      props.add ? ADD_PATH : ""
+    }`,
   });
 };
 
@@ -184,6 +178,13 @@ export const jsCollectionListURL = (props: URLBuilderParams): string => {
   });
 };
 
+export const jsCollectionAddURL = (props: URLBuilderParams): string => {
+  return urlBuilder.build({
+    ...props,
+    suffix: "jsObjects/add",
+  });
+};
+
 export const queryListURL = (props: URLBuilderParams): string =>
   urlBuilder.build({
     ...props,
@@ -194,4 +195,13 @@ export const queryAddURL = (props: URLBuilderParams): string =>
   urlBuilder.build({
     ...props,
     suffix: `queries/add`,
+  });
+
+export const appLibrariesURL = (): string =>
+  urlBuilder.build({
+    suffix: "libraries",
+  });
+export const appPackagesURL = (): string =>
+  urlBuilder.build({
+    suffix: "packages",
   });

@@ -12,7 +12,7 @@ import {
   GIT_UPSTREAM_CHANGES,
   PULL_CHANGES,
   READ_DOCUMENTATION,
-} from "@appsmith/constants/messages";
+} from "ee/constants/messages";
 import styled from "styled-components";
 import {
   Button,
@@ -22,7 +22,7 @@ import {
   ModalFooter,
   Text,
   Tooltip,
-} from "design-system";
+} from "@appsmith/ads";
 import {
   getConflictFoundDocUrlDeploy,
   getGitCommitAndPushError,
@@ -31,16 +31,17 @@ import {
   getIsCommitSuccessful,
   getIsCommittingInProgress,
   getIsDiscardInProgress,
-  getIsFetchingGitRemoteStatus,
   getIsFetchingGitStatus,
-  getIsGitStatusLiteEnabled,
   getIsPullingProgress,
   getPullFailed,
   getUpstreamErrorDocUrl,
 } from "selectors/gitSyncSelectors";
 import { useDispatch, useSelector } from "react-redux";
 
-import { getCurrentAppGitMetaData } from "@appsmith/selectors/applicationSelectors";
+import {
+  getCurrentAppGitMetaData,
+  getCurrentApplication,
+} from "ee/selectors/applicationSelectors";
 import DeployPreview from "../components/DeployPreview";
 import {
   clearCommitErrorState,
@@ -48,8 +49,6 @@ import {
   clearDiscardErrorState,
   commitToRepoInit,
   discardChanges,
-  fetchGitRemoteStatusInit,
-  fetchGitStatusInit,
   gitPullInit,
 } from "actions/gitSyncActions";
 import StatusLoader from "../components/StatusLoader";
@@ -60,11 +59,8 @@ import GitChangesList from "../components/GitChangesList";
 import ConflictInfo from "../components/ConflictInfo";
 
 import { isEllipsisActive, isMacOrIOS } from "utils/helpers";
-import AnalyticsUtil from "utils/AnalyticsUtil";
-import {
-  getApplicationLastDeployedAt,
-  getCurrentApplication,
-} from "selectors/editorSelectors";
+import AnalyticsUtil from "ee/utils/AnalyticsUtil";
+import { getApplicationLastDeployedAt } from "selectors/editorSelectors";
 import GIT_ERROR_CODES from "constants/GitErrorCodes";
 import { Container, Space } from "../components/StyledComponents";
 import DiscardChangesWarning from "../components/DiscardChangesWarning";
@@ -94,6 +90,7 @@ function SubmitWrapper(props: {
     const triggerSubmit = isMacOrIOS()
       ? e.metaKey && e.key === "Enter"
       : e.ctrlKey && e.key === "Enter";
+
     if (triggerSubmit) props.onSubmit();
   };
 
@@ -107,7 +104,6 @@ function Deploy() {
   const gitMetaData = useSelector(getCurrentAppGitMetaData);
   const gitStatus = useSelector(getGitStatus) as GitStatusData;
   const isFetchingGitStatus = useSelector(getIsFetchingGitStatus);
-  const remoteStatusLoading = useSelector(getIsFetchingGitRemoteStatus);
   const isPullingProgress = useSelector(getIsPullingProgress);
   const isCommitAndPushSuccessful = useSelector(getIsCommitSuccessful);
   const hasChangesToCommit = !gitStatus?.isClean;
@@ -129,7 +125,6 @@ function Deploy() {
   const currentApplication = useSelector(getCurrentApplication);
   const { changeReasonText, isAutoUpdate, isManualUpdate } =
     changeInfoSinceLastCommit(currentApplication);
-  const isGitStatusLiteEnabled = useSelector(getIsGitStatusLiteEnabled);
 
   const handleCommit = (doPush: boolean) => {
     setShowDiscardWarning(false);
@@ -138,6 +133,7 @@ function Deploy() {
       isAutoUpdate,
       isManualUpdate,
     });
+
     if (currentBranch) {
       dispatch(
         commitToRepoInit({
@@ -152,6 +148,7 @@ function Deploy() {
     AnalyticsUtil.logEvent("GS_PULL_GIT_CLICK", {
       source: "GIT_DEPLOY_MODAL",
     });
+
     if (currentBranch) {
       dispatch(gitPullInit());
     }
@@ -160,12 +157,6 @@ function Deploy() {
   const commitButtonText = createMessage(COMMIT_AND_PUSH);
 
   useEffect(() => {
-    if (isGitStatusLiteEnabled) {
-      dispatch(fetchGitRemoteStatusInit());
-      dispatch(fetchGitStatusInit({ compareRemote: false }));
-    } else {
-      dispatch(fetchGitStatusInit({ compareRemote: true }));
-    }
     return () => {
       dispatch(clearCommitSuccessfulState());
     };
@@ -175,12 +166,7 @@ function Deploy() {
     !hasChangesToCommit || !commitMessage || commitMessage.trim().length < 1;
   const commitButtonLoading = isCommittingInProgress;
 
-  const commitRequired =
-    !!gitStatus?.modifiedPages ||
-    !!gitStatus?.modifiedQueries ||
-    !!gitStatus?.modifiedJSObjects ||
-    !!gitStatus?.modifiedDatasources ||
-    !!gitStatus?.modifiedJSLibs;
+  const commitRequired = !gitStatus?.isClean;
   const isConflicting = !isFetchingGitStatus && !!pullFailed;
   const commitInputDisabled =
     isConflicting ||
@@ -255,10 +241,12 @@ function Deploy() {
   }, [discardError]);
 
   const scrollWrapperRef = React.createRef<HTMLDivElement>();
+
   useEffect(() => {
     if (scrollWrapperRef.current) {
       setTimeout(() => {
         const top = scrollWrapperRef.current?.scrollHeight || 0;
+
         scrollWrapperRef.current?.scrollTo({
           top: top,
         });
@@ -346,7 +334,7 @@ function Deploy() {
                 value={commitMessageDisplay}
               />
             </SubmitWrapper>
-            {(isFetchingGitStatus || remoteStatusLoading) && (
+            {isFetchingGitStatus && (
               <StatusLoader loaderMsg={createMessage(FETCH_GIT_STATUS)} />
             )}
             {/* <Space size={11} /> */}

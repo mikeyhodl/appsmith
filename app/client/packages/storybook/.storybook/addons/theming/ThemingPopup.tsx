@@ -11,7 +11,8 @@ interface PanelProps {
 }
 
 const Wrapper = styled.div`
-  position: relative;
+  position: fixed;
+  z-index: 999;
   padding: 10px;
   display: flex;
   flex-direction: column;
@@ -60,8 +61,6 @@ export const ThemingPopup: React.FC<PanelProps> = ({ leftShift, onClose }) => {
         setBorderRadius={(value) => updateGlobal("borderRadius", value)}
         seedColor={globals.seedColor}
         setSeedColor={(value) => updateGlobal("seedColor", value)}
-        fontFamily={globals.fontFamily}
-        setFontFamily={(value) => updateGlobal("fontFamily", value)}
         userDensity={globals.userDensity}
         userSizing={globals.userSizing}
         setUserDensity={(value) => updateGlobal("userDensity", value)}

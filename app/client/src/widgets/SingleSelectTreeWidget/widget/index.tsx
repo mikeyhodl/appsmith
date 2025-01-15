@@ -31,11 +31,13 @@ import { FILL_WIDGET_MIN_WIDTH } from "constants/minWidthConstants";
 import { ResponsiveBehavior } from "layoutSystems/common/utils/constants";
 import { DynamicHeight } from "utils/WidgetFeatures";
 import IconSVG from "../icon.svg";
+import ThumbnailSVG from "../thumbnail.svg";
 
 import { WIDGET_TAGS, layoutConfigurations } from "constants/WidgetConstants";
 
 function defaultOptionValueValidation(value: unknown): ValidationResponse {
   if (typeof value === "string") return { isValid: true, parsed: value.trim() };
+
   if (value === undefined || value === null)
     return {
       isValid: false,
@@ -47,8 +49,10 @@ function defaultOptionValueValidation(value: unknown): ValidationResponse {
         },
       ],
     };
+
   return { isValid: true, parsed: value };
 }
+
 class SingleSelectTreeWidget extends BaseWidget<
   SingleSelectTreeWidgetProps,
   WidgetState
@@ -60,6 +64,7 @@ class SingleSelectTreeWidget extends BaseWidget<
       name: "TreeSelect",
       searchTags: ["dropdown", "singleselecttree"],
       iconSVG: IconSVG,
+      thumbnailSVG: ThumbnailSVG,
       tags: [WIDGET_TAGS.SELECT],
       needsMeta: true,
     };
@@ -640,6 +645,8 @@ class SingleSelectTreeWidget extends BaseWidget<
     };
   }
 
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   static getMetaPropertiesMap(): Record<string, any> {
     return {
       selectedOption: undefined,
@@ -709,6 +716,7 @@ class SingleSelectTreeWidget extends BaseWidget<
       if (!this.props.isDirty) {
         this.props.updateWidgetMetaProperty("isDirty", true);
       }
+
       this.props.updateWidgetMetaProperty("selectedOption", value);
       this.props.updateWidgetMetaProperty(
         "selectedLabel",

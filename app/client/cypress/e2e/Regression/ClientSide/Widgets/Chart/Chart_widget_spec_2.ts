@@ -10,9 +10,9 @@ import EditorNavigation, {
   EntityType,
 } from "../../../../../support/Pages/EditorNavigation";
 
-describe("", () => {
+describe("", { tags: ["@tag.Widget", "@tag.Chart", "@tag.Visual"] }, () => {
   before(() => {
-    entityExplorer.DragNDropWidget(draggableWidgets.CHART);
+    entityExplorer.DragDropWidgetNVerify(draggableWidgets.CHART);
   });
 
   it("1. Test Series tile chart", () => {
@@ -23,9 +23,6 @@ describe("", () => {
     );
     agHelper.AssertAutoSave();
     deployMode.DeployApp();
-    agHelper
-      .GetElement(locators._widgetInDeployed(draggableWidgets.CHART))
-      .matchImageSnapshot("chartwidget/piechartsnapshotwithtitle");
     deployMode.NavigateBacktoEditor();
     EditorNavigation.SelectEntityByName("Chart1", EntityType.Widget);
   });
@@ -34,16 +31,10 @@ describe("", () => {
     propPane.SelectPropertiesDropDown("Chart Type", "Column chart");
     agHelper.AssertAutoSave();
     deployMode.DeployApp();
-    agHelper
-      .GetElement(locators._widgetInDeployed(draggableWidgets.CHART))
-      .matchImageSnapshot("chartwidget/columnchartsnapshotwithoutadaptiveaxis");
     deployMode.NavigateBacktoEditor();
     EditorNavigation.SelectEntityByName("Chart1", EntityType.Widget);
     propPane.TogglePropertyState("Adaptive axis", "On");
     deployMode.DeployApp();
-    agHelper
-      .GetElement(locators._widgetInDeployed(draggableWidgets.CHART))
-      .matchImageSnapshot("chartwidget/columnchartsnapshotwithadaptiveaxis");
     deployMode.NavigateBacktoEditor();
     EditorNavigation.SelectEntityByName("Chart1", EntityType.Widget);
   });
@@ -51,27 +42,14 @@ describe("", () => {
   it("3. Test x axis label orientation chart", () => {
     propPane.SelectPropertiesDropDown("Chart Type", "Line chart");
     deployMode.DeployApp();
-    agHelper
-      .GetElement(locators._widgetInDeployed(draggableWidgets.CHART))
-      .matchImageSnapshot("chartwidget/linechartWithAutoXAxisLabelOrientation");
     deployMode.NavigateBacktoEditor();
     EditorNavigation.SelectEntityByName("Chart1", EntityType.Widget);
     propPane.SelectPropertiesDropDown("x-axis label orientation", "Slant");
     deployMode.DeployApp();
-    agHelper
-      .GetElement(locators._widgetInDeployed(draggableWidgets.CHART))
-      .matchImageSnapshot(
-        "chartwidget/linechartWithSlantXAxisLabelOrientation",
-      );
     deployMode.NavigateBacktoEditor();
     EditorNavigation.SelectEntityByName("Chart1", EntityType.Widget);
     propPane.SelectPropertiesDropDown("x-axis label orientation", "Rotate");
     deployMode.DeployApp();
-    agHelper
-      .GetElement(locators._widgetInDeployed(draggableWidgets.CHART))
-      .matchImageSnapshot(
-        "chartwidget/linechartWithRotateXAxisLabelOrientation",
-      );
     deployMode.NavigateBacktoEditor();
     EditorNavigation.SelectEntityByName("Chart1", EntityType.Widget);
   });
@@ -85,7 +63,10 @@ describe("", () => {
     agHelper.AssertElementAbsence(
       propPane._selectPropDropdown("x-axis label orientation"),
     );
-    propPane.SelectPropertiesDropDown("Chart Type", "Custom Fusion Charts");
+    propPane.SelectPropertiesDropDown(
+      "Chart Type",
+      "Custom Fusion Charts (deprecated)",
+    );
     agHelper.AssertElementAbsence(
       propPane._selectPropDropdown("x-axis label orientation"),
     );

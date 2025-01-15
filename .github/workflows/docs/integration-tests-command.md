@@ -22,10 +22,6 @@ The `client-build` job builds the client-side codebase. It uses the configuratio
 
 The `rts-build` job builds the "rts" (real-time suggestions) package of the client-side codebase. It uses the configuration defined in the `.github/workflows/rts-build.yml` file.
 
-### `test-appsmithctl`
-
-The `test-appsmithctl` job runs tests for the `appsmithctl` utility. It uses the configuration from the `.github/workflows/appsmithctl.yml` file.
-
 ### `build-docker-image`
 
 The `build-docker-image` job builds and pushes the Docker image for the application. It depends on the successful completion of the `client-build`, `server-build`, and `rts-build` jobs. The Docker image is built with support for both `linux/arm64` and `linux/amd64` platforms.
@@ -33,10 +29,6 @@ The `build-docker-image` job builds and pushes the Docker image for the applicat
 ### `ci-test`
 
 The `ci-test` job runs continuous integration tests on the Docker image. It depends on the successful completion of the `build-docker-image` job.
-
-### `perf-test`
-
-The `perf-test` job performs performance tests on the Docker image. It depends on the successful completion of the `build-docker-image` job.
 
 ### `ci-test-result`
 

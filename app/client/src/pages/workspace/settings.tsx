@@ -1,28 +1,25 @@
 import React, { useEffect, useState } from "react";
 import { useLocation, useParams } from "react-router-dom";
-import { getCurrentWorkspace } from "@appsmith/selectors/workspaceSelectors";
+import { getFetchedWorkspaces } from "ee/selectors/workspaceSelectors";
 import { useSelector, useDispatch } from "react-redux";
 import styled from "styled-components";
-import { getAllApplications } from "@appsmith/actions/applicationActions";
 import { useMediaQuery } from "react-responsive";
 import { BackButton, StickyHeader } from "components/utils/helperComponents";
 import WorkspaceInviteUsersForm from "pages/workspace/WorkspaceInviteUsersForm";
 import { SettingsPageHeader } from "./SettingsPageHeader";
-import {
-  isPermitted,
-  PERMISSION_TYPE,
-} from "@appsmith/utils/permissionHelpers";
+import { isPermitted, PERMISSION_TYPE } from "ee/utils/permissionHelpers";
 import {
   createMessage,
   DOCUMENTATION,
   INVITE_USERS_PLACEHOLDER,
   SEARCH_USERS,
-} from "@appsmith/constants/messages";
+} from "ee/constants/messages";
 import FormDialogComponent from "components/editorComponents/form/FormDialogComponent";
 import { debounce } from "lodash";
-import { WorkspaceSettingsTabs } from "@appsmith/components/WorkspaceSettingsTabs";
+import { WorkspaceSettingsTabs } from "ee/components/WorkspaceSettingsTabs";
 import { useFeatureFlag } from "utils/hooks/useFeatureFlag";
-import { FEATURE_FLAG } from "@appsmith/entities/FeatureFlag";
+import { FEATURE_FLAG } from "ee/entities/FeatureFlag";
+import { fetchAllWorkspaces } from "ee/actions/workspaceActions";
 
 const SettingsWrapper = styled.div<{
   isMobile?: boolean;
@@ -65,7 +62,7 @@ enum TABS {
 
 export default function Settings() {
   const { workspaceId } = useParams<{ workspaceId: string }>();
-  const currentWorkspace = useSelector(getCurrentWorkspace).filter(
+  const currentWorkspace = useSelector(getFetchedWorkspaces).filter(
     (el) => el.id === workspaceId,
   )[0];
   const location = useLocation();
@@ -98,12 +95,14 @@ export default function Settings() {
 
   useEffect(() => {
     if (!currentWorkspace) {
-      dispatch(getAllApplications());
+      dispatch(fetchAllWorkspaces({ fetchEntities: true }));
     } else {
       setPageTitle(`${currentWorkspace?.name}`);
     }
   }, [dispatch, currentWorkspace]);
 
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const pageMenuItems: any[] = [
     {
       icon: "book-line",
@@ -124,11 +123,12 @@ export default function Settings() {
   }, 300);
 
   const isMobile: boolean = useMediaQuery({ maxWidth: 767 });
+
   return (
     <>
       <SettingsWrapper data-testid="t--settings-wrapper" isMobile={isMobile}>
         <StyledStickyHeader isMobile={isMobile}>
-          <BackButton goTo="/applications" />
+          <BackButton />
           <SettingsPageHeader
             buttonText="Add users"
             onButtonClick={onButtonClick}

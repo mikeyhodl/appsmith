@@ -11,7 +11,7 @@ import PageList from "../../../../support/Pages/PageList";
 
 describe(
   "Entity explorer tests related to widgets and validation",
-  { tags: ["@tag.IDE"] },
+  { tags: ["@tag.IDE", "@tag.PropertyPane"] },
   function () {
     beforeEach(() => {
       agHelper.RestoreLocalStorageCache();
@@ -68,7 +68,7 @@ describe(
 
     it("3. Toggle between widgets in different pages using search functionality", function () {
       EditorNavigation.SelectEntityByName("Page1", EntityType.Page);
-      PageLeftPane.expandCollapseItem("Widgets");
+      EditorNavigation.SelectEntityByName("Container4", EntityType.Widget);
       PageLeftPane.expandCollapseItem("Container4");
       entityExplorer.ActionContextMenuByEntityName({
         entityNameinLeftSidebar: "Text1",

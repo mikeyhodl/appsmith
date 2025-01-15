@@ -2,7 +2,7 @@ export class Sidebar {
   buttons: string[];
   locators = {
     sidebar: ".t--sidebar",
-    sidebarButton: (name: string) => `.t--sidebar-${name}`,
+    sidebarButton: (name: string) => `[data-testid='t--sidebar-${name}']`,
   };
 
   constructor(buttons: string[]) {
@@ -13,11 +13,16 @@ export class Sidebar {
     this.assertVisible();
     cy.get(this.locators.sidebar)
       .find(this.locators.sidebarButton(button))
-      .click({ force: true })
-      .should("have.attr", "data-selected", willFail ? "false" : "true");
+      .as("navigateBtn")
+      .click({ force: true });
+    cy.get("@navigateBtn").should(
+      "have.attr",
+      "data-selected",
+      willFail ? "false" : "true",
+    );
   }
 
-  assertVisible() {
-    cy.get(this.locators.sidebar).should("be.visible");
+  assertVisible(timeout: number = 10000) {
+    cy.get(this.locators.sidebar, { timeout }).should("be.visible");
   }
 }

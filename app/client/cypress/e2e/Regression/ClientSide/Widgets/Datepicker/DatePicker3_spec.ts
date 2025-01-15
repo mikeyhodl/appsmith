@@ -8,7 +8,7 @@ import {
   propPane,
 } from "../../../../../support/Objects/ObjectsCore";
 
-import { format } from "date-fns";
+import { format } from "date-fns/format.cjs";
 import { datePickerlocators } from "../../../../../locators/WidgetLocators";
 import EditorNavigation, {
   EntityType,
@@ -16,10 +16,10 @@ import EditorNavigation, {
 
 describe(
   "Date picker widget testcases",
-  { tags: ["@tag.Widget", "@tag.Datepicker"] },
+  { tags: ["@tag.Widget", "@tag.Datepicker", "@tag.Binding"] },
   () => {
     before(() => {
-      entityExplorer.DragNDropWidget(draggableWidgets.DATEPICKER);
+      entityExplorer.DragDropWidgetNVerify(draggableWidgets.DATEPICKER);
     });
 
     afterEach(() => {
@@ -92,11 +92,8 @@ describe(
       deployMode.DeployApp();
       agHelper.GetNClick(datePickerlocators.input);
       agHelper.ClearNType(datePickerlocators.inputHour, "12", 0, true);
-      agHelper.Sleep(500); // wait for the input to be updated for CI runs
       agHelper.ClearNType(datePickerlocators.inputMinute, "58", 0, true);
-      agHelper.Sleep(500); // wait for the input to be updated for CI runs
       agHelper.ClearNType(datePickerlocators.inputSecond, "59", 0, true);
-      agHelper.Sleep(500); // wait for the input to be updated for CI runs
       agHelper.PressEnter();
       agHelper
         .GetAttribute(datePickerlocators.input, "value")

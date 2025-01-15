@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 
 import { HELP_MODAL_WIDTH } from "constants/HelpConstants";
-import AnalyticsUtil from "utils/AnalyticsUtil";
+import AnalyticsUtil from "ee/utils/AnalyticsUtil";
 import { getCurrentUser } from "selectors/usersSelectors";
 import { useDispatch, useSelector } from "react-redux";
 import bootIntercom, { updateIntercomProperties } from "utils/bootIntercom";
@@ -11,7 +11,7 @@ import {
   createMessage,
   HELP_RESOURCE_TOOLTIP,
   INTERCOM_CONSENT_MESSAGE,
-} from "@appsmith/constants/messages";
+} from "ee/constants/messages";
 import {
   Button,
   Menu,
@@ -21,8 +21,8 @@ import {
   Tooltip,
   MenuSeparator,
   Text,
-} from "design-system";
-import { getAppsmithConfigs } from "@appsmith/configs";
+} from "@appsmith/ads";
+import { getAppsmithConfigs } from "ee/configs";
 import moment from "moment/moment";
 import styled from "styled-components";
 import {
@@ -31,14 +31,11 @@ import {
   getSignpostingSetOverlay,
   getSignpostingTooltipVisible,
   getSignpostingUnreadSteps,
-  inGuidedTour,
 } from "selectors/onboardingSelectors";
 import SignpostingPopup from "pages/Editor/FirstTimeUserOnboarding/Modal";
 import { showSignpostingModal } from "actions/onboardingActions";
-import { triggerWelcomeTour } from "./FirstTimeUserOnboarding/Utils";
-import { isAirgapped } from "@appsmith/utils/airgapHelpers";
 import TooltipContent from "./FirstTimeUserOnboarding/TooltipContent";
-import { getInstanceId } from "@appsmith/selectors/tenantSelectors";
+import { getInstanceId } from "ee/selectors/tenantSelectors";
 import { updateIntercomConsent, updateUserDetails } from "actions/userActions";
 
 const { appVersion, cloudHosting, intercomAppID } = getAppsmithConfigs();
@@ -105,7 +102,9 @@ export function IntercomConsent({
   const instanceId = useSelector(getInstanceId);
   const dispatch = useDispatch();
 
-  const sendUserDataToIntercom = () => {
+  const sendUserDataToIntercom = async () => {
+    const { email } = user || {};
+
     updateIntercomProperties(instanceId, user);
     dispatch(
       updateUserDetails({
@@ -114,8 +113,17 @@ export function IntercomConsent({
     );
     dispatch(updateIntercomConsent());
     showIntercomConsent(false);
+
+    if (user?.enableTelemetry) {
+      await AnalyticsUtil.identifyUser(user, true);
+      AnalyticsUtil.logEvent("SUPPORT_REQUEST_INITIATED", {
+        email,
+      });
+    }
+
     window.Intercom("show");
   };
+
   return (
     <ConsentContainer>
       <ActionsRow>
@@ -160,12 +168,10 @@ function HelpButton() {
   const isFirstTimeUserOnboardingEnabled = useSelector(
     getIsFirstTimeUserOnboardingEnabled,
   );
-  const guidedTourEnabled = useSelector(inGuidedTour);
   const showSignpostingTooltip = useSelector(getSignpostingTooltipVisible);
   const onboardingModalOpen = useSelector(getFirstTimeUserOnboardingModal);
   const unreadSteps = useSelector(getSignpostingUnreadSteps);
   const setOverlay = useSelector(getSignpostingSetOverlay);
-  const isAirgappedInstance = isAirgapped();
   const showUnreadSteps =
     !!unreadSteps.length &&
     isFirstTimeUserOnboardingEnabled &&
@@ -194,6 +200,7 @@ function HelpButton() {
             dispatch(showSignpostingModal(true));
             setShowTooltip(false);
           }
+
           setShowIntercomConsent(false);
           AnalyticsUtil.logEvent("OPEN_HELP", {
             page: "Editor",
@@ -247,21 +254,6 @@ function HelpButton() {
             <IntercomConsent showIntercomConsent={setShowIntercomConsent} />
           ) : (
             <>
-              {!isAirgappedInstance && !guidedTourEnabled && (
-                <>
-                  <MenuItem
-                    data-testid="editor-welcome-tour"
-                    onSelect={() => {
-                      triggerWelcomeTour(dispatch);
-                      AnalyticsUtil.logEvent("HELP_MENU_WELCOME_TOUR_CLICK");
-                    }}
-                    startIcon="guide"
-                  >
-                    Try guided tour
-                  </MenuItem>
-                  <MenuSeparator />
-                </>
-              )}
               {HELP_MENU_ITEMS.map((item) => (
                 <MenuItem
                   id={item.id}
@@ -270,8 +262,10 @@ function HelpButton() {
                     if (item.link) {
                       window.open(item.link, "_blank");
                     }
+
                     if (item.id === "intercom-trigger") {
                       e?.preventDefault();
+
                       if (intercomAppID && window.Intercom) {
                         if (user?.isIntercomConsentGiven || cloudHosting) {
                           window.Intercom("show");

@@ -14,13 +14,13 @@
 // ***********************************************************
 /// <reference types="Cypress" />
 /// <reference types='cypress-tags' />
+import "cypress-real-events";
 import "cypress-real-events/support";
 import "cypress-wait-until";
 import "cypress-network-idle";
 import "cypress-xpath";
-import * as MESSAGES from "../../../client/src/ce/constants/messages.ts";
+import * as MESSAGES from "../../src/ce/constants/messages.ts";
 import "./ApiCommands";
-// Import commands.js using ES2015 syntax:
 import "./commands";
 import { initLocalstorage, addIndexedDBKey } from "./commands";
 import "./dataSourceCommands";
@@ -30,6 +30,7 @@ import RapidMode from "./RapidMode.ts";
 import "cypress-mochawesome-reporter/register";
 import installLogsCollector from "cypress-terminal-report/src/installLogsCollector";
 import { CURRENT_REPO, REPO } from "../fixtures/REPO";
+import { addMatchImageSnapshotCommand } from "@simonsmith/cypress-image-snapshot/command";
 
 import "./WorkspaceCommands";
 import "./queryCommands";
@@ -47,8 +48,13 @@ const registerCypressGrep = require("@cypress/grep");
 registerCypressGrep();
 installLogsCollector();
 
+addMatchImageSnapshotCommand({
+  comparisonMethod: "ssim",
+  failureThreshold: 0.01,
+  failureThresholdType: "percent",
+});
+
 Cypress.on("uncaught:exception", (error) => {
-  //cy.log(error.message);
   return false; // returning false here prevents Cypress from failing the test
 });
 
@@ -58,7 +64,6 @@ Cypress.on("fail", (error) => {
 });
 
 Cypress.env("MESSAGES", MESSAGES);
-let dataSet; // Declare a variable to hold the test data
 
 before(function () {
   if (RapidMode.config.enabled) {
@@ -69,7 +74,6 @@ before(function () {
       }
     });
 
-    //Cypress.Cookies.preserveOnce("SESSION", "remember_token");
     if (!RapidMode.config.usesDSL) {
       cy.visit(RapidMode.url());
       cy.wait("@getWorkspace");
@@ -81,7 +85,6 @@ before(function () {
   if (RapidMode.config.enabled) {
     return;
   }
-  //console.warn = () => {}; //to remove all warnings in cypress console
   initLocalstorage();
   initLocalstorageRegistry();
   cy.startServerAndRoutes();
@@ -90,7 +93,8 @@ before(function () {
     window.indexedDB.deleteDatabase("Appsmith");
   });
   cy.visit("/setup/welcome", { timeout: 60000 });
-  cy.wait("@getMe");
+  cy.wait("@getConsolidatedData");
+
   cy.wait(2000);
   const username = Cypress.env("USERNAME");
   const password = Cypress.env("PASSWORD");
@@ -137,12 +141,9 @@ before(function () {
   if (!Cypress.currentTest.titlePath[0].includes(WALKTHROUGH_TEST_PAGE)) {
     // Adding key FEATURE_WALKTHROUGH (which is used to check if the walkthrough is already shown to the user or not) for non walkthrough cypress tests (to not show walkthrough)
     addIndexedDBKey(FEATURE_WALKTHROUGH_INDEX_KEY, {
-      ab_ds_binding_enabled: true,
-      ab_ds_schema_enabled: true,
       binding_widget: true,
     });
   }
-  //console.warn = () => {};
 
   cy.CreateNewAppInNewWorkspace(); //Creating new workspace and app
   cy.fixture("TestDataSet1").then(function (data) {
@@ -151,12 +152,10 @@ before(function () {
 });
 
 beforeEach(function () {
-  //cy.window().then((win) => (win.onbeforeunload = undefined));
   if (!navigator.userAgent.includes("Cypress")) {
     window.addEventListener("beforeunload", this.beforeunloadFunction);
   }
   initLocalstorage();
-  //Cypress.Cookies.preserveOnce("SESSION", "remember_token");
   cy.startServerAndRoutes();
   //-- Delete local storage data of entity explorer
   cy.DeleteEntityStateLocalStorage();
@@ -172,10 +171,4 @@ after(function () {
   //-- Deleting the application by Api---//
   cy.DeleteAppByApi();
   cy.DeleteWorkspaceByApi();
-  //-- LogOut Application---//
-  //cy.LogOut(false);
-  // Commenting until Upgrade Appsmith cases are fixed
-  // const tedUrl = "http://localhost:5001/v1/parent/cmd";
-  // cy.log("Start the appsmith container");
-  // cy.StartContainer(tedUrl, "appsmith"); // start the old container
 });

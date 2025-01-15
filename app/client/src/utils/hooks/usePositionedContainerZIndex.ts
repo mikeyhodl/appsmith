@@ -1,7 +1,7 @@
 import { Layers } from "constants/Layers";
 
 import { useMemo } from "react";
-import type { AppState } from "@appsmith/reducers";
+import type { AppState } from "ee/reducers";
 import { isWidgetSelected } from "selectors/widgetSelectors";
 import { useSelector } from "react-redux";
 
@@ -33,13 +33,14 @@ export const usePositionedContainerZIndex = (
       return focused
         ? Layers.focusedWidget
         : selected
-        ? Layers.selectedWidget
-        : Layers.positionedWidget;
+          ? Layers.selectedWidget
+          : Layers.positionedWidget;
     }
   }, [isDragging, isThisWidgetDragging, droppableWidget, selected, focused]);
 
   const zIndicesObj = useMemo(() => {
     const onHoverZIndex = isDragging ? zIndex : Layers.positionedWidget + 1;
+
     return { zIndex, onHoverZIndex };
   }, [isDragging, zIndex, Layers.positionedWidget]);
 

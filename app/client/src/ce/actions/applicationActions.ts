@@ -4,10 +4,10 @@ import type {
   FetchApplicationPayload,
   ImportApplicationRequest,
   UpdateApplicationPayload,
-} from "@appsmith/api/ApplicationApi";
-import { ReduxActionTypes } from "@appsmith/constants/ReduxActionConstants";
+} from "ee/api/ApplicationApi";
+import { ReduxActionTypes } from "ee/constants/ReduxActionConstants";
 import type { NavigationSetting, ThemeSetting } from "constants/AppConstants";
-import type { IconNames } from "design-system";
+import type { IconNames } from "@appsmith/ads";
 import type { Datasource } from "entities/Datasource";
 
 export enum ApplicationVersion {
@@ -161,6 +161,13 @@ export const importApplication = (appDetails: ImportApplicationRequest) => {
   };
 };
 
+export const openPartialImportModal = (payload: boolean) => {
+  return {
+    type: ReduxActionTypes.PARTIAL_IMPORT_MODAL_OPEN,
+    payload,
+  };
+};
+
 export const importPartialApplication = (appPartialDetails: {
   applicationFile: File;
 }) => {
@@ -185,9 +192,10 @@ export const importApplicationSuccess = (
   };
 };
 
-export const getAllApplications = () => {
+export const fetchAllApplicationsOfWorkspace = (payload?: string) => {
   return {
-    type: ReduxActionTypes.GET_ALL_APPLICATION_INIT,
+    type: ReduxActionTypes.FETCH_ALL_APPLICATIONS_OF_WORKSPACE_INIT,
+    payload,
   };
 };
 
@@ -197,9 +205,10 @@ export const resetCurrentApplication = () => {
   };
 };
 
-export const initDatasourceConnectionDuringImportRequest = (
-  payload: string,
-) => ({
+export const initDatasourceConnectionDuringImportRequest = (payload: {
+  workspaceId: string;
+  isPartialImport?: boolean;
+}) => ({
   type: ReduxActionTypes.INIT_DATASOURCE_CONNECTION_DURING_IMPORT_REQUEST,
   payload,
 });
@@ -219,9 +228,18 @@ export const setIsReconnectingDatasourcesModalOpen = (payload: {
   payload,
 });
 
-export const setWorkspaceIdForImport = (workspaceId?: string) => ({
+export const setWorkspaceIdForImport = ({
+  editorId = "",
+  workspaceId,
+}: {
+  editorId: string;
+  workspaceId?: string;
+}) => ({
   type: ReduxActionTypes.SET_WORKSPACE_ID_FOR_IMPORT,
-  payload: workspaceId,
+  payload: {
+    workspaceId,
+    editorId,
+  },
 });
 
 export const setPageIdForImport = (pageId?: string) => ({
@@ -244,3 +262,7 @@ export const setIsAppSidebarPinned = (payload: boolean) => ({
   type: ReduxActionTypes.SET_APP_SIDEBAR_PINNED,
   payload,
 });
+
+export const fetchAllPackages = () => {
+  return {};
+};

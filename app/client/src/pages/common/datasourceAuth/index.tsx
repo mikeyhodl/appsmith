@@ -10,10 +10,9 @@ import {
   toggleSaveActionFlag,
   updateDatasourceAuthState,
 } from "actions/datasourceActions";
-import AnalyticsUtil from "utils/AnalyticsUtil";
+import AnalyticsUtil from "ee/utils/AnalyticsUtil";
 import { getCurrentApplicationId } from "selectors/editorSelectors";
-import { useParams, useLocation, useHistory } from "react-router";
-import type { ExplorerURLParams } from "@appsmith/pages/Editor/Explorer/helpers";
+import { useLocation, useHistory } from "react-router";
 import type { Datasource } from "entities/Datasource";
 import { AuthType, AuthenticationStatus } from "entities/Datasource";
 import {
@@ -25,20 +24,25 @@ import {
   SAVE_BUTTON_TEXT,
   TEST_BUTTON_TEXT,
   createMessage,
-} from "@appsmith/constants/messages";
-import { Button, toast } from "design-system";
-import type { ApiDatasourceForm } from "entities/Datasource/RestAPIForm";
+} from "ee/constants/messages";
+import { Button, toast } from "@appsmith/ads";
+import type { ClientCredentials } from "entities/Datasource/RestAPIForm";
+import {
+  GrantType,
+  type ApiDatasourceForm,
+} from "entities/Datasource/RestAPIForm";
 import { TEMP_DATASOURCE_ID } from "constants/Datasource";
 import { INTEGRATION_TABS, SHOW_FILE_PICKER_KEY } from "constants/routes";
-import { integrationEditorURL } from "@appsmith/RouteBuilder";
+import { integrationEditorURL } from "ee/RouteBuilder";
 import { getQueryParams } from "utils/URLUtils";
 import type { AppsmithLocationState } from "utils/history";
-import type { PluginType } from "entities/Action";
-import { getCurrentEnvironmentDetails } from "@appsmith/selectors/environmentSelectors";
+import type { PluginType } from "entities/Plugin";
+import { getCurrentEnvironmentDetails } from "ee/selectors/environmentSelectors";
 import { useFeatureFlag } from "utils/hooks/useFeatureFlag";
-import { FEATURE_FLAG } from "@appsmith/entities/FeatureFlag";
-import { getHasManageDatasourcePermission } from "@appsmith/utils/BusinessFeatures/permissionPageHelpers";
+import { FEATURE_FLAG } from "ee/entities/FeatureFlag";
+import { getHasManageDatasourcePermission } from "ee/utils/BusinessFeatures/permissionPageHelpers";
 import { resetCurrentPluginIdForCreateNewApp } from "actions/onboardingActions";
+import { useParentEntityDetailsFromParams } from "ee/entities/Engine/actionHelpers";
 
 interface Props {
   datasource: Datasource;
@@ -46,7 +50,7 @@ interface Props {
   getSanitizedFormData: () => Datasource;
   currentEnvironment: string;
   isInvalid: boolean;
-  pageId?: string;
+  parentEntityId?: string;
   formName: string;
   viewMode?: boolean;
   shouldRender?: boolean;
@@ -116,6 +120,7 @@ const SaveButtonContainer = styled.div<{
   border-color: var(--ads-v2-color-border);
   align-items: center;
   height: 68px;
+  flex-shrink: ${(props) => (props.isInsideReconnectModal ? "unset" : "0")};
 `;
 
 const StyledAuthMessage = styled.div`
@@ -143,7 +148,7 @@ function DatasourceAuth({
   isSaving,
   isTesting,
   onCancel,
-  pageId: pageIdProp = "",
+  parentEntityId: parentEntityIdProp = "",
   pluginName,
   pluginPackageName,
   pluginType,
@@ -160,6 +165,12 @@ function DatasourceAuth({
         formData?.datasourceStorages[currentEnvironment]
           ?.datasourceConfiguration?.authentication?.authenticationType;
 
+  const authGrantType: GrantType | undefined = (
+    formData &&
+    (formData as ApiDatasourceForm)?.authentication &&
+    ((formData as ApiDatasourceForm)?.authentication as ClientCredentials)
+  )?.grantType;
+
   const { id: datasourceId } = datasource;
   const applicationId = useSelector(getCurrentApplicationId);
 
@@ -173,19 +184,22 @@ function DatasourceAuth({
   );
 
   const currentEnvDetails = useSelector(getCurrentEnvironmentDetails);
-
   // hooks
   const dispatch = useDispatch();
   const location = useLocation();
-  const { pageId: pageIdQuery } = useParams<ExplorerURLParams>();
   const history = useHistory<AppsmithLocationState>();
 
-  const pageId = isInsideReconnectModal
-    ? pageIdProp
-    : ((pageIdQuery || pageIdProp) as string);
+  const { baseParentEntityId, entityType, parentEntityId } =
+    useParentEntityDetailsFromParams(
+      parentEntityIdProp,
+      isInsideReconnectModal,
+    );
 
   useEffect(() => {
-    if (authType === AuthType.OAUTH2) {
+    if (
+      authType === AuthType.OAUTH2 &&
+      authGrantType !== GrantType.ClientCredentials // Client Credentials grant type does not require authorization
+    ) {
       // When the authorization server redirects a user to the datasource form page, the url contains the "response_status" query parameter .
       // Get the access token if response_status is successful else show a toast error
 
@@ -199,18 +213,21 @@ function DatasourceAuth({
         (queryIsImport &&
           queryDatasourceId === datasourceId &&
           !showFilePicker);
+
       if (status && shouldNotify) {
         const display_message = search.get("display_message");
+
         if (status !== AuthorizationStatus.SUCCESS) {
           const message =
             status === AuthorizationStatus.APPSMITH_ERROR
               ? OAUTH_AUTHORIZATION_APPSMITH_ERROR
               : OAUTH_AUTHORIZATION_FAILED;
+
           toast.show(display_message || message, { kind: "error" });
           AnalyticsUtil.logEvent("DATASOURCE_AUTH_COMPLETE", {
             applicationId: applicationId,
             datasourceId: datasourceId,
-            pageId: pageId,
+            pageId: baseParentEntityId,
             oAuthPassOrFailVerdict: status,
             workspaceId: datasource?.workspaceId,
             datasourceName: datasource?.name,
@@ -254,7 +271,7 @@ function DatasourceAuth({
   // Handles datasource testing
   const handleDatasourceTest = () => {
     AnalyticsUtil.logEvent("TEST_DATA_SOURCE_CLICK", {
-      pageId: pageId,
+      pageId: baseParentEntityId,
       appId: applicationId,
       datasourceId: datasourceId,
       environmentId: currentEnvironment,
@@ -268,13 +285,14 @@ function DatasourceAuth({
   const handleDefaultAuthDatasourceSave = () => {
     dispatch(toggleSaveActionFlag(true));
     AnalyticsUtil.logEvent("SAVE_DATA_SOURCE_CLICK", {
-      pageId: pageId,
+      pageId: baseParentEntityId,
       appId: applicationId,
       environmentId: currentEnvironment,
       environmentName: currentEnvDetails.name,
       pluginName: pluginName || "",
       pluginPackageName: pluginPackageName || "",
     });
+
     // After saving datasource, only redirect to the 'new integrations' page
     // if datasource is not used to generate a page
     if (datasource.id === TEMP_DATASOURCE_ID) {
@@ -295,12 +313,18 @@ function DatasourceAuth({
   // Handles Oauth datasource saving
   const handleOauthDatasourceSave = () => {
     dispatch(toggleSaveActionFlag(true));
+
     if (datasource.id === TEMP_DATASOURCE_ID) {
       dispatch(
         createDatasourceFromForm(
           getSanitizedFormData(),
           pluginType
-            ? redirectAuthorizationCode(pageId, datasourceId, pluginType)
+            ? redirectAuthorizationCode(
+                parentEntityId,
+                datasourceId,
+                pluginType,
+                entityType,
+              )
             : undefined,
         ),
       );
@@ -310,11 +334,17 @@ function DatasourceAuth({
           getSanitizedFormData(),
           currentEnvironment,
           pluginType
-            ? redirectAuthorizationCode(pageId, datasourceId, pluginType)
+            ? redirectAuthorizationCode(
+                parentEntityId,
+                datasourceId,
+                pluginType,
+                entityType,
+              )
             : undefined,
         ),
       );
     }
+
     AnalyticsUtil.logEvent("DATASOURCE_AUTHORIZE_CLICK", {
       dsName: datasource?.name,
       orgId: datasource?.workspaceId,
@@ -354,10 +384,11 @@ function DatasourceAuth({
                 dispatch(resetCurrentPluginIdForCreateNewApp());
               } else {
                 const URL = integrationEditorURL({
-                  pageId,
+                  basePageId: baseParentEntityId,
                   selectedTab: INTEGRATION_TABS.NEW,
                   params: getQueryParams(),
                 });
+
                 history.push(URL);
               }
             } else {
@@ -380,13 +411,15 @@ function DatasourceAuth({
           isLoading={isSaving}
           key={buttonType}
           onClick={
-            authType === AuthType.OAUTH2
+            authType === AuthType.OAUTH2 &&
+            authGrantType !== GrantType.ClientCredentials // Client Credentials grant type does not require oauth authorization
               ? handleOauthDatasourceSave
               : handleDefaultAuthDatasourceSave
           }
           size="md"
         >
-          {authType === AuthType.OAUTH2
+          {authType === AuthType.OAUTH2 &&
+          authGrantType !== GrantType.ClientCredentials
             ? isAuthorized
               ? createMessage(SAVE_AND_RE_AUTHORIZE_BUTTON_TEXT)
               : createMessage(SAVE_AND_AUTHORIZE_BUTTON_TEXT)

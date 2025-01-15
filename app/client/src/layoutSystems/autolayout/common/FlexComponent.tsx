@@ -4,10 +4,7 @@ import styled from "styled-components";
 
 import { WIDGET_PADDING } from "constants/WidgetConstants";
 import { useSelector } from "react-redux";
-import {
-  combinedPreviewModeSelector,
-  snipingModeSelector,
-} from "selectors/editorSelectors";
+import { snipingModeSelector } from "selectors/editorSelectors";
 import { getIsResizing } from "selectors/widgetSelectors";
 import { useClickToSelectWidget } from "utils/hooks/useClickToSelectWidget";
 import { usePositionedContainerZIndex } from "utils/hooks/usePositionedContainerZIndex";
@@ -15,6 +12,8 @@ import { widgetTypeClassname } from "widgets/WidgetUtils";
 import { RESIZE_BORDER_BUFFER } from "layoutSystems/common/resizer/common";
 import { checkIsDropTarget } from "WidgetProvider/factory/helpers";
 import type { FlexComponentProps } from "../../autolayout/utils/types";
+import { useHoverToFocusWidget } from "utils/hooks/useHoverToFocusWidget";
+import { selectCombinedPreviewMode } from "selectors/gitModSelectors";
 
 const FlexWidget = styled.div`
   position: relative;
@@ -22,7 +21,10 @@ const FlexWidget = styled.div`
 
 export function FlexComponent(props: FlexComponentProps) {
   const isSnipingMode = useSelector(snipingModeSelector);
-
+  const [handleMouseOver, handleMouseLeave] = useHoverToFocusWidget(
+    props.widgetId,
+    props.isResizeDisabled,
+  );
   const clickToSelectWidget = useClickToSelectWidget(props.widgetId);
   const onClickFn = useCallback(
     (e) => {
@@ -39,6 +41,8 @@ export function FlexComponent(props: FlexComponentProps) {
     props.selected,
   );
 
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const stopEventPropagation = (e: any) => {
     !isSnipingMode && e.stopPropagation();
   };
@@ -52,7 +56,7 @@ export function FlexComponent(props: FlexComponentProps) {
       )} t--widget-${props.widgetName.toLowerCase()}`,
     [props.parentId, props.widgetId, props.widgetType, props.widgetName],
   );
-  const isPreviewMode = useSelector(combinedPreviewModeSelector);
+  const isPreviewMode = useSelector(selectCombinedPreviewMode);
 
   const isResizing = useSelector(getIsResizing);
   const widgetDimensionsViewCss = {
@@ -110,6 +114,8 @@ export function FlexComponent(props: FlexComponentProps) {
       id={"auto_" + props.widgetId}
       onClick={stopEventPropagation}
       onClickCapture={onClickFn}
+      onMouseLeave={handleMouseLeave}
+      onMouseOver={handleMouseOver}
       style={flexComponentStyle}
     >
       {props.children}

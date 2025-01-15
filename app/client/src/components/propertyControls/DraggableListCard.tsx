@@ -6,7 +6,7 @@ import {
   StyledActionContainer,
   InputGroup,
 } from "components/propertyControls/StyledControls";
-import { Button, Checkbox } from "design-system";
+import { Button, Checkbox } from "@appsmith/ads";
 
 const ItemWrapper = styled.div`
   display: flex;
@@ -28,6 +28,7 @@ interface RenderComponentProps {
     isChecked?: boolean;
     isCheckboxDisabled?: boolean;
     isDragDisabled?: boolean;
+    itemType?: "SEPARATOR" | "BUTTON";
   };
   isDelete?: boolean;
   isDragging: boolean;
@@ -45,11 +46,15 @@ interface RenderComponentProps {
 const PADDING_WITHOUT_CHECKBOX = 60;
 const PADDING_WITH_CHECKBOX = 90;
 
-const StyledInputGroup = styled(InputGroup)<{ rightPadding?: number }>`
+const StyledInputGroup = styled(InputGroup)<{
+  rightPadding?: number;
+  isReadOnly?: boolean;
+}>`
   input {
     padding-left: 20px;
     padding-right: ${(props) => props.rightPadding}px;
     text-overflow: ellipsis;
+    cursor: ${(props) => (props.isReadOnly ? "default" : "text")} !important;
   }
 `;
 
@@ -60,6 +65,7 @@ const StyledCheckbox = styled(Checkbox)`
   margin-top: 4px;
   margin-left: 4px;
 `;
+
 export function DraggableListCard(props: RenderComponentProps) {
   const [value, setValue] = useState(props.item.label);
   const [isEditing, setEditing] = useState(false);
@@ -82,6 +88,7 @@ export function DraggableListCard(props: RenderComponentProps) {
   const [visibility, setVisibility] = useState(item.isVisible);
   const ref = useRef<HTMLInputElement | null>(null);
   const debouncedUpdate = _.debounce(updateOption, 1000);
+  const isSeparator = item.itemType === "SEPARATOR";
 
   useEffect(() => {
     setVisibility(item.isVisible);
@@ -113,6 +120,7 @@ export function DraggableListCard(props: RenderComponentProps) {
 
   const onFocus = () => {
     setEditing(false);
+
     if (updateFocus) {
       updateFocus(index, false);
     }
@@ -121,6 +129,7 @@ export function DraggableListCard(props: RenderComponentProps) {
   const onBlur = () => {
     if (!isDragging) {
       setEditing(false);
+
       if (updateFocus) {
         updateFocus(index, false);
       }
@@ -156,6 +165,7 @@ export function DraggableListCard(props: RenderComponentProps) {
   };
 
   const showDelete = !!item.isDerived || isDelete;
+
   return (
     <ItemWrapper className={item.isDuplicateLabel ? "has-duplicate-label" : ""}>
       {item?.isDragDisabled ? (
@@ -170,6 +180,7 @@ export function DraggableListCard(props: RenderComponentProps) {
           props.item.isDuplicateLabel ? `t--has-duplicate-label-${index}` : ""
         }
         dataType="text"
+        isReadOnly={isSeparator}
         onBlur={onBlur}
         onChange={(value: string) => {
           onChange(index, value);
@@ -184,17 +195,19 @@ export function DraggableListCard(props: RenderComponentProps) {
         width="100%"
       />
       <StyledActionContainer>
-        <Button
-          className="t--edit-column-btn"
-          isIconButton
-          kind="tertiary"
-          onClick={() => {
-            onEdit && onEdit(index);
-          }}
-          onFocus={(e) => e.stopPropagation()}
-          size="sm"
-          startIcon="settings-2-line"
-        />
+        {!isSeparator && (
+          <Button
+            className="t--edit-column-btn"
+            isIconButton
+            kind="tertiary"
+            onClick={() => {
+              onEdit && onEdit(index);
+            }}
+            onFocus={(e) => e.stopPropagation()}
+            size="sm"
+            startIcon="settings-v3"
+          />
+        )}
         {showDelete && (
           <Button
             className="t--delete-column-btn"
@@ -207,7 +220,10 @@ export function DraggableListCard(props: RenderComponentProps) {
             startIcon="delete-bin-line"
           />
         )}
-        {!showDelete && toggleVisibility && renderVisibilityIcon()}
+        {!showDelete &&
+          !isSeparator &&
+          toggleVisibility &&
+          renderVisibilityIcon()}
         {/*
          * Used in Table_Widget_V2's primary columns to enable/disable cell editability.
          * Using a common name `showCheckbox` instead of showEditable or isEditable,

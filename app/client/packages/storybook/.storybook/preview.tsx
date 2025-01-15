@@ -61,9 +61,9 @@ const preview = {
     userDensity: {},
     userSizing: {},
   },
+
   parameters: {
     viewport: { viewports: customViewports },
-    actions: { argTypesRegex: "^on[A-Z].*" },
     docs: {
       container: ({ children, context }) => (
         <DocsContainer context={context}>
@@ -74,6 +74,8 @@ const preview = {
       ),
     },
   },
+
+  tags: ["autodocs"]
 };
 
 export default preview;

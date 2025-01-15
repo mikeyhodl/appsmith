@@ -32,6 +32,14 @@ export interface ColorModeTheme {
     bgWarningActive: string;
     bgWarningSubtleHover: string;
     bgWarningSubtleActive: string;
+    // Elevation
+    bgElevation1: string;
+    bgElevation2: string;
+    bgElevation3: string;
+    // Shadow
+    shadowElevation1: string;
+    shadowElevation2: string;
+    shadowElevation3: string;
     // fg
     fg: string;
     fgAccent: string;
@@ -61,8 +69,14 @@ export interface ColorModeTheme {
     // bd on bg*
     bdOnAccent: string;
     bdOnNeutral: string;
+    bdOnNeutralSubtle: string;
+    bdOnNeutralSubtleHover: string;
     bdOnPositive: string;
     bdOnNegative: string;
     bdOnWarning: string;
+    // Elevation
+    bdElevation1: string;
+    bdElevation2: string;
+    bdElevation3: string;
   };
 }

@@ -2,6 +2,7 @@ import {
   agHelper,
   appSettings,
   dataSources,
+  debuggerHelper,
   deployMode,
   entityExplorer,
   entityItems,
@@ -13,13 +14,16 @@ import {
 import EditorNavigation, {
   EntityType,
   PageLeftPane,
+  PagePaneSegment,
 } from "../../../../support/Pages/EditorNavigation";
 
 let dsName: any, query: string;
 
 describe(
   "Bug #14299 - The data from the query does not show up on the widget",
-  { tags: ["@tag.Widget", "@tag.Datasource"] },
+  {
+    tags: ["@tag.Widget", "@tag.Datasource", "@tag.Git", "@tag.AccessControl"],
+  },
   function () {
     before("Create Postgress DS & set theme", () => {
       agHelper.AddDsl("Bugs/14299dsl");
@@ -117,8 +121,20 @@ describe(
     after(
       "Verify Deletion of the datasource after all created queries are deleted",
       () => {
-        deployMode.NavigateBacktoEditor("ran successfully"); //runAstros triggered on PageLaoad of Edit page!
-        PageLeftPane.expandCollapseItem("Queries/JS");
+        deployMode.NavigateBacktoEditor();
+
+        //verify runAstros triggered on PageLaoad of Edit page!
+        debuggerHelper.OpenDebugger();
+        debuggerHelper.ClickLogsTab();
+        debuggerHelper.DebuggerLogsFilter("JSObject1.runAstros");
+        agHelper.AssertContains(
+          "Function executed",
+          "exist",
+          debuggerHelper.locators._logMessage,
+        );
+        debuggerHelper.CloseBottomBar();
+
+        PageLeftPane.switchSegment(PagePaneSegment.JS);
         entityExplorer.ActionContextMenuByEntityName({
           entityNameinLeftSidebar: "JSObject1",
           action: "Delete",

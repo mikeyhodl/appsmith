@@ -1,27 +1,26 @@
-import React, { memo, useEffect, useMemo, useRef, useState } from "react";
+import React, { memo, useMemo, useRef, useState } from "react";
 import Entity, { EntityClassNames } from "../Explorer/Entity";
 import { datasourceTableIcon } from "../Explorer/ExplorerIcons";
 import QueryTemplates from "./QueryTemplates";
-import DatasourceField from "./DatasourceField";
 import type { DatasourceTable } from "entities/Datasource";
-import { DatasourceStructureContext } from "entities/Datasource";
-import { useCloseMenuOnScroll } from "@appsmith/pages/Editor/Explorer/hooks";
+import type { DatasourceStructureContext } from "entities/Datasource";
+import { useCloseMenuOnScroll } from "ee/pages/Editor/Explorer/hooks";
 import { SIDEBAR_ID } from "constants/Explorer";
 import { useSelector } from "react-redux";
-import type { AppState } from "@appsmith/reducers";
-import { getDatasource, getPlugin } from "@appsmith/selectors/entitiesSelector";
+import type { AppState } from "ee/reducers";
+import { getDatasource, getPlugin } from "ee/selectors/entitiesSelector";
 import { getPagePermissions } from "selectors/editorSelectors";
-import { Menu, MenuTrigger, Button, Tooltip, MenuContent } from "design-system";
-import { SHOW_TEMPLATES, createMessage } from "@appsmith/constants/messages";
+import { Menu, MenuTrigger, Button, Tooltip, MenuContent } from "@appsmith/ads";
+import { SHOW_TEMPLATES, createMessage } from "ee/constants/messages";
 import styled from "styled-components";
-import AnalyticsUtil from "utils/AnalyticsUtil";
-import type { Plugin } from "api/PluginApi";
+import AnalyticsUtil from "ee/utils/AnalyticsUtil";
+import type { Plugin } from "entities/Plugin";
 import { omit } from "lodash";
 import { Virtuoso } from "react-virtuoso";
 import { useFeatureFlag } from "utils/hooks/useFeatureFlag";
-import { FEATURE_FLAG } from "@appsmith/entities/FeatureFlag";
-import { hasCreateDSActionPermissionInApp } from "@appsmith/utils/BusinessFeatures/permissionPageHelpers";
-import { useEditorType } from "@appsmith/hooks";
+import { FEATURE_FLAG } from "ee/entities/FeatureFlag";
+import { hasCreateDSActionPermissionInApp } from "ee/utils/BusinessFeatures/permissionPageHelpers";
+import { useEditorType } from "ee/hooks";
 import history from "utils/history";
 
 interface DatasourceStructureItemProps {
@@ -33,6 +32,7 @@ interface DatasourceStructureItemProps {
   currentActionId: string;
   onEntityTableClick?: (table: string) => void;
   tableName?: string;
+  showTemplates: boolean;
 }
 
 const StyledMenuContent = styled(MenuContent)`
@@ -44,12 +44,14 @@ const StructureWrapper = styled.div`
   display: flex;
   flex-direction: column;
   flex-grow: 1;
+  height: 100%;
 `;
 
 const DatasourceStructureItem = memo((props: DatasourceStructureItemProps) => {
   const dbStructure = props.dbStructure;
   let templateMenu = null;
   const [active, setActive] = useState(false);
+
   useCloseMenuOnScroll(SIDEBAR_ID, active, () => setActive(false));
   const collapseRef = useRef<HTMLDivElement | null>(null);
 
@@ -77,13 +79,13 @@ const DatasourceStructureItem = memo((props: DatasourceStructureItemProps) => {
     setActive(false);
   };
 
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const onEntityClick = (entity: any) => {
     AnalyticsUtil.logEvent("DATASOURCE_SCHEMA_TABLE_SELECT", {
       datasourceId: props.datasourceId,
       pluginName: plugin?.name,
     });
-
-    canCreateDatasourceActions && setActive(!active);
 
     if (!!props?.onEntityTableClick) {
       props?.onEntityTableClick(entity.target.outerText);
@@ -105,11 +107,7 @@ const DatasourceStructureItem = memo((props: DatasourceStructureItemProps) => {
               isIconButton
               kind="tertiary"
               onClick={() => setActive(!active)}
-              startIcon={
-                props.context !== DatasourceStructureContext.EXPLORER
-                  ? "add-line"
-                  : "increase-control-v2"
-              }
+              startIcon={"add-line"}
             />
           </MenuTrigger>
         </Tooltip>
@@ -130,26 +128,19 @@ const DatasourceStructureItem = memo((props: DatasourceStructureItemProps) => {
       </Menu>
     ) : null;
 
-  if (dbStructure.templates && !props?.onEntityTableClick)
+  if (dbStructure.templates && props.showTemplates) {
     templateMenu = lightningMenu;
-  const columnsAndKeys = dbStructure.columns.concat(dbStructure.keys);
+  }
 
   const activeState = useMemo(() => {
-    if (props.context === DatasourceStructureContext.DATASOURCE_VIEW_MODE) {
-      return props.tableName === dbStructure.name;
-    } else {
-      return active;
-    }
+    return props.tableName === dbStructure.name || active;
   }, [active, props.tableName]);
 
   return (
     <Entity
       action={onEntityClick}
       active={activeState}
-      className={`datasourceStructure${
-        props.context !== DatasourceStructureContext.EXPLORER &&
-        `-${props.context}`
-      }`}
+      className={`datasourceStructure-${props.context}`}
       collapseRef={collapseRef}
       contextMenu={templateMenu}
       entityId={`${props.datasourceId}-${dbStructure.name}-${props.context}`}
@@ -157,19 +148,7 @@ const DatasourceStructureItem = memo((props: DatasourceStructureItemProps) => {
       isDefaultExpanded={props?.isDefaultOpen}
       name={dbStructure.name}
       step={props.step}
-    >
-      <>
-        {columnsAndKeys.map((field, index) => {
-          return (
-            <DatasourceField
-              field={field}
-              key={`${field.name}${index}`}
-              step={props.step + 1}
-            />
-          );
-        })}
-      </>
-    </Entity>
+    />
   );
 });
 
@@ -180,18 +159,10 @@ type DatasourceStructureProps = Partial<DatasourceStructureItemProps> & {
   context: DatasourceStructureContext;
   isDefaultOpen?: boolean;
   currentActionId: string;
+  showTemplates: boolean;
 };
 
 const DatasourceStructure = (props: DatasourceStructureProps) => {
-  const [containerHeight, setContainerHeight] = useState<number>();
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (containerRef.current?.offsetHeight) {
-      setContainerHeight(containerRef.current?.offsetHeight);
-    }
-  }, []);
-
   const Row = (index: number) => {
     const structure = props.tables[index];
 
@@ -200,20 +171,18 @@ const DatasourceStructure = (props: DatasourceStructureProps) => {
         {...omit(props, ["tables"])}
         dbStructure={structure}
         key={`${props.datasourceId}${structure.name}-${props.context}`}
+        showTemplates={props.showTemplates}
       />
     );
   };
 
   return (
-    <StructureWrapper ref={containerRef}>
-      {containerHeight && (
-        <Virtuoso
-          className="t--schema-virtuoso-container"
-          itemContent={Row}
-          style={{ height: `${containerHeight}px` }}
-          totalCount={props.tables.length}
-        />
-      )}
+    <StructureWrapper>
+      <Virtuoso
+        className="t--schema-virtuoso-container"
+        itemContent={Row}
+        totalCount={props.tables.length}
+      />
     </StructureWrapper>
   );
 };

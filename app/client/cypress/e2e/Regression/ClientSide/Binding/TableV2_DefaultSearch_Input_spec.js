@@ -27,11 +27,13 @@ describe(
       );
       // validation of data displayed in input widgets based on search value set
       EditorNavigation.SelectEntityByName("Table1", EntityType.Widget);
+      _.propPane.ExpandIfCollapsedSection("search\\&filters");
       cy.get(".t--property-control-allowsearching input").click({
         force: true,
       });
       cy.testJsontext("defaultsearchtext", "2736212");
-      cy.wait("@updateLayout").isSelectRow(0);
+      cy.wait("@updateLayout");
+      _.table.SelectTableRow(0, 0, true, "v2");
       cy.readTableV2dataPublish("0", "0").then((tabData) => {
         const tabValue = tabData;
         expect(tabValue).to.be.equal("2736212");

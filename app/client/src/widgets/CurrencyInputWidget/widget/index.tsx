@@ -5,10 +5,7 @@ import CurrencyInputComponent from "../component";
 import { EventType } from "constants/AppsmithActionConstants/ActionConstants";
 import type { ValidationResponse } from "constants/WidgetValidation";
 import { ValidationTypes } from "constants/WidgetValidation";
-import {
-  createMessage,
-  FIELD_REQUIRED_ERROR,
-} from "@appsmith/constants/messages";
+import { createMessage, FIELD_REQUIRED_ERROR } from "ee/constants/messages";
 import type { DerivedPropertiesMap } from "WidgetProvider/factory";
 import {
   CurrencyDropdownOptions,
@@ -45,11 +42,16 @@ import { ResponsiveBehavior } from "layoutSystems/common/utils/constants";
 import { DynamicHeight } from "utils/WidgetFeatures";
 import { getDefaultCurrency } from "../component/CurrencyCodeDropdown";
 import IconSVG from "../icon.svg";
+import ThumbnailSVG from "../thumbnail.svg";
 import { WIDGET_TAGS } from "constants/WidgetConstants";
 
 export function defaultValueValidation(
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   value: any,
   props: CurrencyInputWidgetProps,
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   _?: any,
 ): ValidationResponse {
   const NUMBER_ERROR_MESSAGE = {
@@ -71,8 +73,10 @@ export function defaultValueValidation(
       .format(1.1)
       .replace(/\p{Number}/gu, "");
   }
+
   const decimalSeperator = getLocaleDecimalSeperator();
   const defaultDecimalSeperator = ".";
+
   if (_.isObject(value)) {
     return {
       isValid: false,
@@ -89,6 +93,8 @@ export function defaultValueValidation(
     };
   }
 
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let parsed: any = Number(value);
   let isValid, messages;
 
@@ -158,6 +164,7 @@ class CurrencyInputWidget extends BaseInputWidget<
     return {
       name: "Currency Input",
       iconSVG: IconSVG,
+      thumbnailSVG: ThumbnailSVG,
       tags: [WIDGET_TAGS.INPUTS],
       needsMeta: true,
       searchTags: ["amount", "total"],
@@ -356,6 +363,22 @@ class CurrencyInputWidget extends BaseInputWidget<
                   label: "2",
                   value: 2,
                 },
+                {
+                  label: "3",
+                  value: 3,
+                },
+                {
+                  label: "4",
+                  value: 4,
+                },
+                {
+                  label: "5",
+                  value: 5,
+                },
+                {
+                  label: "6",
+                  value: 6,
+                },
               ],
               isJSConvertible: true,
               isBindProperty: true,
@@ -364,7 +387,7 @@ class CurrencyInputWidget extends BaseInputWidget<
                 type: ValidationTypes.NUMBER,
                 params: {
                   min: 0,
-                  max: 2,
+                  max: 6,
                 },
               },
             },
@@ -405,6 +428,8 @@ class CurrencyInputWidget extends BaseInputWidget<
     };
   }
 
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   static getMetaPropertiesMap(): Record<string, any> {
     return _.merge(super.getMetaPropertiesMap(), {
       text: undefined,
@@ -439,6 +464,7 @@ class CurrencyInputWidget extends BaseInputWidget<
     ) {
       this.formatText();
     }
+
     // If defaultText property has changed, reset isDirty to false
     if (
       this.props.defaultText !== prevProps.defaultText &&
@@ -469,6 +495,7 @@ class CurrencyInputWidget extends BaseInputWidget<
           minimumFractionDigits: this.props.decimals,
           maximumFractionDigits: this.props.decimals,
         }).format(floatVal);
+
         this.props.updateWidgetMetaProperty("text", formattedValue);
       } catch (e) {
         log.error(e);
@@ -480,6 +507,7 @@ class CurrencyInputWidget extends BaseInputWidget<
   onValueChange = (value: string) => {
     let formattedValue = "";
     const decimalSeperator = getLocaleDecimalSeperator();
+
     try {
       if (value && value.includes(decimalSeperator)) {
         formattedValue = limitDecimalValue(this.props.decimals, value);
@@ -518,6 +546,7 @@ class CurrencyInputWidget extends BaseInputWidget<
           new RegExp("\\" + getLocaleThousandSeparator(), "g"),
           "",
         );
+
         this.props.updateWidgetMetaProperty("text", deFormattedValue);
         this.props.updateWidgetMetaProperty("isFocused", isFocused, {
           triggerPropertyName: "onFocus",
@@ -532,8 +561,10 @@ class CurrencyInputWidget extends BaseInputWidget<
             this.props.decimals,
             this.props.text,
           );
+
           this.props.updateWidgetMetaProperty("text", formattedValue);
         }
+
         this.props.updateWidgetMetaProperty("isFocused", isFocused, {
           triggerPropertyName: "onBlur",
           dynamicString: this.props.onBlur,
@@ -571,6 +602,7 @@ class CurrencyInputWidget extends BaseInputWidget<
 
     // Since value is always going to be a number therefore, directly converting it to the current locale
     const formattedValue = Intl.NumberFormat(getLocale()).format(value);
+
     if (!this.props.isDirty) {
       this.props.updateWidgetMetaProperty("isDirty", true);
     }
@@ -590,10 +622,13 @@ class CurrencyInputWidget extends BaseInputWidget<
       "isValid" in this.props && !this.props.isValid && !!this.props.isDirty;
     const currencyCode = this.props.currencyCode;
     const conditionalProps: Partial<CurrencyInputComponentProps> = {};
+
     conditionalProps.errorMessage = this.props.errorMessage;
+
     if (this.props.isRequired && value.length === 0) {
       conditionalProps.errorMessage = createMessage(FIELD_REQUIRED_ERROR);
     }
+
     const { componentHeight } = this.props;
 
     if (this.props.showStepArrows) {

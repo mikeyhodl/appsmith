@@ -9,10 +9,6 @@ import {
   ResizeWrapper,
 } from "layoutSystems/common/resizer/common";
 import type { StyledComponent } from "styled-components";
-import PerformanceTracker, {
-  PerformanceTransactionName,
-} from "utils/PerformanceTracker";
-import "./styles.css";
 
 const getSnappedValues = (
   x: number,
@@ -46,16 +42,21 @@ function ResizableHandle(props: ResizableHandleProps) {
       if (!props.allowResize) {
         return;
       }
+
       const snapped = getSnappedValues(mx, my, props.snapGrid);
+
       if (dragging && memo && (snapped.x !== memo.x || snapped.y !== memo.y)) {
         props.dragCallback(snapped.x, snapped.y);
       }
+
       if (first) {
         props.onStart();
       }
+
       if (last) {
         props.onStop();
       }
+
       return snapped;
     },
   );
@@ -104,23 +105,6 @@ interface ResizableProps {
 }
 
 export function ModalResizable(props: ResizableProps) {
-  // Performance tracking start
-  const sentryPerfTags = props.zWidgetType
-    ? [{ name: "widget_type", value: props.zWidgetType }]
-    : [];
-  PerformanceTracker.startTracking(
-    PerformanceTransactionName.SHOW_RESIZE_HANDLES,
-    { widgetId: props.widgetId },
-    true,
-    sentryPerfTags,
-  );
-
-  useEffect(() => {
-    PerformanceTracker.stopTracking(
-      PerformanceTransactionName.SHOW_RESIZE_HANDLES,
-    );
-  });
-  //end
   const [pointerEvents, togglePointerEvents] = useState(true);
   const [newDimensions, set] = useState({
     width: props.componentWidth,
@@ -142,13 +126,16 @@ export function ModalResizable(props: ResizableProps) {
     const { height, width, x, y } = rect;
     const shouldUpdateHeight =
       props.componentHeight !== height && props.enableVerticalResize;
+
     if (!shouldUpdateHeight) rect.height = props.componentHeight;
 
     const shouldUpdateWidth =
       props.componentWidth !== width && props.enableHorizontalResize;
+
     if (!shouldUpdateWidth) rect.width = props.componentWidth;
 
     const isColliding = props.isColliding({ width, height }, { x, y });
+
     if (!isColliding) {
       set({ ...rect, reset: false });
     }
@@ -281,6 +268,7 @@ export function ModalResizable(props: ResizableProps) {
       component: props.handles.bottomLeft,
     });
   }
+
   const onResizeStop = () => {
     togglePointerEvents(true);
     props.onStop(
@@ -313,6 +301,7 @@ export function ModalResizable(props: ResizableProps) {
         props.enableVerticalResize,
         handle.handleDirection,
       );
+
     return (
       <ResizableHandle
         {...handle}

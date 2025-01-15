@@ -1,6 +1,6 @@
 import styled, { keyframes } from "styled-components";
 import { ContentKind } from "./types";
-import { CodeEditorColors } from "../CodeEditor/styledComponents";
+import { CodeEditorColors } from "../CodeEditor/constants";
 
 export const HighlighedCodeContainer = styled("div")<{
   contentKind: ContentKind;
@@ -11,8 +11,6 @@ export const HighlighedCodeContainer = styled("div")<{
   background-color: #fff !important;
   font-weight: 400 !important;
   line-height: 21px !important;
-
-  min-height: inherit;
   padding: 6px;
 
   pre {
@@ -27,6 +25,7 @@ export const HighlighedCodeContainer = styled("div")<{
       if (props.isReadOnly) {
         return "padding-left: 35px !important";
       }
+
       if (props.showLineNumbers) {
         return "padding-left: 47px !important";
       }
@@ -40,8 +39,8 @@ export const HighlighedCodeContainer = styled("div")<{
       contentKind === ContentKind.CODE
         ? CodeEditorColors.KEYWORD
         : contentKind === ContentKind.PLACEHOLDER
-        ? "#858282"
-        : "inherit"} !important;
+          ? "#858282"
+          : "inherit"} !important;
   }
 `;
 
@@ -50,6 +49,7 @@ export const LazyEditorWrapper = styled("div")`
 `;
 
 export const ContentWrapper = styled("div")<{
+  borderLess: boolean;
   contentKind: ContentKind;
   showLineNumbers?: boolean;
   folding?: boolean;
@@ -61,10 +61,10 @@ export const ContentWrapper = styled("div")<{
     !!height
       ? height
       : contentKind === ContentKind.PLACEHOLDER
-      ? "36px"
-      : "auto"};
+        ? "36px"
+        : "auto"};
   min-height: 36px;
-  border: 1px solid;
+  border: ${(props) => (props.borderLess ? "none" : "1px solid")};
   border-color: inherit;
   ${(props) => props.showLineNumbers && "border: none"}
   border-radius: var(--ads-v2-border-radius);

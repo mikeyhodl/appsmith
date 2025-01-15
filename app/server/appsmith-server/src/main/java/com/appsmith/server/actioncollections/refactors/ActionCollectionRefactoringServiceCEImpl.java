@@ -5,7 +5,6 @@ import com.appsmith.external.models.ActionDTO;
 import com.appsmith.external.models.CreatorContextType;
 import com.appsmith.external.models.MustacheBindingToken;
 import com.appsmith.server.actioncollections.base.ActionCollectionService;
-import com.appsmith.server.constants.FieldName;
 import com.appsmith.server.domains.ActionCollection;
 import com.appsmith.server.dtos.ActionCollectionDTO;
 import com.appsmith.server.dtos.EntityType;
@@ -17,14 +16,10 @@ import com.appsmith.server.services.AstService;
 import com.appsmith.server.solutions.ActionPermission;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.util.LinkedMultiValueMap;
-import org.springframework.util.MultiValueMap;
-import org.springframework.util.StringUtils;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -86,7 +81,7 @@ public class ActionCollectionRefactoringServiceCEImpl implements EntityRefactori
         return astService
                 .replaceValueInMustacheKeys(
                         new HashSet<>(Collections.singletonList(
-                                new MustacheBindingToken(unpublishedCollection.getBody(), 0, true))),
+                                new MustacheBindingToken(unpublishedCollection.getBody(), 0, false))),
                         oldName,
                         newName,
                         evalVersion,
@@ -104,35 +99,20 @@ public class ActionCollectionRefactoringServiceCEImpl implements EntityRefactori
     }
 
     @Override
-    public Mono<Void> updateRefactoredEntity(RefactorEntityNameDTO refactorEntityNameDTO, String branchName) {
+    public Mono<Void> updateRefactoredEntity(RefactorEntityNameDTO refactorEntityNameDTO) {
         String newName = refactorEntityNameDTO.getNewName();
         String actionCollectionId = refactorEntityNameDTO.getActionCollectionId();
 
         Mono<ActionCollectionDTO> branchedActionCollectionDTOMono;
-        if (!StringUtils.hasLength(branchName)) {
-            branchedActionCollectionDTOMono = actionCollectionService.findActionCollectionDTObyIdAndViewMode(
-                    actionCollectionId, false, actionPermission.getEditPermission());
-        } else {
-            branchedActionCollectionDTOMono = actionCollectionService
-                    .findByBranchNameAndDefaultCollectionId(
-                            branchName, actionCollectionId, actionPermission.getEditPermission())
-                    .flatMap(actionCollection ->
-                            actionCollectionService.generateActionCollectionByViewMode(actionCollection, false));
-        }
+        branchedActionCollectionDTOMono = actionCollectionService.findActionCollectionDTObyIdAndViewMode(
+                actionCollectionId, false, actionPermission.getEditPermission());
 
         return branchedActionCollectionDTOMono
                 .flatMap(branchedActionCollection -> {
-                    final HashMap<String, String> actionIds = new HashMap<>();
-                    if (branchedActionCollection.getDefaultToBranchedActionIdsMap() != null) {
-                        actionIds.putAll(branchedActionCollection.getDefaultToBranchedActionIdsMap());
-                    }
-                    if (branchedActionCollection.getDefaultToBranchedArchivedActionIdsMap() != null) {
-                        actionIds.putAll(branchedActionCollection.getDefaultToBranchedArchivedActionIdsMap());
-                    }
-
-                    Flux<ActionDTO> actionUpdatesFlux = Flux.fromIterable(actionIds.values())
-                            .flatMap(actionId -> newActionService.findActionDTObyIdAndViewMode(
-                                    actionId, false, actionPermission.getEditPermission()))
+                    Flux<ActionDTO> actionUpdatesFlux = newActionService
+                            .findByCollectionIdAndViewMode(
+                                    branchedActionCollection.getId(), false, actionPermission.getEditPermission())
+                            .map(action -> newActionService.generateActionByViewMode(action, false))
                             .flatMap(actionDTO -> {
                                 actionDTO.setFullyQualifiedName(newName + "." + actionDTO.getName());
                                 return newActionService
@@ -154,16 +134,13 @@ public class ActionCollectionRefactoringServiceCEImpl implements EntityRefactori
     }
 
     @Override
-    public Flux<String> getExistingEntityNames(String contextId, CreatorContextType contextType, String layoutId) {
-        return getExistingEntities(contextId, contextType, layoutId).map(ActionCollectionDTO::getName);
+    public Flux<String> getExistingEntityNames(
+            String contextId, CreatorContextType contextType, String layoutId, boolean viewMode) {
+        return getExistingEntities(contextId, contextType, layoutId, viewMode).map(ActionCollectionDTO::getName);
     }
 
     protected Flux<ActionCollectionDTO> getExistingEntities(
-            String contextId, CreatorContextType contextType, String layoutId) {
-        MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
-        if (StringUtils.hasText(contextId)) {
-            params.add(FieldName.PAGE_ID, contextId);
-        }
-        return actionCollectionService.getActionCollectionsByViewMode(params, false);
+            String contextId, CreatorContextType contextType, String layoutId, boolean viewMode) {
+        return actionCollectionService.getCollectionsByPageIdAndViewMode(contextId, viewMode, null);
     }
 }

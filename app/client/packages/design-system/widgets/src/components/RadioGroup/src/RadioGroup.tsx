@@ -1,35 +1,63 @@
-import React, { forwardRef } from "react";
+import type { ForwardedRef } from "react";
+import React, { forwardRef, useRef } from "react";
+import {
+  useGroupOrientation,
+  inputFieldStyles,
+  FieldLabel,
+  FieldError,
+  toggleGroupStyles,
+} from "@appsmith/wds";
+import { RadioGroup as HeadlessRadioGroup, Group } from "react-aria-components";
 
-import type {
-  RadioGroupRef as HeadlessRadioGroupRef,
-  RadioGroupProps as HeadlessRadioGroupProps,
-} from "@design-system/headless";
-import { getTypographyClassName } from "@design-system/theming";
-import { RadioGroup as HeadlessRadioGroup } from "@design-system/headless";
+import type { RadioGroupProps } from "./types";
 
-import { fieldStyles } from "../../../styles";
-import { ContextualHelp } from "../../TextInput/src/ContextualHelp";
-
-export interface RadioGroupProps extends HeadlessRadioGroupProps {
-  className?: string;
-}
-
-const _RadioGroup = (props: RadioGroupProps, ref: HeadlessRadioGroupRef) => {
-  const { contextualHelp: contextualHelpProp, ...rest } = props;
-
-  const contextualHelp = Boolean(contextualHelpProp) && (
-    <ContextualHelp contextualHelp={contextualHelpProp} />
+const _RadioGroup = (
+  props: RadioGroupProps,
+  ref: ForwardedRef<HTMLDivElement>,
+) => {
+  const {
+    children,
+    contextualHelp,
+    errorMessage,
+    isDisabled,
+    isReadOnly,
+    isRequired,
+    label,
+    ...rest
+  } = props;
+  const containerRef = useRef<HTMLDivElement>(null);
+  const { orientation } = useGroupOrientation(
+    { orientation: props.orientation },
+    containerRef,
   );
 
   return (
     <HeadlessRadioGroup
-      contextualHelp={contextualHelp}
-      fieldClassName={fieldStyles.field}
-      helpTextClassName={getTypographyClassName("footnote")}
-      labelClassName={getTypographyClassName("body")}
-      ref={ref}
       {...rest}
-    />
+      className={inputFieldStyles.field}
+      isDisabled={isDisabled}
+      isReadOnly={isReadOnly}
+      isRequired={isRequired}
+      ref={ref}
+    >
+      {Boolean(label) && (
+        <FieldLabel
+          contextualHelp={contextualHelp}
+          isDisabled={isDisabled}
+          isRequired={isRequired}
+        >
+          {label}
+        </FieldLabel>
+      )}
+      <Group
+        className={toggleGroupStyles.toggleGroup}
+        data-orientation={orientation}
+        ref={containerRef}
+      >
+        {children}
+      </Group>
+      <FieldError>{errorMessage}</FieldError>
+    </HeadlessRadioGroup>
   );
 };
 

@@ -2,9 +2,7 @@ import EditorNavigation, {
   EntityType,
 } from "../../../../../support/Pages/EditorNavigation";
 
-const dslWithServerSide = require("../../../../../fixtures/Listv2/listWithServerSideData.json");
 const commonlocators = require("../../../../../locators/commonlocators.json");
-const queryLocators = require("../../../../../locators/QueryEditor.json");
 
 import * as _ from "../../../../../support/Objects/ObjectsCore";
 
@@ -87,116 +85,106 @@ const listData = [
   },
 ];
 
-describe("List widget V2 page number and page size", () => {
-  before(() => {
-    _.agHelper.AddDsl("listv2PaginationDsl");
-  });
-
-  beforeEach(() => {
-    _.agHelper.RestoreLocalStorageCache();
-  });
-
-  afterEach(() => {
-    _.agHelper.SaveLocalStorageCache();
-  });
-
-  it("1. List widget V2 with client side pagination", () => {
-    cy.openPropertyPane("listwidgetv2");
-    cy.testJsontext("items", JSON.stringify(listData));
-    cy.wait("@updateLayout");
-    cy.openPropertyPane("textwidget");
-    cy.testJsontext("text", `PageSize {{List1.pageSize}}`);
-    cy.wait("@updateLayout");
-
-    cy.get(commonlocators.bodyTextStyle)
-      .first()
-      .should("have.text", "PageSize 4");
-
-    cy.openPropertyPane("textwidget");
-    cy.wait(2000);
-    cy.testJsontext("text", `Page Number {{List1.pageNo}}`);
-    cy.wait(2000);
-    cy.wait("@updateLayout");
-    cy.get(commonlocators.bodyTextStyle)
-      .first()
-      .should("have.text", "Page Number 1");
-
-    cy.get(commonlocators.listPaginateNextButton).click({
-      force: true,
+describe(
+  "List widget V2 page number and page size",
+  { tags: ["@tag.Widget", "@tag.List", "@tag.Sanity", "@tag.Binding"] },
+  () => {
+    before(() => {
+      _.agHelper.AddDsl("listv2PaginationDsl");
     });
-    cy.get(commonlocators.bodyTextStyle)
-      .first()
-      .should("have.text", "Page Number 2");
 
-    cy.openPropertyPane("listwidgetv2");
-    cy.get(commonlocators.deleteWidget).click({ force: true });
-  });
-
-  it("2. List widget V2 with server side pagination", () => {
-    cy.dragAndDropToCanvas("listwidgetv2", {
-      x: 300,
-      y: 300,
+    beforeEach(() => {
+      _.agHelper.RestoreLocalStorageCache();
     });
-    cy.openPropertyPane("listwidgetv2");
 
-    cy.openPropertyPane("textwidget");
-    cy.testJsontextclear("text");
-    cy.testJsontext("text", `PageSize {{List1.pageSize}}`);
-    cy.wait("@updateLayout");
+    afterEach(() => {
+      _.agHelper.SaveLocalStorageCache();
+    });
 
-    cy.get(commonlocators.bodyTextStyle)
-      .first()
-      .should("have.text", "PageSize 3");
+    it("1. List widget V2 with client side pagination", () => {
+      cy.openPropertyPane("listwidgetv2");
+      cy.testJsontext("items", JSON.stringify(listData));
+      cy.wait("@updateLayout");
+      cy.openPropertyPane("textwidget");
+      cy.testJsontext("text", `PageSize {{List1.pageSize}}`);
+      cy.wait("@updateLayout");
 
-    // toggle serversidepagination -> true
-    cy.openPropertyPane("listwidgetv2");
-    cy.togglebar(".t--property-control-serversidepagination input");
+      cy.get(commonlocators.bodyTextStyle)
+        .first()
+        .should("have.text", "PageSize 4");
 
-    cy.get(commonlocators.bodyTextStyle)
-      .first()
-      .should("have.text", "PageSize 2");
-  });
+      cy.openPropertyPane("textwidget");
+      cy.testJsontext("text", `Page Number {{List1.pageNo}}`);
+      cy.wait("@updateLayout");
+      cy.get(commonlocators.bodyTextStyle)
+        .first()
+        .should("have.text", "Page Number 1");
 
-  it("3. should reset page no if higher than max when switched from server side to client side", () => {
-    cy.addDsl(dslWithServerSide);
-    // Open Datasource editor
-    cy.wait(2000);
-    _.dataSources.CreateDataSource("Postgres");
-    _.dataSources.CreateQueryAfterDSSaved();
+      cy.get(commonlocators.listPaginateNextButton).click({
+        force: true,
+      });
+      cy.get(commonlocators.bodyTextStyle)
+        .first()
+        .should("have.text", "Page Number 2");
 
-    // Click the editing field
-    cy.get(".t--action-name-edit-field").click({ force: true });
+      cy.openPropertyPane("listwidgetv2");
+      cy.get(commonlocators.deleteWidget).click({ force: true });
+    });
 
-    // Click the editing field
-    cy.get(queryLocators.queryNameField).type("Query1");
+    it("2. List widget V2 with server side pagination", () => {
+      cy.dragAndDropToCanvas("listwidgetv2", {
+        x: 300,
+        y: 300,
+      });
+      cy.openPropertyPane("listwidgetv2");
 
-    // switching off Use Prepared Statement toggle
-    cy.get(queryLocators.switch).last().click({ force: true });
+      cy.openPropertyPane("textwidget");
+      _.propPane.UpdatePropertyFieldValue(
+        "Text",
+        "PageSize {{List1.pageSize}}",
+      );
 
-    _.dataSources.EnterQuery(
-      "SELECT * FROM users OFFSET {{List1.pageNo * 1}} LIMIT {{List1.pageSize}};",
-    );
+      cy.get(commonlocators.bodyTextStyle)
+        .first()
+        .should("have.text", "PageSize 3");
 
-    cy.WaitAutoSave();
+      // toggle serversidepagination -> true
+      cy.openPropertyPane("listwidgetv2");
+      _.agHelper.CheckUncheck(commonlocators.serverSidePaginationCheckbox);
 
-    cy.runQuery();
+      cy.get(commonlocators.bodyTextStyle)
+        .first()
+        .should("have.text", "PageSize 2");
 
-    EditorNavigation.SelectEntityByName("Page1", EntityType.Page);
+      //should reset page no if higher than max when switched from server side to client side"
+      // Open Datasource editor
+      _.dataSources.CreateDataSource("Postgres");
+      _.dataSources.CreateQueryAfterDSSaved();
 
-    cy.wait(1000);
+      _.agHelper.RenameQuery("Query1");
 
-    // Click next page in list widget
-    cy.get(".t--list-widget-next-page")
-      .find("button")
-      .click({ force: true })
-      .wait(1000);
+      // switching off Use Prepared Statement toggle
+      _.dataSources.ToggleUsePreparedStatement(false);
 
-    // Change to client side pagination
-    cy.openPropertyPane("listwidgetv2");
-    cy.togglebarDisable(".t--property-control-serversidepagination input");
+      _.dataSources.EnterQuery(
+        "SELECT * FROM users OFFSET {{List1.pageNo * 1}} LIMIT {{List1.pageSize}};",
+      );
 
-    cy.wait(2000);
+      cy.WaitAutoSave();
 
-    cy.get(".t--widget-containerwidget").should("have.length", 2);
-  });
-});
+      cy.runQuery();
+
+      EditorNavigation.SelectEntityByName("Page1", EntityType.Page);
+
+      // Click next page in list widget
+      cy.get(".t--list-widget-next-page").find("button").click({ force: true });
+
+      // Change to client side pagination
+      cy.openPropertyPane("listwidgetv2");
+      _.propPane.UpdatePropertyFieldValue("Items", "{{Query1.data}}");
+      _.propPane.TogglePropertyState("Server side pagination", "Off");
+
+      cy.get(".t--widget-containerwidget").should("have.length", 2);
+    });
+  },
+);

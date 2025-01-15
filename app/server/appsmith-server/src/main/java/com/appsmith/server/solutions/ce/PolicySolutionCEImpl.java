@@ -11,7 +11,6 @@ import com.appsmith.server.domains.NewAction;
 import com.appsmith.server.domains.NewPage;
 import com.appsmith.server.domains.PermissionGroup;
 import com.appsmith.server.domains.Theme;
-import com.appsmith.server.domains.User;
 import com.appsmith.server.dtos.Permission;
 import com.appsmith.server.repositories.ActionCollectionRepository;
 import com.appsmith.server.repositories.ApplicationRepository;
@@ -23,6 +22,7 @@ import com.appsmith.server.solutions.ApplicationPermission;
 import com.appsmith.server.solutions.DatasourcePermission;
 import com.appsmith.server.solutions.PagePermission;
 import lombok.AllArgsConstructor;
+import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.util.StringUtils;
 import reactor.core.publisher.Flux;
@@ -55,7 +55,7 @@ public class PolicySolutionCEImpl implements PolicySolutionCE {
     private final PagePermission pagePermission;
 
     @Override
-    public <T extends BaseDomain> T addPoliciesToExistingObject(Map<String, Policy> policyMap, T obj) {
+    public <T extends BaseDomain> T addPoliciesToExistingObject(@NonNull Map<String, Policy> policyMap, T obj) {
         // Making a deep copy here so we don't modify the `policyMap` object.
         // TODO: Investigate a solution without using deep-copy.
         // TODO: Do we need to return the domain object?
@@ -69,8 +69,11 @@ public class PolicySolutionCEImpl implements PolicySolutionCE {
             policyMap1.put(entry.getKey(), policy);
         }
 
+        Set<Policy> existingPolicies = obj.getPolicies();
+        final Set<Policy> policies = new HashSet<>(existingPolicies == null ? Set.of() : existingPolicies);
+
         // Append the user to the existing permission policy if it already exists.
-        for (Policy policy : obj.getPolicies()) {
+        for (Policy policy : policies) {
             String permission = policy.getPermission();
             if (policyMap1.containsKey(permission)) {
                 Set<String> permissionGroups = new HashSet<>();
@@ -86,7 +89,8 @@ public class PolicySolutionCEImpl implements PolicySolutionCE {
             }
         }
 
-        obj.getPolicies().addAll(policyMap1.values());
+        policies.addAll(policyMap1.values());
+        obj.setPolicies(policies);
         return obj;
     }
 
@@ -99,8 +103,10 @@ public class PolicySolutionCEImpl implements PolicySolutionCE {
             policyMap1.put(entry.getKey(), entry.getValue());
         }
 
+        Set<Policy> existingPolicies = obj.getPolicies();
+        final Set<Policy> policies = new HashSet<>(existingPolicies == null ? Set.of() : existingPolicies);
         // Remove the user from the existing permission policy if it exists.
-        for (Policy policy : obj.getPolicies()) {
+        for (Policy policy : policies) {
             String permission = policy.getPermission();
             if (policyMap1.containsKey(permission)) {
                 if (policy.getPermissionGroups() == null) {
@@ -114,7 +120,7 @@ public class PolicySolutionCEImpl implements PolicySolutionCE {
                 policyMap1.remove(permission);
             }
         }
-
+        obj.setPolicies(policies);
         return obj;
     }
 
@@ -152,47 +158,6 @@ public class PolicySolutionCEImpl implements PolicySolutionCE {
                 policyGenerator.getLateralPolicies(permission, Set.of(permissionGroupId), null);
         policiesForPermission.add(policyWithCurrentPermission);
         return policiesForPermission.stream().collect(Collectors.toMap(Policy::getPermission, Function.identity()));
-    }
-
-    public Map<String, Policy> generatePolicyFromPermissionForMultipleUsers(
-            Set<AclPermission> permissions, List<User> users) {
-        Set<String> usernames = users.stream().map(user -> user.getUsername()).collect(Collectors.toSet());
-
-        return permissions.stream()
-                .map(perm -> {
-                    // Create a policy for the invited user using the permission as per the role
-                    Policy policyWithCurrentPermission = Policy.builder()
-                            .permission(perm.getValue())
-                            .users(usernames)
-                            .build();
-                    // Generate any and all lateral policies that might come with the current permission
-                    Set<Policy> policiesForUser = policyGenerator.getLateralPolicies(perm, usernames, null);
-                    policiesForUser.add(policyWithCurrentPermission);
-                    return policiesForUser;
-                })
-                .flatMap(Collection::stream)
-                .collect(Collectors.toMap(Policy::getPermission, Function.identity()));
-    }
-
-    public Flux<Datasource> updateWithNewPoliciesToDatasourcesByDatasourceIds(
-            Set<String> ids, Map<String, Policy> datasourcePolicyMap, boolean addPolicyToObject) {
-
-        return datasourceRepository
-                .findAllByIds(ids, datasourcePermission.getEditPermission())
-                // In case we have come across a datasource the current user is not allowed to manage, move on.
-                .switchIfEmpty(Mono.empty())
-                .flatMap(datasource -> {
-                    Datasource updatedDatasource;
-                    if (addPolicyToObject) {
-                        updatedDatasource = addPoliciesToExistingObject(datasourcePolicyMap, datasource);
-                    } else {
-                        updatedDatasource = removePoliciesFromExistingObject(datasourcePolicyMap, datasource);
-                    }
-
-                    return Mono.just(updatedDatasource);
-                })
-                .collectList()
-                .flatMapMany(datasources -> datasourceRepository.saveAll(datasources));
     }
 
     @Override

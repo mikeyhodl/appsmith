@@ -5,49 +5,45 @@ import com.appsmith.caching.annotations.CacheEvict;
 import com.appsmith.server.constants.FieldName;
 import com.appsmith.server.domains.Config;
 import com.appsmith.server.domains.PermissionGroup;
-import com.appsmith.server.domains.QConfig;
-import com.appsmith.server.domains.QPermissionGroup;
-import com.appsmith.server.domains.QTenant;
-import com.appsmith.server.domains.QUser;
 import com.appsmith.server.domains.Tenant;
+import com.appsmith.server.domains.TenantConfiguration;
 import com.appsmith.server.domains.User;
 import com.appsmith.server.domains.Workspace;
 import com.appsmith.server.exceptions.AppsmithError;
 import com.appsmith.server.exceptions.AppsmithException;
 import com.appsmith.server.helpers.InMemoryCacheableRepositoryHelper;
+import com.appsmith.server.helpers.ce.bridge.Bridge;
+import com.appsmith.server.helpers.ce.bridge.BridgeQuery;
+import io.micrometer.observation.ObservationRegistry;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.minidev.json.JSONObject;
 import org.springframework.data.mongodb.core.ReactiveMongoOperations;
-import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
+import reactor.core.observability.micrometer.Micrometer;
 import reactor.core.publisher.Mono;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import static com.appsmith.external.constants.spans.TenantSpan.FETCH_TENANT_FROM_DB_SPAN;
 import static com.appsmith.server.constants.FieldName.PERMISSION_GROUP_ID;
 import static com.appsmith.server.constants.ce.FieldNameCE.ANONYMOUS_USER;
 import static com.appsmith.server.constants.ce.FieldNameCE.DEFAULT_PERMISSION_GROUP;
 import static com.appsmith.server.constants.ce.FieldNameCE.INSTANCE_CONFIG;
-import static com.appsmith.server.repositories.BaseAppsmithRepositoryImpl.fieldName;
 import static com.appsmith.server.repositories.ce.BaseAppsmithRepositoryCEImpl.notDeleted;
 
 @Slf4j
 @Component
+@RequiredArgsConstructor
 public class CacheableRepositoryHelperCEImpl implements CacheableRepositoryHelperCE {
     private final ReactiveMongoOperations mongoOperations;
     private final InMemoryCacheableRepositoryHelper inMemoryCacheableRepositoryHelper;
-    private final Map<String, User> tenantAnonymousUserMap = new HashMap<>();
-
-    public CacheableRepositoryHelperCEImpl(
-            ReactiveMongoOperations mongoOperations,
-            InMemoryCacheableRepositoryHelper inMemoryCacheableRepositoryHelper) {
-        this.mongoOperations = mongoOperations;
-        this.inMemoryCacheableRepositoryHelper = inMemoryCacheableRepositoryHelper;
-    }
+    private final ObservationRegistry observationRegistry;
+    private static final String CACHE_DEFAULT_PAGE_ID_TO_DEFAULT_APPLICATION_ID = "pageIdToAppId";
 
     @Cache(cacheName = "permissionGroupsForUser", key = "{#user.email + #user.tenantId}")
     @Override
@@ -67,30 +63,25 @@ public class CacheableRepositoryHelperCEImpl implements CacheableRepositoryHelpe
         }
 
         Mono<Query> createQueryMono = getInstanceAdminPermissionGroupId().map(instanceAdminPermissionGroupId -> {
-            Criteria assignedToUserIdsCriteria = Criteria.where(
-                            fieldName(QPermissionGroup.permissionGroup.assignedToUserIds))
-                    .is(user.getId());
+            BridgeQuery<PermissionGroup> assignedToUserIdsCriteria =
+                    Bridge.equal(PermissionGroup.Fields.assignedToUserIds, user.getId());
 
-            Criteria notDeletedCriteria = notDeleted();
+            BridgeQuery<PermissionGroup> notDeletedCriteria = notDeleted();
 
             // The roles should be either workspace default roles, user management role, or instance admin role
-            Criteria ceSupportedRolesCriteria = new Criteria()
-                    .orOperator(
-                            Criteria.where(fieldName(QPermissionGroup.permissionGroup.defaultDomainType))
-                                    .is(Workspace.class.getSimpleName()),
-                            Criteria.where(fieldName(QPermissionGroup.permissionGroup.defaultDomainType))
-                                    .is(User.class.getSimpleName()),
-                            Criteria.where(fieldName(QPermissionGroup.permissionGroup.id))
-                                    .is(instanceAdminPermissionGroupId));
+            BridgeQuery<PermissionGroup> ceSupportedRolesCriteria = Bridge.or(
+                    Bridge.equal(PermissionGroup.Fields.defaultDomainType, Workspace.class.getSimpleName()),
+                    Bridge.equal(PermissionGroup.Fields.defaultDomainType, User.class.getSimpleName()),
+                    Bridge.equal(PermissionGroup.Fields.id, instanceAdminPermissionGroupId));
 
-            Criteria andCriteria = new Criteria();
-            andCriteria.andOperator(assignedToUserIdsCriteria, notDeletedCriteria, ceSupportedRolesCriteria);
+            BridgeQuery<PermissionGroup> andCriteria =
+                    Bridge.and(assignedToUserIdsCriteria, notDeletedCriteria, ceSupportedRolesCriteria);
 
             Query query = new Query();
             query.addCriteria(andCriteria);
 
             // Since we are only interested in the permission group ids, we can project only the id field.
-            query.fields().include(fieldName(QPermissionGroup.permissionGroup.id));
+            query.fields().include(PermissionGroup.Fields.id);
 
             return query;
         });
@@ -113,12 +104,10 @@ public class CacheableRepositoryHelperCEImpl implements CacheableRepositoryHelpe
         log.debug(
                 "In memory cache miss for anonymous user permission groups. Fetching from DB and adding it to in memory storage.");
 
+        BridgeQuery<Config> query = Bridge.equal(Config.Fields.name, FieldName.PUBLIC_PERMISSION_GROUP);
         // All public access is via a single permission group. Fetch the same and set the cache with it.
         return mongoOperations
-                .findOne(
-                        Query.query(
-                                Criteria.where(fieldName(QConfig.config1.name)).is(FieldName.PUBLIC_PERMISSION_GROUP)),
-                        Config.class)
+                .findOne(Query.query(query), Config.class)
                 .map(publicPermissionGroupConfig ->
                         Set.of(publicPermissionGroupConfig.getConfig().getAsString(PERMISSION_GROUP_ID)))
                 .doOnSuccess(inMemoryCacheableRepositoryHelper::setAnonymousUserPermissionGroupIds);
@@ -145,53 +134,13 @@ public class CacheableRepositoryHelperCEImpl implements CacheableRepositoryHelpe
     }
 
     @Override
-    public Mono<User> getAnonymousUser(String tenantId) {
-        if (tenantAnonymousUserMap.containsKey(tenantId)) {
-            return Mono.just(tenantAnonymousUserMap.get(tenantId));
-        }
-
-        Criteria anonymousUserCriteria =
-                Criteria.where(fieldName(QUser.user.email)).is(FieldName.ANONYMOUS_USER);
-        Criteria tenantIdCriteria =
-                Criteria.where(fieldName(QUser.user.tenantId)).is(tenantId);
-
-        Query query = new Query();
-        query.addCriteria(anonymousUserCriteria);
-        query.addCriteria(tenantIdCriteria);
-
-        return mongoOperations.findOne(query, User.class).map(anonymousUser -> {
-            tenantAnonymousUserMap.put(tenantId, anonymousUser);
-            return anonymousUser;
-        });
-    }
-
-    @Override
-    public Mono<User> getAnonymousUser() {
-        String defaultTenantId = inMemoryCacheableRepositoryHelper.getDefaultTenantId();
-        if (defaultTenantId != null && !defaultTenantId.isEmpty()) {
-            return getAnonymousUser(defaultTenantId);
-        }
-
-        Criteria defaultTenantCriteria =
-                Criteria.where(fieldName(QTenant.tenant.slug)).is(FieldName.DEFAULT);
-        Query query = new Query();
-        query.addCriteria(defaultTenantCriteria);
-
-        return mongoOperations.findOne(query, Tenant.class).flatMap(defaultTenant -> {
-            inMemoryCacheableRepositoryHelper.setDefaultTenantId(defaultTenant.getId());
-            return getAnonymousUser(defaultTenant.getId());
-        });
-    }
-
-    @Override
     public Mono<String> getDefaultTenantId() {
         String defaultTenantId = inMemoryCacheableRepositoryHelper.getDefaultTenantId();
         if (defaultTenantId != null && !defaultTenantId.isEmpty()) {
             return Mono.just(defaultTenantId);
         }
 
-        Criteria defaultTenantCriteria =
-                Criteria.where(fieldName(QTenant.tenant.slug)).is(FieldName.DEFAULT);
+        BridgeQuery<Tenant> defaultTenantCriteria = Bridge.equal(Tenant.Fields.slug, FieldName.DEFAULT);
         Query query = new Query();
         query.addCriteria(defaultTenantCriteria);
 
@@ -209,7 +158,7 @@ public class CacheableRepositoryHelperCEImpl implements CacheableRepositoryHelpe
             return Mono.just(instanceAdminPermissionGroupId);
         }
 
-        Criteria configName = Criteria.where(fieldName(QConfig.config1.name)).is(INSTANCE_CONFIG);
+        BridgeQuery<Config> configName = Bridge.equal(Config.Fields.name, INSTANCE_CONFIG);
 
         return mongoOperations
                 .findOne(new Query().addCriteria(configName), Config.class)
@@ -219,5 +168,50 @@ public class CacheableRepositoryHelperCEImpl implements CacheableRepositoryHelpe
                 })
                 .doOnSuccess(permissionGroupId ->
                         inMemoryCacheableRepositoryHelper.setInstanceAdminPermissionGroupId(permissionGroupId));
+    }
+
+    /**
+     * Returns the default tenant from the cache if present.
+     * If not present in cache, then it fetches the default tenant from the database and adds to redis.
+     * @param tenantId
+     * @return
+     */
+    @Cache(cacheName = "tenant", key = "{#tenantId}")
+    @Override
+    public Mono<Tenant> fetchDefaultTenant(String tenantId) {
+        BridgeQuery<Tenant> defaultTenantCriteria = Bridge.equal(Tenant.Fields.slug, FieldName.DEFAULT);
+        BridgeQuery<Tenant> notDeletedCriteria = notDeleted();
+        BridgeQuery<Tenant> andCriteria = Bridge.and(defaultTenantCriteria, notDeletedCriteria);
+        Query query = new Query();
+        query.addCriteria(andCriteria);
+        log.info("Fetching tenant from database as it couldn't be found in the cache!");
+        return mongoOperations
+                .findOne(query, Tenant.class)
+                .map(tenant -> {
+                    if (tenant.getTenantConfiguration() == null) {
+                        tenant.setTenantConfiguration(new TenantConfiguration());
+                    }
+                    return tenant;
+                })
+                .name(FETCH_TENANT_FROM_DB_SPAN)
+                .tap(Micrometer.observation(observationRegistry));
+    }
+
+    @CacheEvict(cacheName = "tenant", key = "{#tenantId}")
+    @Override
+    public Mono<Void> evictCachedTenant(String tenantId) {
+        return Mono.empty().then();
+    }
+
+    @Cache(cacheName = CACHE_DEFAULT_PAGE_ID_TO_DEFAULT_APPLICATION_ID, key = "{#basePageId}")
+    @Override
+    public Mono<String> fetchBaseApplicationId(String basePageId, String baseApplicationId) {
+        return !StringUtils.hasText(baseApplicationId) ? Mono.empty() : Mono.just(baseApplicationId);
+    }
+
+    @CacheEvict(cacheName = CACHE_DEFAULT_PAGE_ID_TO_DEFAULT_APPLICATION_ID, keys = "#basePageIds")
+    @Override
+    public Mono<Boolean> evictCachedBasePageIds(List<String> basePageIds) {
+        return Mono.just(Boolean.TRUE);
     }
 }

@@ -1,7 +1,7 @@
 package com.appsmith.server.helpers;
 
-import com.appsmith.server.domains.Application;
-import com.appsmith.server.domains.GitApplicationMetadata;
+import com.appsmith.external.models.RefAwareDomain;
+import com.appsmith.server.domains.GitArtifactMetadata;
 import com.appsmith.server.exceptions.AppsmithError;
 import com.appsmith.server.exceptions.AppsmithException;
 import com.appsmith.util.WebClientUtils;
@@ -21,6 +21,28 @@ public class GitUtils {
     public static final Integer MAX_RETRIES = 20;
 
     /**
+     * Pattern for validating the ssh address if that starts with a scheme
+     * Should start with ssh://
+     * may or may not have a username : e.g. ssh://domain.xy:/path/path.git
+     * username can start with any small alphabet or a _ underscore
+     * the RFC host name should have regex : ((?!-)[A-Za-z0-9-]{1,63}(?<!-)\\.)+[A-Za-z0-9-]{1,63}\\.[A-Za-z]{2,6},
+     * however due to already existing leniency
+     * hostname can have all alphanumerics, -, and .  e.g. ssh://_ab-xy@ab-12.ab:/v3/newJet/ai/zilla.git
+     * the port number could be not present as well. e.g. ssh://_ab-xy@domain.com:/v3/newJet/ai/zilla
+     */
+    public static final Pattern URL_PATTERN_WITH_SCHEME =
+            Pattern.compile("^ssh://([a-z_][\\w-]+@)?(?<host>[\\w-.]+)(:(?<port>\\d*))?/+(?<path>.+?)(\\.git)?$");
+
+    /**
+     * Pattern for validating the ssh address if it strictly doesn't start with a scheme
+     * username can start with any small alphabet or a _ underscore
+     * hostname can have all alphanumerics, -, and .  e.g. ssh://_ab-xy@ab-12.ab:/v3/newJet/ai/zilla.git
+     * the port number could be not present as well. e.g. ssh://_ab-xy@domain.com:/v3/newJet/ai/zilla
+     */
+    public static final Pattern URL_PATTERN_WITHOUT_SCHEME =
+            Pattern.compile("^[a-z_][\\w-]+@(?<host>[\\w-.]+):/*(?<path>.+?)(\\.git)?$");
+
+    /**
      * Sample repo urls :
      * git@example.com:user/repoName.git
      * ssh://git@example.org/<workspace_ID>/<repo_name>.git
@@ -33,9 +55,19 @@ public class GitUtils {
         if (StringUtils.isEmptyOrNull(sshUrl)) {
             throw new AppsmithException(AppsmithError.INVALID_PARAMETER, "ssh url");
         }
-        return sshUrl.replaceFirst(".*git@", "https://")
-                .replaceFirst("(\\.[a-zA-Z0-9]*):", "$1/")
-                .replaceFirst("\\.git$", "");
+
+        Matcher match = URL_PATTERN_WITH_SCHEME.matcher(sshUrl);
+        if (!match.matches()) {
+            match = URL_PATTERN_WITHOUT_SCHEME.matcher(sshUrl);
+        }
+
+        if (!match.matches()) {
+            throw new AppsmithException(
+                    AppsmithError.INVALID_GIT_CONFIGURATION,
+                    "Remote URL is incorrect. Please add a URL in standard format. Example: git@example.com:username/reponame.git");
+        }
+
+        return "https://" + match.group("host") + "/" + match.group("path");
     }
 
     /**
@@ -49,16 +81,16 @@ public class GitUtils {
     public static String getRepoName(String remoteUrl) {
         // Pattern to match git SSH URL
         final Matcher matcher = Pattern.compile(
-                        "((git|ssh|http(s)?)|(git@[\\w\\-\\.]+))(:(\\/\\/)?)([\\w.@:/\\-~]+)(\\.git|)(\\/)?")
+                        "((git|ssh)|([\\w\\-\\.]+@[\\w\\-\\.]+))(:(\\/\\/)?)([\\w.@:\\/\\-~\\(\\)\\%]+)(\\.git|)(\\/)?")
                 .matcher(remoteUrl);
         if (matcher.find()) {
             // To trim the postfix and prefix
-            return matcher.group(7).replaceFirst("\\.git$", "").replaceFirst("^(.*[\\\\\\/])", "");
+            return matcher.group(6).replaceFirst("\\.git$", "").replaceFirst("^(.*[\\\\\\/])", "");
         }
         throw new AppsmithException(
                 AppsmithError.INVALID_GIT_CONFIGURATION,
-                "Remote URL is incorrect, "
-                        + "please add a URL in standard format. Example: git@example.com:username/reponame.git");
+                "Remote URL is incorrect. "
+                        + "Please add a URL in standard format. Example: git@example.com:username/reponame.git");
     }
 
     /**
@@ -102,35 +134,33 @@ public class GitUtils {
         return sshUrl.split("\\.")[0].replaceFirst("git@", "");
     }
 
-    public static String getDefaultBranchName(GitApplicationMetadata gitApplicationMetadata) {
-        return StringUtils.isEmptyOrNull(gitApplicationMetadata.getDefaultBranchName())
-                ? gitApplicationMetadata.getBranchName()
-                : gitApplicationMetadata.getDefaultBranchName();
+    public static String getDefaultBranchName(GitArtifactMetadata gitArtifactMetadata) {
+        return StringUtils.isEmptyOrNull(gitArtifactMetadata.getDefaultBranchName())
+                ? gitArtifactMetadata.getRefName()
+                : gitArtifactMetadata.getDefaultBranchName();
     }
 
     /**
-     * This method checks if the application is connected to git and is the default branched.
+     * This method checks if the artifact is connected to git and is the default branched.
      *
-     * @param application   application to be checked
-     * @return              true if the application is default branched, false otherwise
+     * @param gitArtifactMetadata   gitArtifactMetadata to be checked
+     * @return              true if the artifact is default branched, false otherwise
      */
-    public static boolean isDefaultBranchedApplication(Application application) {
-        GitApplicationMetadata metadata = application.getGitApplicationMetadata();
-        return isApplicationConnectedToGit(application)
-                && !StringUtils.isEmptyOrNull(metadata.getBranchName())
-                && metadata.getBranchName().equals(metadata.getDefaultBranchName());
+    public static boolean isDefaultBranchedArtifact(GitArtifactMetadata gitArtifactMetadata) {
+        return isArtifactConnectedToGit(gitArtifactMetadata)
+                && !StringUtils.isEmptyOrNull(gitArtifactMetadata.getRefName())
+                && gitArtifactMetadata.getRefName().equals(gitArtifactMetadata.getDefaultBranchName());
     }
 
     /**
-     * This method checks if the application is connected to Git or not.
-     * @param application   application to be checked
-     * @return              true if the application is connected to Git, false otherwise
+     * This method checks if the artifact is connected to Git or not.
+     * @param gitArtifactMetadata   gitArtifactMetadata to be checked
+     * @return              true if the artifact is connected to Git, false otherwise
      */
-    public static boolean isApplicationConnectedToGit(Application application) {
-        GitApplicationMetadata metadata = application.getGitApplicationMetadata();
-        return metadata != null
-                && !StringUtils.isEmptyOrNull(metadata.getDefaultApplicationId())
-                && !StringUtils.isEmptyOrNull(metadata.getRemoteUrl());
+    public static boolean isArtifactConnectedToGit(GitArtifactMetadata gitArtifactMetadata) {
+        return gitArtifactMetadata != null
+                && !StringUtils.isEmptyOrNull(gitArtifactMetadata.getDefaultArtifactId())
+                && !StringUtils.isEmptyOrNull(gitArtifactMetadata.getRemoteUrl());
     }
 
     public static boolean isMigrationRequired(JSONObject layoutDsl, Integer latestDslVersion) {
@@ -145,8 +175,28 @@ public class GitUtils {
         return isMigrationRequired;
     }
 
-    public static boolean isAutoCommitEnabled(GitApplicationMetadata gitApplicationMetadata) {
-        return gitApplicationMetadata.getAutoCommitConfig() == null
-                || gitApplicationMetadata.getAutoCommitConfig().getEnabled();
+    public static boolean isMigrationRequired(org.json.JSONObject layoutDsl, Integer latestDslVersion) {
+        boolean isMigrationRequired = true;
+        String versionKey = "version";
+        if (layoutDsl.has(versionKey)) {
+            int currentDslVersion = layoutDsl.getInt(versionKey);
+            if (currentDslVersion >= latestDslVersion) {
+                isMigrationRequired = false;
+            }
+        }
+        return isMigrationRequired;
+    }
+
+    public static boolean isAutoCommitEnabled(GitArtifactMetadata gitArtifactMetadata) {
+        return gitArtifactMetadata.getAutoCommitConfig() == null
+                || gitArtifactMetadata.getAutoCommitConfig().getEnabled();
+    }
+
+    // Helper method to reset baseId, refType, and refName for entities
+    public static <T extends RefAwareDomain> T resetEntityReferences(T entity) {
+        entity.setBaseId(entity.getId());
+        entity.setRefType(null);
+        entity.setRefName(null);
+        return entity;
     }
 }

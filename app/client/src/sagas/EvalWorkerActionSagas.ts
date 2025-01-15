@@ -1,49 +1,53 @@
-import { all, call, put, spawn, take } from "redux-saga/effects";
-import { ReduxActionTypes } from "@appsmith/constants/ReduxActionConstants";
-import { MAIN_THREAD_ACTION } from "@appsmith/workers/Evaluation/evalWorkerActions";
+import { all, call, put, select, spawn, take } from "redux-saga/effects";
+import { ReduxActionTypes } from "ee/constants/ReduxActionConstants";
+import { MAIN_THREAD_ACTION } from "ee/workers/Evaluation/evalWorkerActions";
 import log from "loglevel";
-import { logJSVarMutationEvent } from "../sagas/PostEvaluationSagas";
 import type { Channel } from "redux-saga";
 import { storeLogs } from "../sagas/DebuggerSagas";
 import type {
   BatchedJSExecutionData,
   BatchedJSExecutionErrors,
-} from "@appsmith/reducers/entityReducers/jsActionsReducer";
+} from "ee/reducers/entityReducers/jsActionsReducer";
 import type { TMessage } from "utils/MessageUtil";
 import { MessageType } from "utils/MessageUtil";
 import type { ResponsePayload } from "../sagas/EvaluationsSaga";
 import {
-  evalWorker,
   executeTriggerRequestSaga,
   updateDataTreeHandler,
 } from "../sagas/EvaluationsSaga";
-import { logJSFunctionExecution } from "@appsmith/sagas/JSFunctionExecutionSaga";
+import { evalWorker } from "utils/workerInstances";
 import { handleStoreOperations } from "./ActionExecution/StoreActionSaga";
-import type {
-  EvalTreeResponseData,
-  JSVarMutatedEvents,
-} from "workers/Evaluation/types";
+import type { EvalTreeResponseData } from "workers/Evaluation/types";
 import isEmpty from "lodash/isEmpty";
-import type { UnEvalTree } from "entities/DataTree/dataTreeTypes";
 import { sortJSExecutionDataByCollectionId } from "workers/Evaluation/JSObject/utils";
 import type { LintTreeSagaRequestData } from "plugins/Linting/types";
 import { evalErrorHandler } from "./EvalErrorHandler";
+import { getUnevaluatedDataTree } from "selectors/dataTreeSelectors";
+import { endSpan, startRootSpan } from "instrumentation/generateTraces";
+
 export interface UpdateDataTreeMessageData {
   workerResponse: EvalTreeResponseData;
-  unevalTree: UnEvalTree;
 }
 
+// TODO: Fix this the next time the file is edited
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function* handleEvalWorkerRequestSaga(listenerChannel: Channel<any>) {
   while (true) {
+    // TODO: Fix this the next time the file is edited
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const request: TMessage<any> = yield take(listenerChannel);
+
     yield spawn(handleEvalWorkerMessage, request);
   }
 }
 
+// TODO: Fix this the next time the file is edited
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function* lintTreeActionHandler(message: any) {
   const { body } = message;
   const { data } = body;
   const { configTree, unevalTree } = data as LintTreeSagaRequestData;
+
   yield put({
     type: ReduxActionTypes.LINT_TREE,
     payload: {
@@ -53,12 +57,17 @@ export function* lintTreeActionHandler(message: any) {
   });
 }
 
+// TODO: Fix this the next time the file is edited
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function* processLogsHandler(message: any) {
   const { body } = message;
   const { data } = body;
+
   yield call(storeLogs, data);
 }
 
+// TODO: Fix this the next time the file is edited
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function* processJSFunctionExecution(message: any) {
   const { body } = message;
   const {
@@ -74,12 +83,14 @@ export function* processJSFunctionExecution(message: any) {
     JSExecutionData,
     JSExecutionErrors,
   );
+
   if (!isEmpty(sortedData)) {
     yield put({
       type: ReduxActionTypes.SET_JS_FUNCTION_EXECUTION_DATA,
       payload: sortedData,
     });
   }
+
   if (!isEmpty(sortedErrors)) {
     yield put({
       type: ReduxActionTypes.SET_JS_FUNCTION_EXECUTION_ERRORS,
@@ -88,11 +99,14 @@ export function* processJSFunctionExecution(message: any) {
   }
 }
 
+// TODO: Fix this the next time the file is edited
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function* processTriggerHandler(message: any) {
   const { body } = message;
   const { data } = body;
   const { eventType, trigger, triggerMeta } = data;
   const { messageType } = message;
+
   log.debug({ trigger: data.trigger });
   const result: ResponsePayload = yield call(
     executeTriggerRequestSaga,
@@ -100,13 +114,17 @@ export function* processTriggerHandler(message: any) {
     eventType,
     triggerMeta,
   );
+
   if (messageType === MessageType.REQUEST)
     yield call(evalWorker.respond, message.messageId, result);
 }
 
+// TODO: Fix this the next time the file is edited
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function* handleEvalWorkerMessage(message: TMessage<any>) {
   const { body } = message;
   const { data, method } = body;
+
   switch (method) {
     case MAIN_THREAD_ACTION.LINT_TREE: {
       yield call(lintTreeActionHandler, message);
@@ -128,15 +146,15 @@ export function* handleEvalWorkerMessage(message: TMessage<any>) {
       yield call(handleStoreOperations, data);
       break;
     }
-    case MAIN_THREAD_ACTION.LOG_JS_FUNCTION_EXECUTION: {
-      yield call(logJSFunctionExecution, message);
-      break;
-    }
     case MAIN_THREAD_ACTION.PROCESS_BATCHED_TRIGGERS: {
       const batchedTriggers = data;
+
       yield all(
+        // TODO: Fix this the next time the file is edited
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         batchedTriggers.map((data: any) => {
           const { eventType, trigger, triggerMeta } = data;
+
           return call(
             executeTriggerRequestSaga,
             trigger,
@@ -148,18 +166,21 @@ export function* handleEvalWorkerMessage(message: TMessage<any>) {
       break;
     }
     case MAIN_THREAD_ACTION.UPDATE_DATATREE: {
-      const { unevalTree, workerResponse } = data as UpdateDataTreeMessageData;
+      const { workerResponse } = data as UpdateDataTreeMessageData;
+      const rootSpan = startRootSpan("DataTreeFactory.create");
+
+      const unEvalAndConfigTree: ReturnType<typeof getUnevaluatedDataTree> =
+        yield select(getUnevaluatedDataTree);
+
+      endSpan(rootSpan);
+
       yield call(updateDataTreeHandler, {
         evalTreeResponse: workerResponse as EvalTreeResponseData,
-        unevalTree,
+        unevalTree: unEvalAndConfigTree.unEvalTree || {},
         requiresLogging: false,
+        configTree: unEvalAndConfigTree.configTree,
       });
       break;
-    }
-
-    case MAIN_THREAD_ACTION.PROCESS_JS_VAR_MUTATION_EVENTS: {
-      const jsVarMutatedEvents: JSVarMutatedEvents = data;
-      yield call(logJSVarMutationEvent, jsVarMutatedEvents);
     }
   }
 

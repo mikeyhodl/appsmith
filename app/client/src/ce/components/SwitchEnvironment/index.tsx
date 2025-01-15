@@ -1,27 +1,27 @@
 import React, { useEffect, useState } from "react";
 import { useSelector } from "react-redux";
 import styled from "styled-components";
-import { Icon, Link, Option, Select, Text, Tooltip } from "design-system";
+import { Icon, Link, Option, Select, Text, Tooltip } from "@appsmith/ads";
 import { capitalizeFirstLetter } from "utils/helpers";
 import {
   BUSINESS_EDITION_TEXT,
   SWITCH_ENV_DISABLED_TOOLTIP_TEXT,
   createMessage,
-} from "@appsmith/constants/messages";
-import {
-  getRampLink,
-  showProductRamps,
-} from "@appsmith/selectors/rampSelectors";
+} from "ee/constants/messages";
+import { getRampLink, showProductRamps } from "ee/selectors/rampSelectors";
 import { isDatasourceInViewMode } from "selectors/ui";
 import { matchDatasourcePath, matchSAASGsheetsPath } from "constants/routes";
-import { useLocation } from "react-router";
 import {
   RAMP_NAME,
   RampFeature,
   RampSection,
 } from "utils/ProductRamps/RampsControlList";
+import {
+  environmentList,
+  type EnvironmentType,
+} from "constants/EnvironmentContants";
 
-const Wrapper = styled.div`
+export const Wrapper = styled.div`
   display: flex;
   border-right: 1px solid var(--ads-v2-color-border);
   padding: 0px 16px;
@@ -33,7 +33,7 @@ const Wrapper = styled.div`
   }
 `;
 
-const StyledText = styled(Text)<{
+export const StyledText = styled(Text)<{
   disabled: boolean;
 }>`
   color: var(--ads-v2-color-fg-emphasis);
@@ -42,39 +42,41 @@ const StyledText = styled(Text)<{
   flex-direction: row;
 `;
 
-const StyledIcon = styled(Icon)`
+export const StyledIcon = styled(Icon)`
   margin-right: 8px;
 `;
 
-interface Props {
+export interface Props {
   viewMode?: boolean;
+  editorId: string;
+  onChangeEnv?: () => void;
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  startSwitchEnvMessage: (...strArgs: any[]) => string;
 }
 
-interface EnvironmentType {
-  id: string;
-  name: string;
-  selected: boolean;
-}
-
-const environmentList: Array<EnvironmentType> = [
-  {
-    id: "unused_env",
-    name: "production",
-    selected: true,
-  },
-  {
-    id: "unused_env",
-    name: "staging",
-    selected: false,
-  },
-];
-
-const TooltipLink = styled(Link)`
+export const TooltipLink = styled(Link)`
   display: inline;
 `;
 
+export const DisabledTooltipContent = (rampLink: string) => {
+  return (
+    <Text
+      color="var(--ads-v2-color-white)"
+      data-testid="t--switch-env-tooltip"
+      kind="action-m"
+    >
+      {createMessage(SWITCH_ENV_DISABLED_TOOLTIP_TEXT)}
+      <TooltipLink kind="primary" target="_blank" to={rampLink}>
+        {createMessage(BUSINESS_EDITION_TEXT)}
+      </TooltipLink>
+    </Text>
+  );
+};
+
 export default function SwitchEnvironment({}: Props) {
-  const [diableSwitchEnvironment, setDiableSwitchEnvironment] = useState(false);
+  const [disableSwitchEnvironment, setDisableSwitchEnvironment] =
+    useState(false);
   // Fetching feature flags from the store and checking if the feature is enabled
   const showRampSelector = showProductRamps(RAMP_NAME.MULTIPLE_ENV, true);
   const canShowRamp = useSelector(showRampSelector);
@@ -83,14 +85,14 @@ export default function SwitchEnvironment({}: Props) {
     feature: RampFeature.MultipleEnv,
   });
   const rampLink = useSelector(rampLinkSelector);
-  const location = useLocation();
+
   //listen to url change and disable switch environment if datasource page is open
   useEffect(() => {
-    setDiableSwitchEnvironment(
+    setDisableSwitchEnvironment(
       !!matchDatasourcePath(window.location.pathname) ||
         !!matchSAASGsheetsPath(window.location.pathname),
     );
-  }, [location.pathname]);
+  }, [window.location.pathname]);
   //URL for datasource edit and review page is same
   //this parameter helps us to differentiate between the two.
   const isDatasourceViewMode = useSelector(isDatasourceInViewMode);
@@ -108,24 +110,9 @@ export default function SwitchEnvironment({}: Props) {
     );
   };
 
-  const DisabledTooltipContent = () => {
-    return (
-      <Text
-        color="var(--ads-v2-color-white)"
-        data-testid="t--switch-env-tooltip"
-        kind="action-m"
-      >
-        {createMessage(SWITCH_ENV_DISABLED_TOOLTIP_TEXT)}
-        <TooltipLink kind="primary" target="_blank" to={rampLink}>
-          {createMessage(BUSINESS_EDITION_TEXT)}
-        </TooltipLink>
-      </Text>
-    );
-  };
-
   return (
     <Wrapper
-      aria-disabled={diableSwitchEnvironment && !isDatasourceViewMode}
+      aria-disabled={disableSwitchEnvironment && !isDatasourceViewMode}
       data-testid="t--switch-env"
     >
       <Select
@@ -133,7 +120,7 @@ export default function SwitchEnvironment({}: Props) {
         dropdownClassName="select_environemnt_dropdown"
         getPopupContainer={(triggerNode) => triggerNode.parentNode.parentNode}
         isDisabled={
-          (diableSwitchEnvironment && !isDatasourceViewMode) ||
+          (disableSwitchEnvironment && !isDatasourceViewMode) ||
           environmentList.length === 1
         }
         listHeight={400}
@@ -153,7 +140,10 @@ export default function SwitchEnvironment({}: Props) {
             {env.selected ? (
               <div className="flex flex-col gap-1">{renderEnvOption(env)}</div>
             ) : (
-              <Tooltip content={DisabledTooltipContent()} placement="right">
+              <Tooltip
+                content={DisabledTooltipContent(rampLink)}
+                placement="right"
+              >
                 {renderEnvOption(env)}
               </Tooltip>
             )}

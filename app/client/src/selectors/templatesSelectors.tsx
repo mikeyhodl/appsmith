@@ -1,10 +1,20 @@
+import type { Workspace } from "ee/constants/workspaceConstants";
+import type { AppState } from "ee/reducers";
+import { getDefaultPlugins } from "ee/selectors/entitiesSelector";
+import { getFetchedWorkspaces } from "ee/selectors/workspaceSelectors";
+import { hasCreateNewAppPermission } from "ee/utils/permissionHelpers";
 import type { FilterKeys, Template } from "api/TemplatesApi";
+import {
+  BUILDING_BLOCK_EXPLORER_TYPE,
+  DEFAULT_COLUMNS_FOR_EXPLORER_BUILDING_BLOCKS,
+  DEFAULT_ROWS_FOR_EXPLORER_BUILDING_BLOCKS,
+  WIDGET_TAGS,
+} from "constants/WidgetConstants";
 import Fuse from "fuse.js";
-import type { AppState } from "@appsmith/reducers";
+import type { Filter } from "pages/Templates/TemplateFilters";
+import { TEMPLATE_BUILDING_BLOCKS_FILTER_FUNCTION_VALUE } from "pages/Templates/constants";
 import { createSelector } from "reselect";
-import { getWorkspaceCreateApplication } from "@appsmith/selectors/applicationSelectors";
-import { getDefaultPlugins } from "@appsmith/selectors/entitiesSelector";
-import type { Filter } from "pages/Templates/Filters";
+import type { WidgetCardProps } from "widgets/BaseWidget";
 
 const fuzzySearchOptions = {
   keys: ["title", "id", "datasources", "widgets"],
@@ -20,25 +30,12 @@ export const isImportingTemplateSelector = (state: AppState) =>
   state.ui.templates.isImportingTemplate;
 export const isImportingTemplateToAppSelector = (state: AppState) =>
   state.ui.templates.isImportingTemplateToApp;
-export const isImportingStarterBuildingBlockToAppSelector = (state: AppState) =>
-  state.ui.templates.isImportingStarterBuildingBlockToApp;
-export const starterBuildingBlockDatasourcePromptSelector = (state: AppState) =>
-  state.ui.templates.starterBuildingBlockDatasourcePrompt;
+export const currentForkingBuildingBlockName = (state: AppState) =>
+  state.ui.templates.currentForkingTemplateInfo.buildingBlock.name;
 export const buildingBlocksSourcePageIdSelector = (state: AppState) =>
   state.ui.templates.buildingBlockSourcePageId;
 export const showTemplateNotificationSelector = (state: AppState) =>
   state.ui.templates.templateNotificationSeen;
-
-export const getWorkspaceForTemplates = createSelector(
-  getWorkspaceCreateApplication,
-  (workspaceList) => {
-    if (workspaceList.length) {
-      return workspaceList[0];
-    }
-
-    return null;
-  },
-);
 
 export const getTemplateFilterSelector = (state: AppState) =>
   state.ui.templates.filters;
@@ -63,6 +60,42 @@ export const getTemplateById = (id: string) => (state: AppState) => {
 
 export const getActiveTemplateSelector = (state: AppState) =>
   state.ui.templates.activeTemplate;
+
+export const getBuildingBlocksList = (state: AppState) => {
+  return state.ui.templates.templates.filter(
+    (template) =>
+      template.functions[0] === TEMPLATE_BUILDING_BLOCKS_FILTER_FUNCTION_VALUE,
+  );
+};
+
+export const getBuildingBlockExplorerCards = createSelector(
+  getBuildingBlocksList,
+  (buildingBlocks) => {
+    const adjustedBuildingBlocks: WidgetCardProps[] = buildingBlocks.map(
+      (buildingBlock) => ({
+        rows:
+          buildingBlock.templateGridRowSize ||
+          DEFAULT_ROWS_FOR_EXPLORER_BUILDING_BLOCKS,
+        columns:
+          buildingBlock.templateGridColumnSize ||
+          DEFAULT_COLUMNS_FOR_EXPLORER_BUILDING_BLOCKS,
+        type: BUILDING_BLOCK_EXPLORER_TYPE,
+        displayName: buildingBlock.title,
+        icon:
+          buildingBlock.screenshotUrls.length > 1
+            ? buildingBlock.screenshotUrls[1]
+            : buildingBlock.screenshotUrls[0],
+        thumbnail:
+          buildingBlock.screenshotUrls.length > 1
+            ? buildingBlock.screenshotUrls[1]
+            : buildingBlock.screenshotUrls[0],
+        tags: [WIDGET_TAGS.BUILDING_BLOCKS],
+      }),
+    );
+
+    return adjustedBuildingBlocks;
+  },
+);
 
 export const getFilteredTemplateList = createSelector(
   getTemplatesSelector,
@@ -122,6 +155,7 @@ export const getSearchedTemplateList = createSelector(
     }
 
     const fuzzy = new Fuse(templates, fuzzySearchOptions);
+
     return fuzzy.search(query);
   },
 );
@@ -132,6 +166,7 @@ export const templatesDatasourceFiltersSelector = createSelector(
   getDefaultPlugins,
   (templates, plugins) => {
     const datasourceFilters: Filter[] = [];
+
     templates.map((template) => {
       template.datasources.map((pluginIdentifier) => {
         if (
@@ -189,6 +224,7 @@ export const getFilterListSelector = createSelector(
             if (filter.value) {
               return filter.value === templateValue;
             }
+
             return filter.label === templateValue;
           })
         ) {
@@ -196,8 +232,10 @@ export const getFilterListSelector = createSelector(
             if (datum.value) {
               return datum.value === templateValue;
             }
+
             return datum.label === templateValue;
           });
+
           filteredData && filters[key].push(filteredData);
         }
       });
@@ -206,24 +244,29 @@ export const getFilterListSelector = createSelector(
     templates.forEach((template) => {
       filterFilters(FUNCTIONS_FILTER, allFunctions, template);
     });
+
     return filters;
   },
 );
 
 export const getForkableWorkspaces = createSelector(
-  getWorkspaceCreateApplication,
-  (workspaces) => {
-    return workspaces.map((workspace) => {
-      return {
-        label: workspace.workspace.name,
-        value: workspace.workspace.id,
-      };
-    });
+  getFetchedWorkspaces,
+  (workspaces: Workspace[]) => {
+    return workspaces
+      .filter((workspace) =>
+        hasCreateNewAppPermission(workspace.userPermissions ?? []),
+      )
+      .map((workspace) => {
+        return {
+          label: workspace.name,
+          value: workspace.id,
+        };
+      });
   },
 );
 
-export const templateModalOpenSelector = (state: AppState) =>
-  state.ui.templates.showTemplatesModal;
+export const templateModalSelector = (state: AppState) =>
+  state.ui.templates.templatesModal;
 
 export const templatesCountSelector = (state: AppState) =>
   state.ui.templates.templates.length;

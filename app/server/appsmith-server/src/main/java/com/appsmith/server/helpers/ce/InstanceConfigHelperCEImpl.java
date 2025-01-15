@@ -9,7 +9,9 @@ import com.appsmith.server.domains.Config;
 import com.appsmith.server.dtos.ResponseDTO;
 import com.appsmith.server.exceptions.AppsmithError;
 import com.appsmith.server.exceptions.AppsmithException;
+import com.appsmith.server.helpers.LoadShifter;
 import com.appsmith.server.helpers.NetworkUtils;
+import com.appsmith.server.helpers.RTSCaller;
 import com.appsmith.server.services.AnalyticsService;
 import com.appsmith.server.services.ConfigService;
 import com.appsmith.server.services.FeatureFlagService;
@@ -52,6 +54,8 @@ public class InstanceConfigHelperCEImpl implements InstanceConfigHelperCE {
     private final AnalyticsService analyticsService;
     private final NetworkUtils networkUtils;
     private final ReleaseNotesService releaseNotesService;
+
+    private final RTSCaller rtsCaller;
 
     private boolean isRtsAccessible = false;
 
@@ -122,7 +126,7 @@ public class InstanceConfigHelperCEImpl implements InstanceConfigHelperCE {
                             analyticsProperties,
                             false);
                 })
-                .subscribeOn(commonConfig.scheduler())
+                .subscribeOn(LoadShifter.elasticScheduler)
                 .subscribe();
     }
 
@@ -179,10 +183,9 @@ public class InstanceConfigHelperCEImpl implements InstanceConfigHelperCE {
     public Mono<Void> performRtsHealthCheck() {
         log.debug("Performing RTS health check of this instance...");
 
-        return WebClientUtils.create(commonConfig.getRtsBaseUrl() + "/rts-api/v1/health-check")
-                .get()
-                .retrieve()
-                .toBodilessEntity()
+        return rtsCaller
+                .get("/rts-api/v1/health-check")
+                .flatMap((spec) -> spec.retrieve().toBodilessEntity())
                 .doOnNext(nextSignal -> {
                     log.debug("RTS health check succeeded");
                     this.isRtsAccessible = true;
@@ -192,22 +195,6 @@ public class InstanceConfigHelperCEImpl implements InstanceConfigHelperCE {
                     return Mono.empty();
                 })
                 .then();
-    }
-
-    @Override
-    public void printReady() {
-        System.out.println(
-                """
-
-                         █████╗ ██████╗ ██████╗ ███████╗███╗   ███╗██╗████████╗██╗  ██╗    ██╗███████╗    ██████╗ ██╗   ██╗███╗   ██╗███╗   ██╗██╗███╗   ██╗ ██████╗ ██╗
-                        ██╔══██╗██╔══██╗██╔══██╗██╔════╝████╗ ████║██║╚══██╔══╝██║  ██║    ██║██╔════╝    ██╔══██╗██║   ██║████╗  ██║████╗  ██║██║████╗  ██║██╔════╝ ██║
-                        ███████║██████╔╝██████╔╝███████╗██╔████╔██║██║   ██║   ███████║    ██║███████╗    ██████╔╝██║   ██║██╔██╗ ██║██╔██╗ ██║██║██╔██╗ ██║██║  ███╗██║
-                        ██╔══██║██╔═══╝ ██╔═══╝ ╚════██║██║╚██╔╝██║██║   ██║   ██╔══██║    ██║╚════██║    ██╔══██╗██║   ██║██║╚██╗██║██║╚██╗██║██║██║╚██╗██║██║   ██║╚═╝
-                        ██║  ██║██║     ██║     ███████║██║ ╚═╝ ██║██║   ██║   ██║  ██║    ██║███████║    ██║  ██║╚██████╔╝██║ ╚████║██║ ╚████║██║██║ ╚████║╚██████╔╝██╗
-                        ╚═╝  ╚═╝╚═╝     ╚═╝     ╚══════╝╚═╝     ╚═╝╚═╝   ╚═╝   ╚═╝  ╚═╝    ╚═╝╚══════╝    ╚═╝  ╚═╝ ╚═════╝ ╚═╝  ╚═══╝╚═╝  ╚═══╝╚═╝╚═╝  ╚═══╝ ╚═════╝ ╚═╝
-
-                        Please open http://localhost:<port> in your browser to experience Appsmith!
-                        """);
     }
 
     @Override

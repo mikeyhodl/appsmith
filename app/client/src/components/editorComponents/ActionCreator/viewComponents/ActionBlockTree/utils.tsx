@@ -1,5 +1,5 @@
 import React from "react";
-import { Icon } from "design-system";
+import { Icon } from "@appsmith/ads";
 import { AppsmithFunction, FieldType } from "../../constants";
 import type { ActionTree } from "../../types";
 import { FIELD_GROUP_CONFIG } from "../../FieldGroup/FieldGroupConfig";
@@ -7,9 +7,9 @@ import { getFunctionName, getFunctionArguments } from "@shared/ast";
 import { FIELD_CONFIG } from "../../Field/FieldConfig";
 import { getCodeFromMoustache, getEvaluationVersion } from "../../utils";
 import { ApiMethodIcon } from "pages/Editor/Explorer/ExplorerIcons";
-import { getCurrentActions } from "@appsmith/selectors/entitiesSelector";
+import { getCurrentActions } from "ee/selectors/entitiesSelector";
 import { useSelector } from "react-redux";
-import type { HTTP_METHOD } from "constants/ApiEditorConstants/CommonApiConstants";
+import type { HTTP_METHOD } from "PluginActionEditor/constants/CommonApiConstants";
 
 function GetIconForAction(
   actionType: ActionTree["actionType"],
@@ -88,6 +88,9 @@ function GetIconForAction(
 
     case AppsmithFunction.postWindowMessage:
       return () => <Icon name="chat-upload-icon" />;
+
+    default:
+      return () => <Icon name="js" />;
   }
 }
 
@@ -123,6 +126,7 @@ function getActionHeading(
     case AppsmithFunction.download:
       const fileName =
         FIELD_CONFIG[FieldType.DOWNLOAD_FILE_NAME_FIELD].getter(code);
+
       return fileName ? fileName : "Add data to download";
 
     case AppsmithFunction.jsFunction:
@@ -146,12 +150,14 @@ function getActionHeading(
 
     case AppsmithFunction.showModal:
       return (
-        FIELD_CONFIG[FieldType.SHOW_MODAL_FIELD].getter(code) || "Select modal"
+        FIELD_CONFIG[FieldType.SHOW_MODAL_FIELD].getter(code).split(".")[0] ||
+        "Select modal"
       );
 
     case AppsmithFunction.closeModal:
       return (
-        FIELD_CONFIG[FieldType.CLOSE_MODAL_FIELD].getter(code) || "Select modal"
+        FIELD_CONFIG[FieldType.CLOSE_MODAL_FIELD].getter(code).split(".")[0] ||
+        "Select modal"
       );
 
     case AppsmithFunction.resetWidget:

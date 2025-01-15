@@ -1,45 +1,39 @@
-import React, { Component } from "react";
-import type { AppState } from "@appsmith/reducers";
-import { connect } from "react-redux";
-import type { Placement } from "popper.js";
+import type { AppState } from "ee/reducers";
 import * as Sentry from "@sentry/react";
-import _, { toString } from "lodash";
-import type { ControlProps } from "./BaseControl";
-import BaseControl from "./BaseControl";
-import styled from "styled-components";
-import type { Indices } from "constants/Layers";
-import EvaluatedValuePopup from "components/editorComponents/CodeEditor/EvaluatedValuePopup";
-import { EditorTheme } from "components/editorComponents/CodeEditor/EditorConfig";
 import type { CodeEditorExpected } from "components/editorComponents/CodeEditor";
+import { EditorTheme } from "components/editorComponents/CodeEditor/EditorConfig";
+import EvaluatedValuePopup from "components/editorComponents/CodeEditor/EvaluatedValuePopup";
+import { DraggableListCard } from "components/propertyControls/DraggableListCard";
+import type { Indices } from "constants/Layers";
+import { Button } from "@appsmith/ads";
+import type { DataTree } from "entities/DataTree/dataTreeTypes";
+import _, { toString as lodashToString } from "lodash";
+import { DraggableListControl } from "pages/Editor/PropertyPane/DraggableListControl";
+import type { Placement } from "popper.js";
+import React, { Component } from "react";
+import { connect } from "react-redux";
+import {
+  getDataTreeForAutocomplete,
+  getPathEvalErrors,
+} from "selectors/dataTreeSelectors";
+import styled from "styled-components";
+import type { EvaluationError } from "utils/DynamicBindingUtils";
+import { isDynamicValue } from "utils/DynamicBindingUtils";
 import type { ColumnProperties } from "widgets/TableWidgetV2/component/Constants";
-import { StickyType } from "widgets/TableWidgetV2/component/Constants";
+import {
+  StickyType,
+  extraSpace,
+  itemHeight,
+  noOfItemsToDisplay,
+} from "widgets/TableWidgetV2/component/Constants";
+import { ColumnTypes } from "widgets/TableWidgetV2/constants";
 import {
   createColumn,
   isColumnTypeEditable,
   reorderColumns,
 } from "widgets/TableWidgetV2/widget/utilities";
-import type { DataTree } from "entities/DataTree/dataTreeTypes";
-import {
-  getDataTreeForAutocomplete,
-  getPathEvalErrors,
-} from "selectors/dataTreeSelectors";
-import type { EvaluationError } from "utils/DynamicBindingUtils";
-import { getEvalValuePath, isDynamicValue } from "utils/DynamicBindingUtils";
-import { DraggableListCard } from "components/propertyControls/DraggableListCard";
-import { Checkbox } from "design-system";
-import { ColumnTypes } from "widgets/TableWidgetV2/constants";
-import { DraggableListControl } from "pages/Editor/PropertyPane/DraggableListControl";
-import { Button } from "design-system";
-const EdtiableCheckboxWrapper = styled.div<{ rightPadding: boolean | null }>`
-  position: relative;
-  ${(props) => props.rightPadding && `right: 6px;`}
-  align-items: center;
-  .ads-v2-checkbox {
-    width: 16px;
-    height: 16px;
-    padding: 0;
-  }
-`;
+import type { ControlProps } from "./BaseControl";
+import BaseControl from "./BaseControl";
 
 const EmptyStateLabel = styled.div`
   margin: 20px 0px;
@@ -49,6 +43,8 @@ const EmptyStateLabel = styled.div`
 
 interface ReduxStateProps {
   dynamicData: DataTree;
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   datasources: any;
   errors: EvaluationError[];
 }
@@ -58,6 +54,8 @@ interface EvaluatedValueProps {
   popperPlacement?: Placement;
   popperZIndex?: Indices;
   dataTreePath?: string;
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   evaluatedValue?: any;
   expected?: CodeEditorExpected;
   hideEvaluatedValue?: boolean;
@@ -78,8 +76,11 @@ const getOriginalColumn = (
   const column: ColumnProperties | undefined = Object.values(
     reorderedColumns,
   ).find((column: ColumnProperties) => column.index === index);
+
   return column;
 };
+
+const fixedHeight = itemHeight * noOfItemsToDisplay + extraSpace;
 
 interface State {
   focusedIndex: number | null;
@@ -88,6 +89,7 @@ interface State {
 }
 
 const LIST_CLASSNAME = "tablewidgetv2-primarycolumn-list";
+
 class PrimaryColumnsControlV2 extends BaseControl<ControlProps, State> {
   constructor(props: ControlProps) {
     super(props);
@@ -101,6 +103,7 @@ class PrimaryColumnsControlV2 extends BaseControl<ControlProps, State> {
     for (let index = 0; index < tableColumnLabels.length; index++) {
       const currLabel = tableColumnLabels[index] as string;
       const duplicateValueIndex = tableColumnLabels.indexOf(currLabel);
+
       if (duplicateValueIndex !== index) {
         // get column id from columnOrder index
         duplicateColumnIds.push(reorderedColumns[columnOrder[index]].id);
@@ -112,6 +115,10 @@ class PrimaryColumnsControlV2 extends BaseControl<ControlProps, State> {
       duplicateColumnIds,
       hasScrollableList: false,
     };
+  }
+
+  componentDidMount(): void {
+    this.setHasScrollableList();
   }
 
   componentDidUpdate(prevProps: ControlProps): void {
@@ -135,18 +142,7 @@ class PrimaryColumnsControlV2 extends BaseControl<ControlProps, State> {
       );
     }
 
-    const listElement = document.querySelector(`.${LIST_CLASSNAME}`);
-
-    requestAnimationFrame(() => {
-      const hasScrollableList =
-        listElement && listElement?.scrollHeight > listElement?.clientHeight;
-
-      if (hasScrollableList !== this.state.hasScrollableList) {
-        this.setState({
-          hasScrollableList: !!hasScrollableList,
-        });
-      }
-    });
+    this.setHasScrollableList();
   }
 
   render() {
@@ -157,6 +153,7 @@ class PrimaryColumnsControlV2 extends BaseControl<ControlProps, State> {
     if (Object.keys(columns).length === 0) {
       return <EmptyStateLabel>Table columns will appear here</EmptyStateLabel>;
     }
+
     // Get an empty array of length of columns
     let columnOrder: string[] = new Array(Object.keys(columns).length);
 
@@ -201,39 +198,29 @@ class PrimaryColumnsControlV2 extends BaseControl<ControlProps, State> {
     const isFocused =
       !_.isNull(this.state.focusedIndex) &&
       _.includes(this.state.duplicateColumnIds, column?.id);
+
     return (
       <>
         <div className="flex pt-2 pb-2 justify-between">
           <div>{Object.values(reorderedColumns).length} columns</div>
-          {this.isEditableColumnPresent() && (
-            <EdtiableCheckboxWrapper
-              className="flex t--uber-editable-checkbox"
-              rightPadding={this.state.hasScrollableList}
-            >
-              <span className="mr-2">Editable</span>
-              <Checkbox
-                isSelected={this.isAllColumnsEditable()}
-                onChange={this.toggleAllColumnsEditability}
-              />
-            </EdtiableCheckboxWrapper>
-          )}
         </div>
         <div className="flex flex-col w-full gap-1">
           <EvaluatedValuePopupWrapper {...this.props} isFocused={isFocused}>
             <DraggableListControl
               className={LIST_CLASSNAME}
               deleteOption={this.deleteOption}
-              fixedHeight={370}
+              fixedHeight={fixedHeight}
               focusedIndex={this.state.focusedIndex}
-              itemHeight={45}
+              itemHeight={itemHeight}
               items={draggableComponentColumns}
               keyAccessor="id"
               onEdit={this.onEdit}
               propertyPath={this.props.dataTreePath}
+              // TODO: Fix this the next time the file is edited
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               renderComponent={(props: any) =>
                 DraggableListCard({
                   ...props,
-                  showCheckbox: true,
                   placeholder: "Column title",
                 })
               }
@@ -262,6 +249,21 @@ class PrimaryColumnsControlV2 extends BaseControl<ControlProps, State> {
     const column = createColumn(this.props.widgetProperties, "customColumn");
 
     this.updateProperty(`${this.props.propertyName}.${column.id}`, column);
+  };
+
+  setHasScrollableList = () => {
+    const listElement = document.querySelector(`.${LIST_CLASSNAME}`);
+
+    requestAnimationFrame(() => {
+      const hasScrollableList =
+        listElement && listElement?.scrollHeight > listElement?.clientHeight;
+
+      if (hasScrollableList !== this.state.hasScrollableList) {
+        this.setState({
+          hasScrollableList: !!hasScrollableList,
+        });
+      }
+    });
   };
 
   onEdit = (index: number) => {
@@ -312,8 +314,11 @@ class PrimaryColumnsControlV2 extends BaseControl<ControlProps, State> {
   }[] => {
     const updates: {
       propertyName: string;
+      // TODO: Fix this the next time the file is edited
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       propertyValue: any;
     }[] = [];
+
     updates.push({
       propertyName: `${propertyName}.${column.id}.isEditable`,
       propertyValue: checked,
@@ -324,12 +329,13 @@ class PrimaryColumnsControlV2 extends BaseControl<ControlProps, State> {
      * if not, toggle isCellEditable value as well. We're doing this to smooth
      * the user experience.
      */
-    if (!isDynamicValue(toString(column.isCellEditable))) {
+    if (!isDynamicValue(lodashToString(column.isCellEditable))) {
       updates.push({
         propertyName: `${propertyName}.${column.id}.isCellEditable`,
         propertyValue: checked,
       });
     }
+
     return updates;
   };
   toggleCheckbox = (index: number, checked: boolean) => {
@@ -365,12 +371,14 @@ class PrimaryColumnsControlV2 extends BaseControl<ControlProps, State> {
       const columnOrderIndex = columnOrder.findIndex(
         (column: string) => column === originalColumn.id,
       );
+
       if (columnOrderIndex > -1)
         propertiesToDelete.push(`columnOrder[${columnOrderIndex}]`);
 
       this.deleteProperties(propertiesToDelete);
       // if column deleted, clean up duplicateIndexes
       let duplicateColumnIds = [...this.state.duplicateColumnIds];
+
       duplicateColumnIds = duplicateColumnIds.filter(
         (id) => id !== originalColumn.id,
       );
@@ -394,6 +402,7 @@ class PrimaryColumnsControlV2 extends BaseControl<ControlProps, State> {
       // check entered label is unique or duplicate
       const tableColumnLabels = _.map(columns, "label");
       let duplicateColumnIds = [...this.state.duplicateColumnIds];
+
       // if duplicate, add into array
       if (_.includes(tableColumnLabels, updatedLabel)) {
         duplicateColumnIds.push(originalColumn.id);
@@ -438,6 +447,7 @@ class PrimaryColumnsControlV2 extends BaseControl<ControlProps, State> {
           !isEditable,
         ),
       );
+
     this.batchUpdatePropertiesWithAssociatedUpdates(allUpdates);
 
     if (isEditable) {
@@ -450,12 +460,6 @@ class PrimaryColumnsControlV2 extends BaseControl<ControlProps, State> {
         this.deleteOption(columnOrder.indexOf(editActionColumn.id));
       }
     }
-  };
-
-  isEditableColumnPresent = () => {
-    return Object.values(this.props.propertyValue).some((column) =>
-      isColumnTypeEditable((column as ColumnProperties).columnType),
-    );
   };
 
   static getControlType() {
@@ -480,6 +484,7 @@ class EvaluatedValuePopupWrapperClass extends Component<EvaluatedValuePopupWrapp
     pathEvaluatedValue: unknown;
   } => {
     const { errors } = this.props;
+
     if (!dataTreePath) {
       return {
         isInvalid: false,
@@ -488,7 +493,7 @@ class EvaluatedValuePopupWrapperClass extends Component<EvaluatedValuePopupWrapp
       };
     }
 
-    const pathEvaluatedValue = _.get(dataTree, getEvalValuePath(dataTreePath));
+    const pathEvaluatedValue = _.get(dataTree, dataTreePath);
 
     return {
       isInvalid: errors.length > 0,
@@ -509,6 +514,7 @@ class EvaluatedValuePopupWrapperClass extends Component<EvaluatedValuePopupWrapp
     const { errors, isInvalid, pathEvaluatedValue } =
       this.getPropertyValidation(dynamicData, dataTreePath);
     let evaluated = evaluatedValue;
+
     if (dataTreePath) {
       evaluated = pathEvaluatedValue;
     }

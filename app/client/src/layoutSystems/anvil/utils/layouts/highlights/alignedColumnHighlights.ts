@@ -5,6 +5,7 @@ import {
 import type {
   AnvilHighlightInfo,
   DraggedWidget,
+  HighlightPayload,
   LayoutProps,
 } from "../../anvilTypes";
 import { HIGHLIGHT_SIZE } from "../../constants";
@@ -23,7 +24,7 @@ import type { LayoutElementPositions } from "layoutSystems/common/types";
  * @param draggedWidgets | DraggedWidget[] : List of widgets that are being dragged
  * @param layoutOrder | string[] : Top - down hierarchy of layout IDs.
  * @param parentDropTarget | string : id of immediate drop target ancestor.
- * @returns AnvilHighlightInfo[] : List of highlights for the layout.
+ * @returns HighlightPayload : List of highlights for the layout.
  */
 export const deriveAlignedColumnHighlights =
   (
@@ -35,24 +36,16 @@ export const deriveAlignedColumnHighlights =
   (
     positions: LayoutElementPositions,
     draggedWidgets: DraggedWidget[],
-  ): AnvilHighlightInfo[] => {
-    if (
-      !layoutProps ||
-      !positions ||
-      !positions[layoutProps.layoutId] ||
-      !draggedWidgets.length
-    )
-      return [];
-
+  ): HighlightPayload => {
     const { layoutStyle } = layoutProps;
 
     const baseHighlight: AnvilHighlightInfo = {
+      layoutId: layoutProps.layoutId,
       alignment:
         layoutStyle && layoutStyle["justifyContent"]
           ? (layoutStyle["justifyContent"] as FlexLayerAlignment)
           : FlexLayerAlignment.Start,
       canvasId,
-      dropZone: {},
       height: HIGHLIGHT_SIZE,
       isVertical: false,
       layoutOrder,
@@ -60,6 +53,12 @@ export const deriveAlignedColumnHighlights =
       posY: HIGHLIGHT_SIZE / 2,
       rowIndex: 0,
       width: 0,
+      edgeDetails: {
+        bottom: false,
+        left: false,
+        right: false,
+        top: false,
+      },
     };
 
     const hasFillWidget: boolean = draggedWidgets.some(

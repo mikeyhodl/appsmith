@@ -15,7 +15,8 @@ import type {
 } from "WidgetProvider/constants";
 import { ASSETS_CDN_URL } from "constants/ThirdPartyConstants";
 import IconSVG from "../icon.svg";
-import { getAssetUrl } from "@appsmith/utils/airgapHelpers";
+import ThumbnailSVG from "../thumbnail.svg";
+import { getAssetUrl } from "ee/utils/airgapHelpers";
 import { WIDGET_TAGS } from "constants/WidgetConstants";
 import { FlexVerticalAlignment } from "layoutSystems/common/utils/constants";
 
@@ -31,6 +32,7 @@ class ImageWidget extends BaseWidget<ImageWidgetProps, WidgetState> {
     return {
       name: "Image",
       iconSVG: IconSVG,
+      thumbnailSVG: ThumbnailSVG,
       tags: [WIDGET_TAGS.MEDIA],
     };
   }
@@ -302,6 +304,8 @@ class ImageWidget extends BaseWidget<ImageWidgetProps, WidgetState> {
     return {};
   }
   // TODO Find a way to enforce this, (dont let it be set)
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   static getMetaPropertiesMap(): Record<string, any> {
     return {};
   }
@@ -315,6 +319,7 @@ class ImageWidget extends BaseWidget<ImageWidgetProps, WidgetState> {
 
   getWidgetView() {
     const { maxZoomLevel, objectFit } = this.props;
+
     return (
       <ImageComponent
         borderRadius={this.props.borderRadius}

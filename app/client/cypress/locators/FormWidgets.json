@@ -63,7 +63,6 @@
   "exploreWidget": "[class$=bp3-panel-stack-view] > div:nth-child(1) > div:nth-child(1) > span:nth-child(4)",
   "widgetRelatedDocument": "div.main > div:nth-child(1) > div:nth-child(1)",
   "dropdowonChevranDown": ".t--widget-selectwidget .bp3-icon-chevron-down",
-  "addWidget": ".t--entity.group.widgets > div:nth-child(1) >div:nth-child(5)",
   "dropdownDefaultButton": ".t--widget-selectwidget .bp3-button",
   "toggleVisible": ".t--property-control-visible .t--js-toggle",
   "inputToggleVisible": "div.t--property-control-visible div.CodeMirror-lines",
@@ -75,5 +74,10 @@
   "NavHomePage": "[data-testid='t--default-home-icon']",
   "apiCallToast": "div.Toastify__toast-body",
   "toggleOnOptionChange": ".t--property-control-onoptionchange .t--js-toggle",
-  "toggleButtonVariant": ".t--property-control-buttonvariant .t--js-toggle"
+  "toggleButtonVariant": ".t--property-control-buttonvariant .t--js-toggle",
+  "minDateTextArea" : ".t--property-control-mindate  .CodeMirror textarea",
+  "minDateInput" : ".t--property-control-mindate .ads-v2-input__input-section-input",
+  "datePickerInput": ".t--widget-datepickerwidget2 .bp3-input",
+  "dayPickerNextButton": ".DayPicker-NavButton--next",
+  "dayPickerToday": ".ads-v2-datepicker__calender-today"
 }

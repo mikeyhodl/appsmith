@@ -12,6 +12,8 @@ import EditorNavigation, {
   EntityType,
 } from "../../../../support/Pages/EditorNavigation";
 
+import BottomTabs from "../../../../support/Pages/IDE/BottomTabs";
+
 describe(
   "Test Create Api and Bind to List widget",
   { tags: ["@tag.Binding"] },
@@ -24,7 +26,7 @@ describe(
     it("1. Test_Add users api and execute api", function () {
       apiPage.CreateAndFillApi(this.dataSet.userApi + "/mock-api?records=10");
       cy.RunAPI();
-      cy.get(apiLocators.jsonResponseTab).click();
+      BottomTabs.response.selectResponseResponseTypeFromMenu("JSON");
       cy.get(apiLocators.responseBody)
         .contains("name")
         .siblings("span")
@@ -59,11 +61,11 @@ describe(
       cy.waitUntil(
         () => cy.get(".t--widget-textwidget span").should("be.visible"),
         {
-          errorMsg: "Pubish app page is not loaded evn after 20 secs",
+          errorMsg: "Pubish app page is not loaded even after 20 seconds",
           timeout: 20000,
           interval: 1000,
         },
-      ).then(() => cy.wait(500));
+      );
 
       cy.get(".t--widget-textwidget span").should("have.length", 8);
       cy.get(".t--widget-textwidget span")
@@ -100,11 +102,11 @@ describe(
       cy.waitUntil(
         () => cy.get(".t--widget-textwidget span").should("be.visible"),
         {
-          errorMsg: "Pubish app page is not loaded evn after 20 secs",
+          errorMsg: "Pubish app page is not loaded even after 20 seconds",
           timeout: 20000,
           interval: 1000,
         },
-      ).then(() => cy.wait(500));
+      );
       cy.get(".t--widget-textwidget span").should("have.length", 6);
       cy.get(".t--widget-textwidget span")
         .first()

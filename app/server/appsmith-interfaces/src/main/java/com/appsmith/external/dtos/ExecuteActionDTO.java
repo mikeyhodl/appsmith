@@ -17,6 +17,10 @@ import java.util.stream.Collectors;
 public class ExecuteActionDTO {
 
     String actionId;
+    String datasourceId;
+    String workspaceId;
+    String instanceId;
+    String tenantId;
 
     List<Param> params;
 

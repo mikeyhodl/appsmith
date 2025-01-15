@@ -1,41 +1,53 @@
-import homePage from "../../../../../locators/HomePage";
-import gitSyncLocators from "../../../../../locators/gitSyncLocators";
 import * as _ from "../../../../../support/Objects/ObjectsCore";
 
-describe("Git import empty repository", { tags: ["@tag.Git"] }, function () {
-  let repoName;
-  const assertConnectFailure = true;
-  const failureMessage =
-    "git import failed. \nDetails: Cannot import app from an empty repo";
-  before(() => {
-    _.homePage.NavigateToHome();
-    cy.createWorkspace();
-    cy.wait("@createWorkspace").then((interception) => {
-      const newWorkspaceName = interception.response.body.data.name;
-      cy.CreateAppForWorkspace(newWorkspaceName, newWorkspaceName);
+describe(
+  "Git import empty repository",
+  {
+    tags: [
+      "@tag.Git",
+      "@tag.AccessControl",
+      "@tag.Workflows",
+      "@tag.Module",
+      "@tag.Theme",
+      "@tag.JS",
+      "@tag.Container",
+      "@tag.ImportExport",
+    ],
+  },
+  function () {
+    let repoName;
+    const assertConnectFailure = true;
+    const failureMessage =
+      "git import failed. \nDetails: Cannot import app from an empty repo";
+    before(() => {
+      _.homePage.NavigateToHome();
+      cy.createWorkspace();
+      cy.wait("@createWorkspace").then((interception) => {
+        const newWorkspaceName = interception.response.body.data.name;
+        cy.CreateAppForWorkspace(newWorkspaceName, newWorkspaceName);
+      });
+      cy.generateUUID().then((uid) => {
+        repoName = uid;
+        _.gitSync.CreateTestGiteaRepo(repoName);
+      });
     });
-    cy.generateUUID().then((uid) => {
-      repoName = uid;
-      _.gitSync.CreateTestGiteaRepo(repoName);
-      //cy.createTestGithubRepo(repoName);
-    });
-  });
 
-  it("1. Bug #12749 Git Import - Empty Repo NullPointerException", () => {
-    cy.get(homePage.homeIcon).click();
-    cy.get(homePage.optionsIcon).first().click();
-    cy.get(homePage.workspaceImportAppOption).click({ force: true });
-    cy.get(".t--import-json-card").next().click();
-    cy.generateUUID().then((uid) => {
-      repoName = uid;
-      //cy.createTestGithubRepo(repoName);
-      _.gitSync.CreateTestGiteaRepo(repoName);
-      cy.importAppFromGit(repoName, true, failureMessage);
+    it("1. Bug #12749 Git Import - Empty Repo NullPointerException", () => {
+      cy.generateUUID().then((uid) => {
+        repoName = uid;
+        _.gitSync.CreateTestGiteaRepo(repoName);
+        _.gitSync.ImportAppFromGit(undefined, repoName, false);
+        cy.wait("@importFromGit").then((interception) => {
+          const status = interception.response.body.responseMeta.status;
+          const message = interception.response.body.responseMeta.error.message;
+          expect(status).to.be.gte(400);
+          expect(message).to.contain(failureMessage);
+          _.gitSync.CloseConnectModal();
+        });
+      });
     });
-    cy.get(gitSyncLocators.closeGitSyncModal).click();
-  });
-  after(() => {
-    _.gitSync.DeleteTestGithubRepo(repoName);
-    //cy.deleteTestGithubRepo(repoName);
-  });
-});
+    after(() => {
+      _.gitSync.DeleteTestGithubRepo(repoName);
+    });
+  },
+);

@@ -5,12 +5,10 @@ const dotenv = require("dotenv");
 const chalk = require("chalk");
 const cypressLogToOutput = require("cypress-log-to-output");
 const installLogsPrinter = require("cypress-terminal-report/src/installLogsPrinter");
-const {
-  addMatchImageSnapshotPlugin,
-} = require("cypress-image-snapshot/plugin");
 const { tagify } = require("cypress-tags");
 const { cypressHooks } = require("../scripts/cypress-hooks");
-const { cypressSplit } = require("../scripts/cypress-split");
+const { dynamicSplit } = require("../scripts/cypress-split-dynamic");
+const { staticSplit } = require("../scripts/cypress-split-static");
 // ***********************************************************
 // This example plugins/index.js can be used to load plugins
 //
@@ -29,12 +27,6 @@ const { cypressSplit } = require("../scripts/cypress-split");
  */
 
 module.exports = async (on, config) => {
-  // on("task", {
-  //   isFileExist,
-  // });
-  // `on` is used to hook into various events Cypress emits
-  // `config` is the resolved Cypress config
-
   cypressLogToOutput.install(on, (type, event) => {
     if (event.level === "error" || event.type === "error") {
       return true;
@@ -53,7 +45,6 @@ module.exports = async (on, config) => {
   installLogsPrinter(on, logsPrinterOptions);
 
   on("file:preprocessor", tagify(config));
-  addMatchImageSnapshotPlugin(on, config);
 
   on("before:browser:launch", (browser = {}, launchOptions) => {
     /*
@@ -64,7 +55,7 @@ module.exports = async (on, config) => {
       browser,
       launchOptions.args,
     );
-    if (browser.name === "chrome") {
+    if (browser.name === "chrome" || browser.name === "chromium") {
       const video = path.join(
         "cypress",
         "fixtures",
@@ -90,20 +81,6 @@ module.exports = async (on, config) => {
       return launchOptions;
     }
   });
-  // module.exports = (on, config) => {
-  //   on("after:spec", (spec, results) => {
-  //     if (results && results.video) {
-  //       // Do we have failures for any retry attempts?
-  //       const failures = _.some(results.tests, (test) => {
-  //         return _.some(test.attempts, { state: "failed" });
-  //       });
-  //       if (!failures) {
-  //         // delete the video if the spec passed and no tests retried
-  //         return del(results.video);
-  //       }
-  //     }
-  //   });
-  // };
 
   /**
    * Fallback to APPSMITH_* env variables for Cypress.env if config.env doesn't already have it.
@@ -173,7 +150,7 @@ module.exports = async (on, config) => {
     },
 
     /*
-    Change video source for for camera & code scanner 
+    Change video source for for camera & code scanner
     */
     changeVideoSource(videoSource) {
       console.log("TASK - Changing video source to", videoSource);
@@ -235,7 +212,10 @@ module.exports = async (on, config) => {
   console.log("config.specPattern:", config.specPattern);
 
   if (process.env["RUNID"]) {
-    config = await new cypressSplit().splitSpecs(on, config);
+    config =
+      process.env["CYPRESS_STATIC_ALLOCATION"] == "true"
+        ? await new staticSplit().splitSpecs(config)
+        : await new dynamicSplit().splitSpecs(config);
     cypressHooks(on, config);
   }
 

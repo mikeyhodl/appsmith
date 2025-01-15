@@ -1,4 +1,4 @@
-import type { MODULE_TYPE } from "@appsmith/constants/ModuleConstants";
+import type { MODULE_TYPE } from "ee/constants/ModuleConstants";
 import type { ActionResponse } from "api/ActionAPI";
 
 export type ModuleId = string;
@@ -15,11 +15,12 @@ export interface ModuleInstance {
   inputs: {
     [key: string]: string;
   };
+  sourceModuleId: ModuleId;
 }
 
 export interface ModuleInstanceData {
   config: ModuleInstance;
-  data: ActionResponse;
+  data: ActionResponse | undefined;
   isLoading: boolean;
 }
 export type ModuleInstanceDataState = ModuleInstanceData[];

@@ -11,6 +11,7 @@ import com.external.plugins.models.UserQuery;
 import com.external.plugins.models.UserTextContent;
 import com.external.plugins.models.VisionMessage;
 import com.external.plugins.models.VisionRequestDTO;
+import com.external.plugins.utils.MessageUtils;
 import com.external.plugins.utils.RequestUtils;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
@@ -59,7 +60,8 @@ public class VisionCommand implements OpenAICommand {
 
     private final Gson gson;
 
-    private final String regex = "(ft:)?(gpt).*(vision).*";
+    private final String regex =
+            "^(gpt-4-(vision-preview|\\d{4}-vision-preview)|gpt-4o(.*)?|ft:(gpt-4-(vision-preview|\\d{4}-vision-preview)|gpt-4o).*)$";
     private final Pattern pattern = Pattern.compile(regex);
 
     @Override
@@ -102,8 +104,10 @@ public class VisionCommand implements OpenAICommand {
 
         visionRequestDTO.setModel(model);
 
-        List<VisionMessage> visionMessages = transformSystemMessages(formData.get(SYSTEM_MESSAGES));
-        visionMessages.addAll(transformUserMessages(formData.get(USER_MESSAGES)));
+        List<VisionMessage> visionMessages = transformSystemMessages(
+                MessageUtils.extractMessages((Map<String, Object>) formData.get(SYSTEM_MESSAGES)));
+        visionMessages.addAll(
+                transformUserMessages(MessageUtils.extractMessages((Map<String, Object>) formData.get(USER_MESSAGES))));
         Float temperature = getTemperatureFromFormData(formData);
 
         visionRequestDTO.setMessages(visionMessages);
@@ -132,12 +136,12 @@ public class VisionCommand implements OpenAICommand {
                     UserTextContent userContent = new UserTextContent();
                     userContent.setType(TEXT_TYPE);
                     userContent.setText(userQuery.getContent());
-                    visionMessage.getContent().add(userContent);
+                    ((List<Object>) visionMessage.getContent()).add(userContent);
                 } else if (QueryType.IMAGE.equals(userQuery.getType())) {
                     UserImageContent userContent = new UserImageContent();
                     userContent.setType(IMAGE_TYPE);
                     userContent.setImageUrl(new UserImageContent.ImageUrl(userQuery.getContent()));
-                    visionMessage.getContent().add(userContent);
+                    ((List<Object>) visionMessage.getContent()).add(userContent);
                 }
             }
             return List.of(visionMessage);
@@ -165,7 +169,7 @@ public class VisionCommand implements OpenAICommand {
                 VisionMessage visionMessage = new VisionMessage();
                 if (StringUtils.hasText(systemMessageMap.get(CONTENT))) {
                     visionMessage.setRole(Role.system);
-                    visionMessage.setContent(List.of(systemMessageMap.get(CONTENT)));
+                    visionMessage.setContent(systemMessageMap.get(CONTENT));
                     visionMessages.add(visionMessage);
                 }
             }

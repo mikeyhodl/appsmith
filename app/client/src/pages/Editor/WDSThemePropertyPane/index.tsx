@@ -1,41 +1,36 @@
-import {
-  SegmentedControl,
-  Switch,
-  Tooltip,
-  Select,
-  Option,
-} from "design-system";
+import { debounce } from "lodash";
 import styled from "styled-components";
-import React, { useCallback } from "react";
+import { isValidColor } from "utils/helpers";
 import { useDispatch, useSelector } from "react-redux";
+import React, { useCallback, useRef, useState } from "react";
 import type { ThemeSetting } from "constants/AppConstants";
 import { getCurrentApplicationId } from "selectors/editorSelectors";
-import { updateApplication } from "@appsmith/actions/applicationActions";
-import type { UpdateApplicationPayload } from "@appsmith/api/ApplicationApi";
-import { getAppThemeSettings } from "@appsmith/selectors/applicationSelectors";
-import ColorPickerComponent from "components/propertyControls/ColorPickerComponentV2";
+import { updateApplication } from "ee/actions/applicationActions";
+import type { UpdateApplicationPayload } from "ee/api/ApplicationApi";
+import { getAppThemeSettings } from "ee/selectors/applicationSelectors";
+import {
+  LeftIcon,
+  StyledInputGroup,
+} from "components/propertyControls/ColorPickerComponentV2";
+import { SegmentedControl, Tooltip, Icon } from "@appsmith/ads";
+
+import styles from "./styles.module.css";
 
 import {
   THEME_SETTINGS_BORDER_RADIUS_OPTIONS,
   THEME_SETTINGS_DENSITY_OPTIONS,
   THEME_SETTINGS_SIZING_OPTIONS,
+  THEME_SETTINGS_COLOR_MODE_OPTIONS,
+  THEME_SETTING_COLOR_PRESETS,
 } from "./constants";
 import SettingSection from "../ThemePropertyPane/SettingSection";
-import { FONT_METRICS } from "@design-system/theming";
+import { AppMaxWidthSelect } from "./components/AppMaxWidthSelect";
 
 const SubText = styled.p`
   font-size: var(--ads-v2-font-size-4);
   line-height: 1rem;
   font-weight: var(--ads-v2-font-weight-normal);
   color: var(--ads-v2-color-fg);
-`;
-
-const FontText = styled.div`
-  border-radius: var(--ads-v2-border-radius);
-  border: 1px solid var(--ads-v2-color-border);
-  font-size: 11px;
-  height: 18px;
-  width: 18px;
 `;
 
 const buttonGroupOptions = THEME_SETTINGS_BORDER_RADIUS_OPTIONS.map(
@@ -56,10 +51,14 @@ const buttonGroupOptions = THEME_SETTINGS_BORDER_RADIUS_OPTIONS.map(
 );
 
 function WDSThemePropertyPane() {
+  const inputRef = useRef<HTMLInputElement>(null);
   const dispatch = useDispatch();
   const theme = useSelector(getAppThemeSettings);
   const applicationId = useSelector(getCurrentApplicationId);
-  const [isFullColorPicker, setFullColorPicker] = React.useState(false);
+  const [accentColor, setAccentColor] = useState(theme.accentColor);
+  const isCustomColor = THEME_SETTING_COLOR_PRESETS[theme.colorMode].includes(
+    theme.accentColor,
+  );
 
   const updateTheme = useCallback(
     (theme: ThemeSetting) => {
@@ -75,77 +74,104 @@ function WDSThemePropertyPane() {
 
       dispatch(updateApplication(applicationId, payload));
     },
-    [updateApplication],
+    [updateApplication, dispatch],
   );
 
+  const debouncedOnColorChange = useCallback(
+    debounce((e: React.ChangeEvent<HTMLInputElement>) => {
+      updateTheme({
+        ...theme,
+        accentColor: e.target.value,
+      });
+      setAccentColor(e.target.value);
+    }, 250),
+    [theme, updateTheme],
+  );
+
+  const onColorInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (isValidColor(e.target.value)) {
+      updateTheme({
+        ...theme,
+        accentColor: e.target.value,
+      });
+
+      (document.querySelector("#color-picker") as HTMLInputElement).value =
+        e.target.value;
+    }
+
+    setAccentColor(e.target.value);
+  };
+
   return (
-    <main className="mt-1">
+    <main className={styles.main}>
       {/* COLORS */}
       <SettingSection className="px-4 pb-3" isDefaultOpen title="Color">
         <section className="space-y-2">
-          <ColorPickerComponent
-            changeColor={(color: string) => {
+          <SegmentedControl
+            data-testid="t--anvil-theme-settings-color-mode"
+            isFullWidth
+            onChange={(value: string) => {
               updateTheme({
                 ...theme,
-                accentColor: color,
+                colorMode: value as ThemeSetting["colorMode"],
               });
+              inputRef.current?.focus();
             }}
-            color={theme.accentColor}
-            isFullColorPicker={isFullColorPicker}
-            portalContainer={
-              document.getElementById("app-settings-portal") || undefined
-            }
-            setFullColorPicker={setFullColorPicker}
+            options={THEME_SETTINGS_COLOR_MODE_OPTIONS}
+            value={theme.colorMode ?? "LIGHT"}
           />
-        </section>
-        <Switch
-          defaultSelected={theme.colorMode === "dark"}
-          onChange={(isSelected: boolean) => {
-            updateTheme({
-              ...theme,
-              colorMode: isSelected ? "dark" : "light",
-            });
-          }}
-        >
-          Dark Mode
-        </Switch>
-      </SettingSection>
-
-      <SettingSection
-        className="px-4 py-3 border-t "
-        isDefaultOpen
-        title="Typography"
-      >
-        <section className="space-y-2">
-          <Select
-            dropdownClassName="t--theme-font-dropdown"
-            onSelect={(value: string) => {
-              updateTheme({
-                ...theme,
-                fontFamily: value,
-              });
-            }}
-            value={theme.fontFamily}
+          <StyledInputGroup
+            $isValid={isValidColor(accentColor)}
+            data-testid="t--color-picker-input"
+            inputRef={inputRef}
+            leftIcon={<LeftIcon color={accentColor} />}
+            onChange={onColorInputChange}
+            placeholder={"Enter color name or hex"}
+            type="text"
+            value={accentColor}
+          />
+          <div
+            className={styles["presets-list"]}
+            data-testid="t--anvil-theme-settings-accent-color-list"
           >
-            {Object.keys(FONT_METRICS)
-              .filter((item) => {
-                return (
-                  ["-apple-system", "BlinkMacSystemFont", "Segoe UI"].includes(
-                    item,
-                  ) === false
-                );
-              })
-              .map((option, index) => (
-                <Option key={index} value={option}>
-                  <div className="flex items-center w-full space-x-2 cursor-pointer">
-                    <FontText className="flex items-center justify-center">
-                      Aa
-                    </FontText>
-                    <div className="leading-normal">{option}</div>
-                  </div>
-                </Option>
-              ))}
-          </Select>
+            {THEME_SETTING_COLOR_PRESETS[theme.colorMode].map((color) => (
+              <button
+                data-selected={theme.accentColor === color ? "" : undefined}
+                key={color}
+                onClick={() => {
+                  updateTheme({
+                    ...theme,
+                    accentColor: color,
+                  });
+                  inputRef.current?.focus();
+                  setAccentColor(color);
+                  (
+                    document.querySelector("#color-picker") as HTMLInputElement
+                  ).value = color;
+                }}
+                style={{ backgroundColor: color, color }}
+              >
+                {theme.accentColor === color && (
+                  <Icon color="white" name="check-line" size="md" />
+                )}
+              </button>
+            ))}
+            <label
+              data-selected={isCustomColor === false ? "" : undefined}
+              htmlFor="color-picker"
+              style={{ color: theme.accentColor }}
+            >
+              {isCustomColor === false && (
+                <Icon color="white" name="check-line" size="md" />
+              )}
+              <input
+                defaultValue={theme.accentColor}
+                id="color-picker"
+                onChange={debouncedOnColorChange}
+                type="color"
+              />
+            </label>
+          </div>
         </section>
       </SettingSection>
 
@@ -158,6 +184,7 @@ function WDSThemePropertyPane() {
         <section className="space-y-2">
           <SubText>Density</SubText>
           <SegmentedControl
+            data-testid="t--anvil-theme-settings-density"
             isFullWidth={false}
             onChange={(value: string) => {
               updateTheme({
@@ -172,6 +199,7 @@ function WDSThemePropertyPane() {
         <section className="space-y-2">
           <SubText>Sizing</SubText>
           <SegmentedControl
+            data-testid="t--anvil-theme-settings-sizing"
             isFullWidth={false}
             onChange={(value: string) => {
               updateTheme({
@@ -193,6 +221,7 @@ function WDSThemePropertyPane() {
       >
         <section className="space-y-2">
           <SegmentedControl
+            data-testid="t--anvil-theme-settings-corners"
             isFullWidth={false}
             onChange={(value: string) => {
               updateTheme({
@@ -202,6 +231,26 @@ function WDSThemePropertyPane() {
             }}
             options={buttonGroupOptions}
             value={theme.borderRadius}
+          />
+        </section>
+      </SettingSection>
+
+      {/* Layout Style */}
+      <SettingSection
+        className="px-4 py-3 border-t"
+        isDefaultOpen
+        title="Layout"
+      >
+        <section className="space-y-2">
+          <SubText>Max app width</SubText>
+          <AppMaxWidthSelect
+            onSelect={(value) => {
+              updateTheme({
+                ...theme,
+                appMaxWidth: value as ThemeSetting["appMaxWidth"],
+              });
+            }}
+            value={theme.appMaxWidth}
           />
         </section>
       </SettingSection>

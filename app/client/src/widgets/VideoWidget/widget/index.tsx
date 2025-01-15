@@ -13,13 +13,14 @@ import type {
   AnvilConfig,
   AutocompletionDefinitions,
 } from "WidgetProvider/constants";
-import { getAssetUrl } from "@appsmith/utils/airgapHelpers";
+import { getAssetUrl } from "ee/utils/airgapHelpers";
 import { ASSETS_CDN_URL } from "constants/ThirdPartyConstants";
 import {
   FlexVerticalAlignment,
   ResponsiveBehavior,
 } from "layoutSystems/common/utils/constants";
 import IconSVG from "../icon.svg";
+import ThumbnailSVG from "../thumbnail.svg";
 import type {
   SnipingModeProperty,
   PropertyUpdates,
@@ -44,6 +45,7 @@ class VideoWidget extends BaseWidget<VideoWidgetProps, WidgetState> {
     return {
       name: "Video",
       iconSVG: IconSVG,
+      thumbnailSVG: ThumbnailSVG,
       tags: [WIDGET_TAGS.MEDIA],
       needsMeta: true,
       searchTags: ["youtube"],
@@ -127,7 +129,7 @@ class VideoWidget extends BaseWidget<VideoWidgetProps, WidgetState> {
               type: ValidationTypes.TEXT,
               params: {
                 regex:
-                  /(http(s)?:\/\/.)?(www\.)?[-a-zA-Z0-9@:%._\+~#=]{2,256}\.[a-z]{2,6}\b([-a-zA-Z0-9@:%_\+.~#?&//=]*)/,
+                  /^(http(s)?:\/\/)?([-a-zA-Z0-9:%._\+~#=]*@)?(([-a-zA-Z0-9\.]{2,256}\.[a-z]{2,6})|(?:\d{1,3}\.){3}\d{1,3}\b)\b([-a-zA-Z0-9@:%_\+.~#?&//=]*)$/,
                 expected: {
                   type: "Video URL",
                   example: getAssetUrl(`${ASSETS_CDN_URL}/widgets/bird.mp4`),
@@ -279,6 +281,8 @@ class VideoWidget extends BaseWidget<VideoWidgetProps, WidgetState> {
 
   private _player = React.createRef<ReactPlayer>();
 
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   static getMetaPropertiesMap(): Record<string, any> {
     return {
       // Property reflecting the state of the widget
@@ -338,6 +342,7 @@ class VideoWidget extends BaseWidget<VideoWidgetProps, WidgetState> {
 
   getWidgetView() {
     const { autoPlay, onEnd, onPause, onPlay, playing, url } = this.props;
+
     return (
       <Suspense fallback={<Skeleton />}>
         <VideoComponent

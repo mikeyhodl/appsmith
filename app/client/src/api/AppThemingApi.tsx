@@ -45,9 +45,14 @@ class AppThemingApi extends API {
     applicationId: string,
     theme: AppTheme,
   ): Promise<AxiosPromise<ApiResponse<AppTheme[]>>> {
+    const payload = {
+      ...theme,
+      new: undefined,
+    };
+
     return API.put(
       `${AppThemingApi.baseUrl}/themes/applications/${applicationId}`,
-      theme,
+      payload,
     );
   }
 
@@ -65,23 +70,6 @@ class AppThemingApi extends API {
     return API.patch(
       `${AppThemingApi.baseUrl}/applications/${applicationId}/themes/${theme.id}`,
       theme,
-    );
-  }
-
-  /**
-   * fires api for saving current theme
-   *
-   * @param applicationId
-   * @param theme
-   * @returns
-   */
-  static async saveTheme(
-    applicationId: string,
-    payload: { name: string },
-  ): Promise<AxiosPromise<ApiResponse<AppTheme[]>>> {
-    return API.patch(
-      `${AppThemingApi.baseUrl}/themes/applications/${applicationId}`,
-      payload,
     );
   }
 

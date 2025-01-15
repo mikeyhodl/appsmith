@@ -1,5 +1,5 @@
-import type { PackageMetadata } from "@appsmith/constants/PackageConstants";
-import type { AppState } from "@appsmith/reducers";
+import type { PackageMetadata } from "ee/constants/PackageConstants";
+import type { AppState } from "ee/reducers";
 
 const DEFAULT_PACKAGE_LIST: PackageMetadata[] = [];
 
@@ -13,3 +13,9 @@ export const getIsCreatingPackage = (state: AppState, workspaceId: string) =>
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export const getPackagesList = (state: AppState): PackageMetadata[] =>
   DEFAULT_PACKAGE_LIST;
+
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export const getPackagesOfWorkspace = (state: AppState) => [];
+
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export const getIsPackageUpgrading = (state: AppState): boolean => false;

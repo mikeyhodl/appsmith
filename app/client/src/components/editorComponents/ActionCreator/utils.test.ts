@@ -20,7 +20,7 @@ import {
   objectSetter,
   sortSubMenuOptions,
 } from "./utils";
-import type { TreeDropdownOption } from "design-system-old";
+import type { TreeDropdownOption } from "@appsmith/ads-old";
 
 describe("Test argStringToArray", () => {
   const cases = [
@@ -85,10 +85,12 @@ describe("Test argStringToArray", () => {
       expected: ["(a, b) => {return a + b}"],
     },
   ];
+
   test.each(cases.map((x) => [x.index, x.input, x.expected]))(
     "test case %d",
     (_, input, expected) => {
       const result = argsStringToArray(input as string);
+
       expect(result).toStrictEqual(expected);
     },
   );
@@ -171,10 +173,12 @@ describe("Test stringToJS", () => {
       expected: "'Hello'",
     },
   ];
+
   test.each(cases.map((x) => [x.index, x.input, x.expected]))(
     "test case %d",
     (_, input, expected) => {
       const result = stringToJS(input as string);
+
       expect(result).toStrictEqual(expected);
     },
   );
@@ -232,10 +236,12 @@ describe("Test JSToString", () => {
       expected: "{{() => {return 5}}}",
     },
   ];
+
   test.each(cases.map((x) => [x.index, x.input, x.expected]))(
     "test case %d",
     (_, input, expected) => {
       const result = JSToString(input as string);
+
       expect(result).toStrictEqual(expected);
     },
   );
@@ -246,32 +252,34 @@ describe("Test modalSetter", () => {
     {
       index: 1,
       input: "{{showModal('')}}",
-      expected: "{{showModal('Modal1');}}",
-      value: "Modal1",
+      expected: "{{showModal(Modal1.name);}}",
+      value: "Modal1.name",
     },
     {
       index: 2,
-      input: "{{showModal('Modal1')}}",
-      expected: "{{showModal('Modal2');}}",
-      value: "Modal2",
+      input: "{{showModal(Modal1.name)}}",
+      expected: "{{showModal(Modal2.name);}}",
+      value: "Modal2.name",
     },
     {
       index: 3,
       input: "{{closeModal('')}}",
-      expected: "{{closeModal('Modal1');}}",
-      value: "Modal1",
+      expected: "{{closeModal(Modal1.name);}}",
+      value: "Modal1.name",
     },
     {
       index: 4,
-      input: "{{closeModal('Modal1')}}",
-      expected: "{{closeModal('Modal2');}}",
-      value: "Modal2",
+      input: "{{closeModal(Modal1.name)}}",
+      expected: "{{closeModal(Modal2.name);}}",
+      value: "Modal2.name",
     },
   ];
+
   test.each(cases.map((x) => [x.index, x.input, x.expected, x.value]))(
     "test case %d",
     (index, input, expected, value) => {
       const result = modalSetter(value as string, input as string);
+
       expect(result).toStrictEqual(expected);
     },
   );
@@ -286,24 +294,36 @@ describe("Test modalGetter", () => {
     },
     {
       index: 2,
-      input: "{{showModal('Modal1')}}",
-      expected: "Modal1",
+      input: "{{showModal(Modal1.name)}}",
+      expected: "Modal1.name",
     },
     {
       index: 3,
+      input: '{{showModal("Modal1")}}',
+      expected: "Modal1",
+    },
+    {
+      index: 4,
       input: "{{closeModal('')}}",
       expected: "",
     },
     {
-      index: 4,
-      input: "{{closeModal('Modal1')}}",
+      index: 5,
+      input: "{{closeModal(Modal1.name)}}",
+      expected: "Modal1.name",
+    },
+    {
+      index: 6,
+      input: '{{closeModal("Modal1")}}',
       expected: "Modal1",
     },
   ];
+
   test.each(cases.map((x) => [x.index, x.input, x.expected]))(
     "test case %d",
     (index, input, expected) => {
       const result = modalGetter(input as string);
+
       expect(result).toStrictEqual(expected);
     },
   );
@@ -412,6 +432,7 @@ describe("Test textSetter", () => {
       value: "hello-id",
     },
   ];
+
   test.each(
     cases.map((x) => [x.index, x.input, x.expected, x.value, x.argNum]),
   )("test case %d", (index, input, expected, value, argNum) => {
@@ -420,6 +441,7 @@ describe("Test textSetter", () => {
       input as string,
       argNum as number,
     );
+
     expect(result).toStrictEqual(expected);
   });
 });
@@ -529,10 +551,12 @@ describe("Test textGetter", () => {
       argNum: 1,
     },
   ];
+
   test.each(cases.map((x) => [x.index, x.input, x.expected, x.argNum]))(
     "test case %d",
     (index, input, expected, argNum) => {
       const result = textGetter(input as string, argNum as number);
+
       expect(result).toStrictEqual(expected);
     },
   );
@@ -576,6 +600,7 @@ describe("Test enumTypeSetter", () => {
       argNum: 2,
     },
   ];
+
   test.each(
     cases.map((x) => [x.index, x.input, x.expected, x.value, x.argNum]),
   )("test case %d", (index, input, expected, value, argNum) => {
@@ -584,6 +609,7 @@ describe("Test enumTypeSetter", () => {
       input as string,
       argNum as number,
     );
+
     expect(result).toStrictEqual(expected);
   });
 });
@@ -609,10 +635,12 @@ describe("Test enumTypeGetter", () => {
       argNum: 0,
     },
   ];
+
   test.each(cases.map((x) => [x.index, x.input, x.expected, x.argNum]))(
     "test case %d",
     (index, input, expected, argNum) => {
       const result = enumTypeGetter(input as string, argNum as number);
+
       expect(result).toStrictEqual(expected);
     },
   );
@@ -642,6 +670,7 @@ describe("Test objectSetter", () => {
       argNum: 1,
     },
   ];
+
   test.each(
     cases.map((x) => [x.index, x.input, x.expected, x.value, x.argNum]),
   )("test case %d", (index, input, expected, value, argNum) => {
@@ -650,6 +679,7 @@ describe("Test objectSetter", () => {
       input as string,
       argNum as number,
     );
+
     expect(result).toStrictEqual(expected);
   });
 });
@@ -697,10 +727,12 @@ describe("Test isValueValidURL", () => {
       expected: false,
     },
   ];
+
   test.each(cases.map((x) => [x.index, x.input, x.expected]))(
     "test case %d",
     (_, input, expected) => {
       const result = isValueValidURL(input as string);
+
       expect(result).toStrictEqual(expected);
     },
   );
@@ -1033,6 +1065,7 @@ describe("sortSubMenuOptions", () => {
     "test case %d",
     (_, input, expected) => {
       const result = sortSubMenuOptions(input as TreeDropdownOption[]);
+
       expect(result).toStrictEqual(expected);
     },
   );

@@ -1,6 +1,7 @@
 import EditorNavigation, {
   EntityType,
   PageLeftPane,
+  PagePaneSegment,
 } from "../../../../support/Pages/EditorNavigation";
 
 const testdata = require("../../../../fixtures/testdata.json");
@@ -16,23 +17,60 @@ let ee = ObjectsRegistry.EntityExplorer,
 
 describe(
   "Entity explorer API pane related testcases",
-  { tags: ["@tag.IDE"] },
+  { tags: ["@tag.IDE", "@tag.PropertyPane"] },
   function () {
     it("1. Empty Message validation for Widgets/API/Queries", function () {
       homePage.CreateNewWorkspace("EmptyMsgCheck", true);
       homePage.CreateAppInWorkspace("EmptyMsgCheck");
-      PageLeftPane.expandCollapseItem("Widgets");
+      PageLeftPane.switchSegment(PagePaneSegment.UI);
       agHelper.AssertElementVisibility(
-        locator._visibleTextSpan("No widget to display"),
+        locator._visibleTextSpan(
+          Cypress.env(
+            "MESSAGES",
+          ).EDITOR_PANE_TEXTS.widget_blank_state_description(),
+        ),
       );
-      agHelper.AssertElementVisibility(locator._visibleTextSpan("New widget"));
+      agHelper.AssertElementVisibility(
+        locator._visibleTextSpan(
+          Cypress.env("MESSAGES").EDITOR_PANE_TEXTS.widget_add_button(),
+        ),
+      );
+      PageLeftPane.switchSegment(PagePaneSegment.Queries);
+      agHelper.AssertElementVisibility(
+        locator._visibleTextSpan(
+          Cypress.env(
+            "MESSAGES",
+          ).EDITOR_PANE_TEXTS.query_blank_state_description(),
+        ),
+      );
+      agHelper.AssertElementVisibility(
+        locator._visibleTextSpan(
+          Cypress.env("MESSAGES").EDITOR_PANE_TEXTS.query_blank_state(),
+        ),
+      );
+      agHelper.AssertElementVisibility(
+        locator._visibleTextSpan(
+          Cypress.env("MESSAGES").EDITOR_PANE_TEXTS.query_add_button(),
+        ),
+      );
 
-      PageLeftPane.expandCollapseItem("Queries/JS");
+      PageLeftPane.switchSegment(PagePaneSegment.JS);
       agHelper.AssertElementVisibility(
-        locator._visibleTextSpan("No query/JS to display"),
+        locator._visibleTextSpan(
+          Cypress.env(
+            "MESSAGES",
+          ).EDITOR_PANE_TEXTS.js_blank_state_description(),
+        ),
       );
       agHelper.AssertElementVisibility(
-        locator._visibleTextSpan("New query/JS"),
+        locator._visibleTextSpan(
+          Cypress.env("MESSAGES").EDITOR_PANE_TEXTS.js_blank_state(),
+        ),
+      );
+      agHelper.AssertElementVisibility(
+        locator._visibleTextSpan(
+          Cypress.env("MESSAGES").EDITOR_PANE_TEXTS.js_add_button(),
+        ),
       );
     });
 
@@ -47,7 +85,7 @@ describe(
         testdata.Get,
       );
       cy.ResponseStatusCheck(testdata.successStatusCode);
-      PageLeftPane.expandCollapseItem("Queries/JS");
+      PageLeftPane.switchSegment(PagePaneSegment.Queries);
       ee.ActionContextMenuByEntityName({
         entityNameinLeftSidebar: "FirstAPI",
         action: "Show bindings",
@@ -64,10 +102,10 @@ describe(
       cy.Createpage(pageid);
       EditorNavigation.SelectEntityByName("Page1", EntityType.Page);
       agHelper.Sleep(); //for the selected entity to settle loading!
-      PageLeftPane.expandCollapseItem("Queries/JS");
+      PageLeftPane.switchSegment(PagePaneSegment.Queries);
       ee.ActionContextMenuByEntityName({
         entityNameinLeftSidebar: "FirstAPI",
-        action: "Edit name",
+        action: "Rename",
       });
       cy.EditApiNameFromExplorer("SecondAPI");
       cy.xpath(apiwidget.popover)
@@ -82,7 +120,7 @@ describe(
         toastToValidate: "action moved to page",
       });
       cy.wait(500);
-      PageLeftPane.expandCollapseItem("Queries/JS");
+      PageLeftPane.switchSegment(PagePaneSegment.Queries);
       PageLeftPane.assertPresence("SecondAPI");
       ee.ActionContextMenuByEntityName({
         entityNameinLeftSidebar: "SecondAPI",

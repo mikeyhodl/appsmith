@@ -2,7 +2,7 @@ package com.appsmith.server.services.ce;
 
 import com.appsmith.server.configurations.CloudServicesConfig;
 import com.appsmith.server.domains.Application;
-import com.appsmith.server.domains.GitApplicationMetadata;
+import com.appsmith.server.domains.GitArtifactMetadata;
 import com.appsmith.server.domains.Workspace;
 import com.appsmith.server.dtos.TemplateDTO;
 import com.appsmith.server.exceptions.AppsmithException;
@@ -17,11 +17,9 @@ import mockwebserver3.RecordedRequest;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.test.context.support.WithUserDetails;
-import org.springframework.test.context.junit.jupiter.SpringExtension;
 import reactor.test.StepVerifier;
 
 import java.io.IOException;
@@ -29,7 +27,6 @@ import java.time.Instant;
 import java.util.List;
 
 @Slf4j
-@ExtendWith(SpringExtension.class)
 @SpringBootTest
 public class ApplicationTemplateServicePublishTemplateTest {
     private static MockWebServer mockCloudServices;
@@ -82,7 +79,7 @@ public class ApplicationTemplateServicePublishTemplateTest {
         testApplication.setUpdatedAt(Instant.now());
         testApplication.setLastDeployedAt(Instant.now());
         testApplication.setModifiedBy("some-user");
-        testApplication.setGitApplicationMetadata(new GitApplicationMetadata());
+        testApplication.setGitApplicationMetadata(new GitArtifactMetadata());
 
         cloudServicesConfig.setBaseUrl(String.format("http://localhost:%s", mockCloudServices.getPort()));
 

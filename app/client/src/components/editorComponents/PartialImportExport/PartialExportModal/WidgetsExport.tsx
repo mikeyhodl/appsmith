@@ -1,4 +1,4 @@
-import { Checkbox, Text } from "design-system";
+import { Checkbox, Text } from "@appsmith/ads";
 import WidgetIcon from "pages/Editor/Explorer/Widgets/WidgetIcon";
 import React from "react";
 import type { CanvasStructure } from "reducers/uiReducers/pageCanvasStructureReducer";
@@ -26,6 +26,7 @@ const WidgetsExport = ({
 }: Props) => {
   if (!widgets || !widgets.children || widgets.children.length === 0)
     return null;
+
   return (
     <WidgetSelector
       selectAllchecked={selectAllchecked}
@@ -42,6 +43,7 @@ export default WidgetsExport;
 interface WidgetSelectorProps extends BaseProps {
   widgetList: CanvasStructure[];
 }
+
 function WidgetSelector({
   selectAllchecked,
   selectedWidgetIds,
@@ -55,12 +57,14 @@ function WidgetSelector({
     checked: boolean,
   ) => {
     const isSelected = selectedWidgetIds.includes(node.widgetId);
+
     if (checked) {
       !isSelected && selectedWidgetIds.push(node.widgetId);
     } else {
       isSelected &&
         selectedWidgetIds.splice(selectedWidgetIds.indexOf(node.widgetId), 1);
     }
+
     node?.children?.forEach((child) => {
       toggleNestedChildrenSelection(child, selectedWidgetIds, checked);
     });
@@ -68,8 +72,10 @@ function WidgetSelector({
 
   const toggleNode = (node: CanvasStructure, checked: boolean) => {
     const prevSelectedWidgetIds = [...selectedWidgetIds];
+
     toggleNestedChildrenSelection(node, prevSelectedWidgetIds, checked);
     updateSelectedWidgets(prevSelectedWidgetIds);
+
     if (!checked) updateSelectAllChecked(false);
   };
 
@@ -79,10 +85,15 @@ function WidgetSelector({
     isParentSelected: boolean,
   ) {
     const isSelected = selectedWidgetIds.includes(widget.widgetId);
+
     return (
-      <div style={{ marginLeft: level > 0 ? level + 8 : level }}>
+      <div
+        key={widget.widgetId}
+        style={{ marginLeft: level > 0 ? level + 8 : level }}
+      >
         <CheckboxContainer>
           <Checkbox
+            data-testid={`t--partial-export-modal-widget-select-${widget.widgetId}`}
             isDisabled={isParentSelected}
             isSelected={isSelected}
             onChange={(checked) => toggleNode(widget, checked)}
@@ -103,16 +114,19 @@ function WidgetSelector({
 
   const handleSelectAllClick = (checked: boolean) => {
     const prevSelectedWidgetIds = [...selectedWidgetIds];
+
     widgetList.forEach((widget) => {
       toggleNestedChildrenSelection(widget, prevSelectedWidgetIds, checked);
     });
     updateSelectedWidgets(prevSelectedWidgetIds);
     updateSelectAllChecked(checked);
   };
+
   return (
-    <CheckboxWrapper>
+    <CheckboxWrapper data-testid="t--partialExportModal-widgetsSection">
       <Checkbox
         className="mb-4"
+        data-testid="t--partial-export-modal-widget-select-all"
         isSelected={selectAllchecked}
         onChange={handleSelectAllClick}
       >

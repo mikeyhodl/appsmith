@@ -12,3 +12,23 @@ export const deleteLayoutElementPositions = (elements: string[]) => {
     payload: elements,
   };
 };
+
+export const selectAnvilWidget = (widgetId: string, evt: CustomEvent) => {
+  return {
+    type: AnvilReduxActionTypes.ANVIL_WIDGET_SELECTION_CLICK,
+    payload: {
+      widgetId: widgetId,
+      e: evt,
+    },
+  };
+};
+
+// This is a stopgap measure until #33014 is resolved
+export const debugWidget = (widgetId: string) => {
+  return {
+    type: AnvilReduxActionTypes.DEBUG_WIDGET,
+    payload: {
+      widgetId,
+    },
+  };
+};
