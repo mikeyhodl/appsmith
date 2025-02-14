@@ -1,4 +1,5 @@
 import * as _ from "../../../../support/Objects/ObjectsCore";
+const commonlocators = require("../../../../locators/commonlocators.json");
 
 describe(
   "Test Create Api and Bind to Table widget V2",
@@ -19,6 +20,7 @@ describe(
       cy.readTableV2dataPublish("0", "0").then((tabData) => {
         expect(tabData).to.eq("#2");
       });
+      _.propPane.ExpandIfCollapsedSection("search\\&filters");
       // Input onsearchtextchanged control
       cy.get(".t--property-control-onsearchtextchanged .t--js-toggle")
         .first()
@@ -32,9 +34,7 @@ describe(
         expect(tabData).to.eq("#2");
       });
       // Disable Client Search
-      cy.togglebarDisable(
-        ".t--property-control-clientsidesearch input[type='checkbox']",
-      );
+      _.agHelper.CheckUncheck(commonlocators.clientSideSearch, false);
       cy.wait(1000); //wait & then read the table value
       // Verify Client Search doesnt work
       cy.readTableV2dataPublish("0", "0").then((tabData) => {

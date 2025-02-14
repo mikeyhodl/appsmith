@@ -79,6 +79,7 @@ interface BodyPropsType {
   width?: number;
   tableSizes: TableSizes;
   innerElementType?: ReactElementType;
+  isInfiniteScrollEnabled?: boolean;
 }
 
 const TableVirtualBodyComponent = React.forwardRef(
@@ -90,14 +91,12 @@ const TableVirtualBodyComponent = React.forwardRef(
           height={
             props.height -
             props.tableSizes.TABLE_HEADER_HEIGHT -
-            2 * WIDGET_PADDING
+            2 * props.tableSizes.VERTICAL_PADDING
           }
           innerElementType={props.innerElementType}
           itemCount={Math.max(props.rows.length, props.pageSize)}
           itemData={props.rows}
-          itemSize={
-            props.tableSizes.ROW_HEIGHT + props.tableSizes.ROW_VIRTUAL_OFFSET
-          }
+          itemSize={props.tableSizes.ROW_HEIGHT}
           outerRef={ref}
           width={`calc(100% + ${2 * WIDGET_PADDING}px)`}
         >
@@ -139,6 +138,7 @@ export const TableBody = React.forwardRef(
       handleReorderColumn,
       headerGroups,
       isAddRowInProgress,
+      isInfiniteScrollEnabled,
       isResizingColumn,
       isSortable,
       multiRowSelection,
@@ -190,15 +190,22 @@ export const TableBody = React.forwardRef(
           totalColumnsWidth: props.totalColumnsWidth,
         }}
       >
-        {useVirtual ? (
+        {isInfiniteScrollEnabled ? (
+          <div>Infinite Scroll</div>
+        ) : useVirtual ? (
           <TableVirtualBodyComponent
+            isInfiniteScrollEnabled={false}
             ref={ref}
             rows={rows}
             width={width}
             {...restOfProps}
           />
         ) : (
-          <TableBodyComponent rows={rows} {...restOfProps} />
+          <TableBodyComponent
+            isInfiniteScrollEnabled={false}
+            rows={rows}
+            {...restOfProps}
+          />
         )}
       </BodyContext.Provider>
     );

@@ -12,7 +12,6 @@ import { WIDGET_TAGS } from "constants/WidgetConstants";
 import { ValidationTypes } from "constants/WidgetValidation";
 import { EventType } from "constants/AppsmithActionConstants/ActionConstants";
 import type { OnButtonClickProps } from "components/propertyControls/ButtonControl";
-import { FEATURE_FLAG } from "@appsmith/entities/FeatureFlag";
 
 class ExternalWidget extends BaseWidget<ExternalWidgetProps, WidgetState> {
   static type = "EXTERNAL_WIDGET";
@@ -20,9 +19,7 @@ class ExternalWidget extends BaseWidget<ExternalWidgetProps, WidgetState> {
   static getConfig() {
     return {
       name: "Custom Widget [alpha]",
-      hideCard: !super.getFeatureFlag(
-        FEATURE_FLAG.release_custom_widgets_enabled,
-      ),
+      hideCard: true,
       iconSVG: IconSVG,
       needsMeta: true,
       isCanvas: false,
@@ -156,6 +153,8 @@ class ExternalWidget extends BaseWidget<ExternalWidgetProps, WidgetState> {
     };
   }
 
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   static getMetaPropertiesMap(): Record<string, any> {
     return {
       model: {},
@@ -190,6 +189,8 @@ class ExternalWidget extends BaseWidget<ExternalWidgetProps, WidgetState> {
         height={this.props.componentHeight}
         model={this.props.model}
         srcDoc={this.props.srcDoc}
+        // TODO: Fix this the next time the file is edited
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         update={(data: any) => this.update(data)}
         width={this.props.componentWidth}
       />

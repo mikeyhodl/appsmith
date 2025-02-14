@@ -1,9 +1,20 @@
 #!/bin/bash
 
+# Source the helper script
+source pg-utils.sh
+
 set -o errexit
 set -o pipefail
 set -o nounset
 set -o noglob
+
+mode=mongo
+if [[ "$APPSMITH_DB_URL" = postgresql://* ]]; then
+  mode=pg
+fi
+
+tlog "Running with $mode."
+cd "/opt/appsmith/server/$mode"
 
 declare -a extra_args
 proxy_configured=0
@@ -20,6 +31,13 @@ match-proxy-url() {
   proxy_port="${BASH_REMATCH[5]-}"
   [[ -n $proxy_host ]]
 }
+
+# Extract the database parameters from the APPSMITH_DB_URL and wait for the database to be available
+if [[ "$mode" == "pg" ]]; then
+  extract_postgres_db_params "$APPSMITH_DB_URL"
+  waitForPostgresAvailability
+  init_pg_db
+fi
 
 if match-proxy-url "${HTTP_PROXY-}"; then
   extra_args+=(-Dhttp.proxyHost="$proxy_host" -Dhttp.proxyPort="$proxy_port")
@@ -59,16 +77,17 @@ fi
 
 # Wait until RTS started and listens on port 8091
 while ! curl --fail --silent localhost:"${APPSMITH_RTS_PORT:-8091}"/rts-api/v1/health-check; do
-  echo 'Waiting for RTS to start ...'
+  tlog 'Waiting for RTS to start ...'
   sleep 1
 done
-echo 'RTS started.'
+tlog 'RTS started.'
 
 sh /opt/appsmith/run-starting-page-init.sh &
 
 # Ref -Dlog4j2.formatMsgNoLookups=true https://spring.io/blog/2021/12/10/log4j2-vulnerability-and-spring-boot
 exec java ${APPSMITH_JAVA_ARGS:-} ${APPSMITH_JAVA_HEAP_ARG:-} \
   --add-opens java.base/java.time=ALL-UNNAMED \
+  --add-opens java.base/java.nio=ALL-UNNAMED \
   -Dserver.port=8080 \
   -XX:+ShowCodeDetailsInExceptionMessages \
   -Djava.security.egd=file:/dev/./urandom \

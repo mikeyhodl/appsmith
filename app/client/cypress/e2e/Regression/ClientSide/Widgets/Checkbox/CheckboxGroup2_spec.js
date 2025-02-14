@@ -1,7 +1,5 @@
-const commonlocators = require("../../../../../locators/commonlocators.json");
 const formWidgetsPage = require("../../../../../locators/FormWidgets.json");
 const publish = require("../../../../../locators/publishWidgetspage.json");
-const explorer = require("../../../../../locators/explorerlocators.json");
 import {
   agHelper,
   propPane,
@@ -10,7 +8,7 @@ import {
 
 describe(
   "Checkbox Group Widget Functionality",
-  { tags: ["@tag.Widget", "@tag.Checkbox"] },
+  { tags: ["@tag.Widget", "@tag.Checkbox", "@tag.Binding"] },
   function () {
     before(() => {
       agHelper.AddDsl("checkboxgroupDsl");
@@ -79,8 +77,6 @@ describe(
     it("3. handleSelectAllChange: unchecked", function () {
       const selectAllSelector = formWidgetsPage.selectAllCheckboxControl;
       const uncheckedOptionInputs = `${formWidgetsPage.checkboxGroupOptionInputs} input:not(:checked)`;
-      // Deselect all
-      cy.get(selectAllSelector).click();
       // Should get 2 unchecked option inputs
       cy.get(uncheckedOptionInputs).should("have.length", 2);
       //handleSelectAllChange: checked", function () {
@@ -118,7 +114,6 @@ describe(
     });
 
     it("5. Check isDirty meta property", function () {
-      cy.get(explorer.addWidget).click();
       cy.dragAndDropToCanvas("textwidget", { x: 300, y: 500 });
       cy.openPropertyPane("textwidget");
       propPane.UpdatePropertyFieldValue("Text", "{{CBGTest.isDirty}}");

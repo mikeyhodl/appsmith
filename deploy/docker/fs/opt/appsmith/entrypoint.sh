@@ -1,22 +1,124 @@
 #!/usr/bin/env bash
 
+# Source the helper script
+source pg-utils.sh
+
 set -e
 
-echo "Running as: $(id)"
+tlog "Running as: $(id)"
 
 stacks_path=/appsmith-stacks
 
+export APPSMITH_PG_DATABASE="appsmith"
 export SUPERVISORD_CONF_TARGET="$TMP/supervisor-conf.d/"  # export for use in supervisord.conf
 export MONGODB_TMP_KEY_PATH="$TMP/mongodb-key"  # export for use in supervisor process mongodb.conf
 
 mkdir -pv "$SUPERVISORD_CONF_TARGET" "$WWW_PATH"
 
+setup_proxy_variables() {
+  export NO_PROXY="${NO_PROXY-localhost,127.0.0.1}"
+
+  # Ensure `localhost` and `127.0.0.1` are in always present in `NO_PROXY`.
+  local no_proxy_lines
+  no_proxy_lines="$(echo "$NO_PROXY" | tr , \\n)"
+  if ! echo "$no_proxy_lines" | grep -q '^localhost$'; then
+    export NO_PROXY="localhost,$NO_PROXY"
+  fi
+  if ! echo "$no_proxy_lines" | grep -q '^127.0.0.1$'; then
+    export NO_PROXY="127.0.0.1,$NO_PROXY"
+  fi
+
+  # If one of NO_PROXY or no_proxy are set, copy it to the other. If both are set, prefer NO_PROXY.
+  if [[ -n ${NO_PROXY-} ]]; then
+    export no_proxy="$NO_PROXY"
+  elif [[ -n ${no_proxy-} ]]; then
+    export NO_PROXY="$no_proxy"
+  fi
+
+  # If one of HTTPS_PROXY or https_proxy are set, copy it to the other. If both are set, prefer HTTPS_PROXY.
+  if [[ -n ${HTTPS_PROXY-} ]]; then
+    export https_proxy="$HTTPS_PROXY"
+  elif [[ -n ${https_proxy-} ]]; then
+    export HTTPS_PROXY="$https_proxy"
+  fi
+
+  # If one of HTTP_PROXY or http_proxy are set, copy it to the other. If both are set, prefer HTTP_PROXY.
+  if [[ -n ${HTTP_PROXY-} ]]; then
+    export http_proxy="$HTTP_PROXY"
+  elif [[ -n ${http_proxy-} ]]; then
+    export HTTP_PROXY="$http_proxy"
+  fi
+}
+
+
+init_env_file() {
+  CONF_PATH="/appsmith-stacks/configuration"
+  ENV_PATH="$CONF_PATH/docker.env"
+  TEMPLATES_PATH="/opt/appsmith/templates"
+
+  if [[ -n "$APPSMITH_MONGODB_URI" ]]; then
+    export APPSMITH_DB_URL="$APPSMITH_MONGODB_URI"
+    unset APPSMITH_MONGODB_URI
+  fi
+
+  # Build an env file with current env variables. We single-quote the values, as well as escaping any single-quote characters.
+  printenv | grep -E '^APPSMITH_|^MONGO_' | sed "s/'/'\\\''/g; s/=/='/; s/$/'/" > "$TMP/pre-define.env"
+
+  tlog "Initialize .env file"
+  if ! [[ -e "$ENV_PATH" ]]; then
+    # Generate new docker.env file when initializing container for first time or in Heroku which does not have persistent volume
+    tlog "Generating default configuration file"
+    mkdir -p "$CONF_PATH"
+
+    local default_appsmith_mongodb_user="appsmith"
+    local generated_appsmith_mongodb_password=$(
+      tr -dc A-Za-z0-9 </dev/urandom | head -c 13
+      echo ""
+    )
+    local generated_appsmith_encryption_password=$(
+      tr -dc A-Za-z0-9 </dev/urandom | head -c 13
+      echo ""
+    )
+    local generated_appsmith_encription_salt=$(
+      tr -dc A-Za-z0-9 </dev/urandom | head -c 13
+      echo ""
+    )
+    local generated_appsmith_supervisor_password=$(
+      tr -dc A-Za-z0-9 </dev/urandom | head -c 13
+      echo ''
+    )
+
+    bash "$TEMPLATES_PATH/docker.env.sh" "$default_appsmith_mongodb_user" "$generated_appsmith_mongodb_password" "$generated_appsmith_encryption_password" "$generated_appsmith_encription_salt" "$generated_appsmith_supervisor_password" > "$ENV_PATH"
+  fi
+
+  tlog "Load environment configuration"
+
+  # Load the ones in `docker.env` in the stacks folder.
+  set -o allexport
+  . "$ENV_PATH"
+  set +o allexport
+
+  if [[ -n "$APPSMITH_MONGODB_URI" ]]; then
+    export APPSMITH_DB_URL="$APPSMITH_MONGODB_URI"
+    unset APPSMITH_MONGODB_URI
+  fi
+
+  # Load the ones set from outside, should take precedence, and so will overwrite anything from `docker.env` above.
+  set -o allexport
+  . "$TMP/pre-define.env"
+  set +o allexport
+}
+
+init_env_file
+setup_proxy_variables
+
 # ip is a reserved keyword for tracking events in Mixpanel. Instead of showing the ip as is Mixpanel provides derived properties.
 # As we want derived props alongwith the ip address we are sharing the ip address in separate keys
 # https://help.mixpanel.com/hc/en-us/articles/360001355266-Event-Properties
 if [[ -n ${APPSMITH_SEGMENT_CE_KEY-} ]]; then
-  ip="$(curl -sS https://api64.ipify.org || echo unknown)"
+  ip="$(set -o pipefail; curl --connect-timeout 5 -sS https://cs.appsmith.com/api/v1/ip | grep -Eo '\d+(\.\d+){3}' || echo "unknown")"
   curl \
+    --connect-timeout 5 \
     --user "$APPSMITH_SEGMENT_CE_KEY:" \
     --header 'Content-Type: application/json' \
     --data '{
@@ -37,20 +139,20 @@ if [[ -n "${FILESTORE_IP_ADDRESS-}" ]]; then
   FILESTORE_IP_ADDRESS="$(echo "$FILESTORE_IP_ADDRESS" | xargs)"
   FILE_SHARE_NAME="$(echo "$FILE_SHARE_NAME" | xargs)"
 
-  echo "Running appsmith for cloudRun"
-  echo "creating mount point"
+  tlog "Running appsmith for cloudRun"
+  tlog "creating mount point"
   mkdir -p "$stacks_path"
-  echo "Mounting File Sytem"
+  tlog "Mounting File Sytem"
   mount -t nfs -o nolock "$FILESTORE_IP_ADDRESS:/$FILE_SHARE_NAME" /appsmith-stacks
-  echo "Mounted File Sytem"
-  echo "Setting HOSTNAME for Cloudrun"
+  tlog "Mounted File Sytem"
+  tlog "Setting HOSTNAME for Cloudrun"
   export HOSTNAME="cloudrun"
 fi
 
 
 function get_maximum_heap() {
     resource=$(ulimit -u)
-    echo "Resource : $resource"
+    tlog "Resource : $resource"
     if [[ "$resource" -le 256 ]]; then
         maximum_heap=128
     elif [[ "$resource" -le 512 ]]; then
@@ -64,68 +166,9 @@ function setup_backend_heap_arg() {
     fi
 }
 
-init_env_file() {
-  CONF_PATH="/appsmith-stacks/configuration"
-  ENV_PATH="$CONF_PATH/docker.env"
-  TEMPLATES_PATH="/opt/appsmith/templates"
-
-  # Build an env file with current env variables. We single-quote the values, as well as escaping any single-quote characters.
-  printenv | grep -E '^APPSMITH_|^MONGO_' | sed "s/'/'\\\''/g; s/=/='/; s/$/'/" > "$TMP/pre-define.env"
-
-  echo "Initialize .env file"
-  if ! [[ -e "$ENV_PATH" ]]; then
-    # Generate new docker.env file when initializing container for first time or in Heroku which does not have persistent volume
-    echo "Generating default configuration file"
-    mkdir -p "$CONF_PATH"
-    local default_appsmith_mongodb_user="appsmith"
-    local generated_appsmith_mongodb_password=$(
-      tr -dc A-Za-z0-9 </dev/urandom | head -c 13
-      echo ""
-    )
-    local generated_appsmith_encryption_password=$(
-      tr -dc A-Za-z0-9 </dev/urandom | head -c 13
-      echo ""
-    )
-    local generated_appsmith_encription_salt=$(
-      tr -dc A-Za-z0-9 </dev/urandom | head -c 13
-      echo ""
-    )
-    local generated_appsmith_supervisor_password=$(
-      tr -dc A-Za-z0-9 </dev/urandom | head -c 13
-      echo ''
-    )
-    bash "$TEMPLATES_PATH/docker.env.sh" "$default_appsmith_mongodb_user" "$generated_appsmith_mongodb_password" "$generated_appsmith_encryption_password" "$generated_appsmith_encription_salt" "$generated_appsmith_supervisor_password" > "$ENV_PATH"
-  fi
-
-
-  echo "Load environment configuration"
-  set -o allexport
-  . "$ENV_PATH"
-  . "$TMP/pre-define.env"
-  set +o allexport
-}
-
-setup_proxy_variables() {
-  export NO_PROXY="${NO_PROXY-localhost,127.0.0.1}"
-
-  # If one of HTTPS_PROXY or https_proxy are set, copy it to the other. If both are set, prefer HTTPS_PROXY.
-  if [[ -n ${HTTPS_PROXY-} ]]; then
-    export https_proxy="$HTTPS_PROXY"
-  elif [[ -n ${https_proxy-} ]]; then
-    export HTTPS_PROXY="$https_proxy"
-  fi
-
-  # If one of HTTP_PROXY or http_proxy are set, copy it to the other. If both are set, prefer HTTP_PROXY.
-  if [[ -n ${HTTP_PROXY-} ]]; then
-    export http_proxy="$HTTP_PROXY"
-  elif [[ -n ${http_proxy-} ]]; then
-    export HTTP_PROXY="$http_proxy"
-  fi
-}
-
 unset_unused_variables() {
   # Check for enviroment vairalbes
-  echo "Checking environment configuration"
+  tlog "Checking environment configuration"
   if [[ -z "${APPSMITH_MAIL_ENABLED}" ]]; then
     unset APPSMITH_MAIL_ENABLED # If this field is empty is might cause application crash
   fi
@@ -153,18 +196,30 @@ unset_unused_variables() {
   fi
 }
 
-check_mongodb_uri() {
-  echo "Checking APPSMITH_MONGODB_URI"
+configure_database_connection_url() {
+  tlog "Configuring database connection URL"
+  isPostgresUrl=0
+  isMongoUrl=0
+
+  if [[ "${APPSMITH_DB_URL}" == "postgresql:"* ]]; then
+    isPostgresUrl=1
+  elif [[ "${APPSMITH_DB_URL}" == "mongodb"* ]]; then
+    isMongoUrl=1
+  fi
+}
+
+check_db_uri() {
+  tlog "Checking APPSMITH_DB_URL"
   isUriLocal=1
-  if [[ $APPSMITH_MONGODB_URI == *"localhost"* || $APPSMITH_MONGODB_URI == *"127.0.0.1"* ]]; then
-    echo "Detected local MongoDB"
+  if [[ $APPSMITH_DB_URL == *"localhost"* || $APPSMITH_DB_URL == *"127.0.0.1"* ]]; then
+    tlog "Detected local DB"
     isUriLocal=0
   fi
 }
 
 init_mongodb() {
   if [[ $isUriLocal -eq 0 ]]; then
-    echo "Initializing local database"
+    tlog "Initializing local database"
     MONGO_DB_PATH="$stacks_path/data/mongodb"
     MONGO_LOG_PATH="$MONGO_DB_PATH/log"
     MONGO_DB_KEY="$MONGO_DB_PATH/key"
@@ -181,7 +236,7 @@ init_mongodb() {
 }
 
 init_replica_set() {
-  echo "Checking initialized database"
+  tlog "Checking initialized database"
   shouldPerformInitdb=1
   for path in \
     "$MONGO_DB_PATH/WiredTiger" \
@@ -195,21 +250,21 @@ init_replica_set() {
   done
 
   if [[ $isUriLocal -gt 0 && -f /proc/cpuinfo ]] && ! grep --quiet avx /proc/cpuinfo; then
-    echo "====================================================================================================" >&2
-    echo "==" >&2
-    echo "== AVX instruction not found in your CPU. Appsmith's embedded MongoDB may not start. Please use an external MongoDB instance instead." >&2
-    echo "== See https://docs.appsmith.com/getting-started/setup/instance-configuration/custom-mongodb-redis#custom-mongodb for instructions." >&2
-    echo "==" >&2
-    echo "====================================================================================================" >&2
+    tlog "====================================================================================================" >&2
+    tlog "==" >&2
+    tlog "== AVX instruction not found in your CPU. Appsmith's embedded MongoDB may not start. Please use an external MongoDB instance instead." >&2
+    tlog "== See https://docs.appsmith.com/getting-started/setup/instance-configuration/custom-mongodb-redis#custom-mongodb for instructions." >&2
+    tlog "==" >&2
+    tlog "====================================================================================================" >&2
   fi
 
   if [[ $shouldPerformInitdb -gt 0 && $isUriLocal -eq 0 ]]; then
-    echo "Initializing Replica Set for local database"
+    tlog "Initializing Replica Set for local database"
     # Start installed MongoDB service - Dependencies Layer
     mongod --fork --port 27017 --dbpath "$MONGO_DB_PATH" --logpath "$MONGO_LOG_PATH"
-    echo "Waiting 10s for MongoDB to start"
+    tlog "Waiting 10s for MongoDB to start"
     sleep 10
-    echo "Creating MongoDB user"
+    tlog "Creating MongoDB user"
     mongosh "127.0.0.1/appsmith" --eval "db.createUser({
         user: '$APPSMITH_MONGODB_USER',
         pwd: '$APPSMITH_MONGODB_PASSWORD',
@@ -219,20 +274,20 @@ init_replica_set() {
         }, 'readWrite']
       }
     )"
-    echo "Enabling Replica Set"
+    tlog "Enabling Replica Set"
     mongod --dbpath "$MONGO_DB_PATH" --shutdown || true
     mongod --fork --port 27017 --dbpath "$MONGO_DB_PATH" --logpath "$MONGO_LOG_PATH" --replSet mr1 --keyFile "$MONGODB_TMP_KEY_PATH" --bind_ip localhost
-    echo "Waiting 10s for MongoDB to start with Replica Set"
+    tlog "Waiting 10s for MongoDB to start with Replica Set"
     sleep 10
-    mongosh "$APPSMITH_MONGODB_URI" --eval 'rs.initiate()'
+    mongosh "$APPSMITH_DB_URL" --eval 'rs.initiate()'
     mongod --dbpath "$MONGO_DB_PATH" --shutdown || true
   fi
 
   if [[ $isUriLocal -gt 0 ]]; then
-    echo "Checking Replica Set of external MongoDB"
+    tlog "Checking Replica Set of external MongoDB"
 
     if appsmithctl check-replica-set; then
-      echo "MongoDB ReplicaSet is enabled"
+      tlog "MongoDB ReplicaSet is enabled"
     else
       echo -e "\033[0;31m***************************************************************************************\033[0m"
       echo -e "\033[0;31m*      MongoDB Replica Set is not enabled                                             *\033[0m"
@@ -252,14 +307,6 @@ use-mongodb-key() {
   chmod 600 "$MONGODB_TMP_KEY_PATH"
 }
 
-# Keep Let's Encrypt directory persistent
-mount_letsencrypt_directory() {
-  echo "Mounting Let's encrypt directory"
-  rm -rf /etc/letsencrypt
-  mkdir -p /appsmith-stacks/{letsencrypt,ssl}
-  ln -s /appsmith-stacks/letsencrypt /etc/letsencrypt
-}
-
 is_empty_directory() {
   [[ -d $1 && -z "$(ls -A "$1")" ]]
 }
@@ -277,7 +324,7 @@ check_setup_custom_ca_certificates() {
       if is_empty_directory "$container_ca_certs_path"; then
         rmdir -v "$container_ca_certs_path"
       else
-        echo "The 'ca-certificates' directory inside the container is not empty. Please clear it and restart to use certs from 'stacks/ca-certs' directory." >&2
+        tlog "The 'ca-certificates' directory inside the container is not empty. Please clear it and restart to use certs from 'stacks/ca-certs' directory." >&2
         return
       fi
     fi
@@ -301,11 +348,11 @@ setup-custom-ca-certificates() (
   rm -f "$store" "$opts_file"
 
   if [[ -n "$(ls "$stacks_ca_certs_path"/*.pem 2>/dev/null)" ]]; then
-    echo "Looks like you have some '.pem' files in your 'ca-certs' folder. Please rename them to '.crt' to be picked up automatically.".
+    tlog "Looks like you have some '.pem' files in your 'ca-certs' folder. Please rename them to '.crt' to be picked up automatically.".
   fi
 
   if ! [[ -d "$stacks_ca_certs_path" && "$(find "$stacks_ca_certs_path" -maxdepth 1 -type f -name '*.crt' | wc -l)" -gt 0 ]]; then
-    echo "No custom CA certificates found."
+    tlog "No custom CA certificates found."
     return
   fi
 
@@ -317,7 +364,7 @@ setup-custom-ca-certificates() (
     -deststorepass changeit
 
   # Add the custom CA certificates to the store.
-  find "$stacks_ca_certs_path" -maxdepth 1 -type f -name '*.crt' \
+  find -L "$stacks_ca_certs_path" -maxdepth 1 -type f -name '*.crt' \
     -print \
     -exec keytool -import -alias '{}' -noprompt -keystore "$store" -file '{}' -storepass changeit ';'
 
@@ -325,9 +372,6 @@ setup-custom-ca-certificates() (
     echo "-Djavax.net.ssl.trustStore=$store"
     echo "-Djavax.net.ssl.trustStorePassword=changeit"
   } > "$opts_file"
-
-  # Get certbot to use the combined trusted CA certs file.
-  export REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
 )
 
 configure_supervisord() {
@@ -340,7 +384,7 @@ configure_supervisord() {
 
   # Disable services based on configuration
   if [[ -z "${DYNO}" ]]; then
-    if [[ $isUriLocal -eq 0 ]]; then
+    if [[ $isUriLocal -eq 0 && $isMongoUrl -eq 1 ]]; then
       cp "$supervisord_conf_source/mongodb.conf" "$SUPERVISORD_CONF_TARGET"
     fi
     if [[ $APPSMITH_REDIS_URL == *"localhost"* || $APPSMITH_REDIS_URL == *"127.0.0.1"* ]]; then
@@ -361,80 +405,114 @@ check_redis_compatible_page_size() {
   page_size="$(getconf PAGE_SIZE)"
   if [[ $page_size -gt 4096 ]]; then
     curl \
+    --connect-timeout 5 \
       --silent \
       --user "$APPSMITH_SEGMENT_CE_KEY:" \
       --header 'Content-Type: application/json' \
       --data '{ "userId": "'"$HOSTNAME"'", "event":"RedisCompile" }' \
       https://api.segment.io/v1/track \
       || true
-    echo "Compile Redis stable with page size of $page_size"
+    tlog "Compile Redis stable with page size of $page_size"
     apt-get update
     apt-get install --yes build-essential
-    curl --location https://download.redis.io/redis-stable.tar.gz | tar -xz -C /tmp
+    curl --connect-timeout 5 --location https://download.redis.io/redis-stable.tar.gz | tar -xz -C /tmp
     pushd /tmp/redis-stable
     make
     make install
     popd
     rm -rf /tmp/redis-stable
   else
-    echo "Redis is compatible with page size of $page_size"
+    tlog "Redis is compatible with page size of $page_size"
   fi
 }
 
 init_postgres() {
   # Initialize embedded postgres by default; set APPSMITH_ENABLE_EMBEDDED_DB to 0, to use existing cloud postgres mockdb instance
   if [[ ${APPSMITH_ENABLE_EMBEDDED_DB: -1} != 0 ]]; then
-    echo ""
-    echo "Checking initialized local postgres"
+    tlog "Checking initialized local postgres"
     POSTGRES_DB_PATH="$stacks_path/data/postgres/main"
 
-    if [ -e "$POSTGRES_DB_PATH/PG_VERSION" ]; then
-        echo "Found existing Postgres, Skipping initialization"
-        chown -R postgres:postgres "$POSTGRES_DB_PATH"
+    mkdir -p "$POSTGRES_DB_PATH" "$TMP/pg-runtime"
+
+    # Postgres does not allow it's server to be run with super user access, we use user postgres and the file system owner also needs to be the same user postgres
+    chown -R postgres:postgres "$POSTGRES_DB_PATH" "$TMP/pg-runtime"
+
+    if [[ -e "$POSTGRES_DB_PATH/PG_VERSION" ]]; then
+      /opt/appsmith/pg-upgrade.sh
     else
-      echo "Initializing local postgresql database"
-      mkdir -p "$POSTGRES_DB_PATH"
-
-      # Postgres does not allow it's server to be run with super user access, we use user postgres and the file system owner also needs to be the same user postgres
-      chown postgres:postgres "$POSTGRES_DB_PATH"
-
-      # Initialize the postgres db file system
-      su postgres -c "/usr/lib/postgresql/13/bin/initdb -D $POSTGRES_DB_PATH"
-
-      # Start the postgres server in daemon mode
-      su postgres -c "/usr/lib/postgresql/13/bin/pg_ctl -D $POSTGRES_DB_PATH start"
-
-      # Create mockdb db and user and populate it with the data
-      seed_embedded_postgres
-      # Stop the postgres daemon
-      su postgres -c "/usr/lib/postgresql/13/bin/pg_ctl stop -D $POSTGRES_DB_PATH"
+      tlog "Initializing local Postgres data folder"
+      su postgres -c "env PATH='$PATH' initdb -D $POSTGRES_DB_PATH"
     fi
+    cp /opt/appsmith/postgres/appsmith_hba.conf "$POSTGRES_DB_PATH/pg_hba.conf"
+    # PostgreSQL requires strict file permissions for the pg_hba.conf file. Add file permission settings after copying the configuration file.
+    # 600 is the recommended permission for pg_hba.conf file for read and write access to the owner only.
+    chown postgres:postgres "$POSTGRES_DB_PATH/pg_hba.conf"
+    chmod 600 "$POSTGRES_DB_PATH/pg_hba.conf"
+
+    create_appsmith_pg_db "$POSTGRES_DB_PATH"
   else
     runEmbeddedPostgres=0
   fi
 
 }
 
-seed_embedded_postgres(){
-    # Create mockdb database
-    psql -U postgres -c "CREATE DATABASE mockdb;"
-    # Create mockdb superuser
-    su postgres -c "/usr/lib/postgresql/13/bin/createuser mockdb -s"
-    # Dump the sql file containing mockdb data
-    psql -U postgres -d mockdb --file='/opt/appsmith/templates/mockdb_postgres.sql'
+safe_init_postgres() {
+  runEmbeddedPostgres=1
+  # fail safe to prevent entrypoint from exiting, and prevent postgres from starting
+  # when runEmbeddedPostgres=0 , postgres conf file for supervisord will not be copied
+  # so postgres will not be started by supervisor. Explicit message helps us to know upgrade script failed.
 
-    # Create users database
-    psql -U postgres -c "CREATE DATABASE users;"
-    # Create users superuser
-    su postgres -c "/usr/lib/postgresql/13/bin/createuser users -s"
-    # Dump the sql file containing mockdb data
-    psql -U postgres -d users --file='/opt/appsmith/templates/users_postgres.sql'
+  if init_postgres; then
+    tlog "init_postgres succeeded."
+  else
+    local exit_status=$?
+    tlog "init_postgres failed with exit status $exit_status."
+    runEmbeddedPostgres=0
+  fi
 }
 
-safe_init_postgres(){
-runEmbeddedPostgres=1
-# fail safe to prevent entrypoint from exiting, and prevent postgres from starting
-init_postgres || runEmbeddedPostgres=0
+# Method to create a appsmith database in the postgres 
+# Args:
+#     POSTGRES_DB_PATH (string): Path to the postgres data directory
+# Returns:
+#     None
+# Example:
+#     create_appsmith_pg_db "/appsmith-stacks/data/postgres/main"
+create_appsmith_pg_db() {
+  POSTGRES_DB_PATH=$1
+  # Start the postgres , wait for it to be ready and create a appsmith db
+  su postgres -c "env PATH='$PATH' pg_ctl -D $POSTGRES_DB_PATH -l $POSTGRES_DB_PATH/logfile start"
+  echo "Waiting for Postgres to start"
+  local max_attempts=300
+  local attempt=0
+
+  local unix_socket_directory=$(get_unix_socket_directory "$POSTGRES_DB_PATH")
+  echo "Unix socket directory is $unix_socket_directory"
+  until su postgres -c "env PATH='$PATH' pg_isready -h $unix_socket_directory"; do
+    if (( attempt >= max_attempts )); then
+      echo "Postgres failed to start within 300 seconds."
+      return 1
+    fi
+    tlog "Waiting for Postgres to be ready... Attempt $((++attempt))/$max_attempts"
+    sleep 1
+  done
+  # Check if the appsmith DB is present
+  DB_EXISTS=$(su postgres -c "env PATH='$PATH' psql -tAc \"SELECT 1 FROM pg_database WHERE datname='${APPSMITH_PG_DATABASE}'\"")
+
+  if [[ "$DB_EXISTS" != "1" ]]; then
+    su postgres -c "env PATH='$PATH' psql -c \"CREATE DATABASE ${APPSMITH_PG_DATABASE}\""
+  else
+    echo "Database ${APPSMITH_PG_DATABASE} already exists."
+  fi
+  su postgres -c "env PATH='$PATH' pg_ctl -D $POSTGRES_DB_PATH stop"
+}
+
+setup_caddy() {
+  if [[ "$APPSMITH_RATE_LIMIT" == "disabled" ]]; then
+    export _APPSMITH_CADDY="/opt/caddy/caddy_vanilla"
+  else
+    export _APPSMITH_CADDY="/opt/caddy/caddy"
+  fi
 }
 
 init_loading_pages(){
@@ -443,28 +521,49 @@ init_loading_pages(){
   mkdir -p "$XDG_DATA_HOME" "$XDG_CONFIG_HOME"
   cp templates/loading.html "$WWW_PATH"
   node caddy-reconfigure.mjs
-  /opt/caddy/caddy start --config "$TMP/Caddyfile"
+  "$_APPSMITH_CADDY" start --config "$TMP/Caddyfile"
 }
 
 function setup_auto_heal(){
    if [[ ${APPSMITH_AUTO_HEAL-} = 1 ]]; then
      # By default APPSMITH_AUTO_HEAL=0
      # To enable auto heal set APPSMITH_AUTO_HEAL=1
-     bash /opt/appsmith/auto_heal.sh $APPSMITH_AUTO_HEAL_CURL_TIMEOUT >> /appsmith-stacks/logs/cron/auto_heal.log 2>&1 &
+     bash /opt/appsmith/auto_heal.sh $APPSMITH_AUTO_HEAL_CURL_TIMEOUT >> "$APPSMITH_LOG_DIR"/cron/auto_heal.log 2>&1 &
    fi
 }
 
+function setup_monitoring(){
+   if [[ ${APPSMITH_MONITORING-} = 1 ]]; then
+     # By default APPSMITH_MONITORING=0
+     # To enable auto heal set APPSMITH_MONITORING=1
+     bash /opt/appsmith/JFR-recording-24-hours.sh $APPSMITH_LOG_DIR 2>&1 &
+   fi
+}
+
+print_appsmith_info(){
+  tr '\n' ' ' < /opt/appsmith/info.json
+}
+
+function capture_infra_details(){
+  bash /opt/appsmith/generate-infra-details.sh || true
+}
+
 # Main Section
+print_appsmith_info
+setup_caddy
 init_loading_pages
-init_env_file
-setup_proxy_variables
 unset_unused_variables
 
-check_mongodb_uri
+configure_database_connection_url
+check_db_uri
+# Don't run MongoDB if running in a Heroku dyno.
 if [[ -z "${DYNO}" ]]; then
-  # Don't run MongoDB if running in a Heroku dyno.
-  init_mongodb
-  init_replica_set
+  if [[ $isMongoUrl -eq 1 ]]; then
+    # Setup MongoDB and initialize replica set
+    tlog "Initializing MongoDB"
+    init_mongodb
+    init_replica_set
+  fi
 else
   # These functions are used to limit heap size for Backend process when deployed on Heroku
   get_maximum_heap
@@ -476,8 +575,6 @@ fi
 check_setup_custom_ca_certificates
 setup-custom-ca-certificates
 
-mount_letsencrypt_directory
-
 check_redis_compatible_page_size
 
 safe_init_postgres
@@ -485,12 +582,15 @@ safe_init_postgres
 configure_supervisord
 
 # Ensure the restore path exists in the container, so an archive can be copied to it, if need be.
-mkdir -p /appsmith-stacks/data/{backup,restore}
+mkdir -p /appsmith-stacks/data/{backup,restore} /appsmith-stacks/ssl
 
 # Create sub-directory to store services log in the container mounting folder
-mkdir -p /appsmith-stacks/logs/{supervisor,backend,cron,editor,rts,mongodb,redis,postgres,appsmithctl}
+export APPSMITH_LOG_DIR="${APPSMITH_LOG_DIR:-/appsmith-stacks/logs}"
+mkdir -p "$APPSMITH_LOG_DIR"/{supervisor,backend,cron,editor,rts,mongodb,redis,postgres,appsmithctl}
 
 setup_auto_heal
+capture_infra_details
+setup_monitoring || echo true
 
 # Handle CMD command
 exec "$@"

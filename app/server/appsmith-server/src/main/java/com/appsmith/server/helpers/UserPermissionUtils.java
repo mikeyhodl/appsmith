@@ -13,9 +13,10 @@ import java.util.Optional;
 import java.util.Set;
 
 public class UserPermissionUtils {
-    public static boolean validaDomainObjectPermissionExists(
+    public static boolean validateDomainObjectPermissionExists(
             BaseDomain baseDomain, AclPermission aclPermission, Set<String> permissionGroups) {
-        Optional<Policy> permissionPolicy = baseDomain.getPolicies().stream()
+        Set<Policy> basePolicies = baseDomain.getPolicies() == null ? Set.of() : baseDomain.getPolicies();
+        Optional<Policy> permissionPolicy = basePolicies.stream()
                 .filter(policy -> policy.getPermission().equals(aclPermission.getValue()))
                 .findFirst();
         return permissionPolicy.isPresent()
@@ -30,12 +31,12 @@ public class UserPermissionUtils {
             AppsmithError appsmithError) {
         return baseDomainFlux
                 .zipWith(permissionGroupIdsMono.repeat())
-                .map(tuple -> {
-                    if (!validaDomainObjectPermissionExists(tuple.getT1(), aclPermission, tuple.getT2())) {
-                        throw new AppsmithException(
-                                appsmithError, domainEntity, tuple.getT1().getId());
+                .flatMap(tuple -> {
+                    if (!validateDomainObjectPermissionExists(tuple.getT1(), aclPermission, tuple.getT2())) {
+                        return Mono.error(new AppsmithException(
+                                appsmithError, domainEntity, tuple.getT1().getId()));
                     }
-                    return Boolean.TRUE;
+                    return Mono.just(Boolean.TRUE);
                 })
                 .collectList()
                 .thenReturn(Boolean.TRUE);

@@ -1,14 +1,13 @@
-import React from "react";
+import React, { useCallback } from "react";
 import styled from "styled-components";
-import { connect } from "react-redux";
-import { getTypographyByKey, Text, TextType } from "design-system-old";
+import { useDispatch } from "react-redux";
+import { getTypographyByKey, Text, TextType } from "@appsmith/ads-old";
+import { Icon } from "@appsmith/ads";
 import { setGlobalSearchCategory } from "actions/globalSearchActions";
-import { HELPBAR_PLACEHOLDER } from "@appsmith/constants/messages";
-import AnalyticsUtil from "utils/AnalyticsUtil";
+import AnalyticsUtil from "ee/utils/AnalyticsUtil";
 import { modText } from "utils/helpers";
 import { filterCategories, SEARCH_CATEGORY_ID } from "./utils";
-import { protectedModeSelector } from "selectors/gitSyncSelectors";
-import type { AppState } from "@appsmith/reducers";
+import { useGitProtectedMode } from "pages/Editor/gitSync/hooks/modHooks";
 
 const StyledHelpBar = styled.button`
   padding: 0 var(--ads-v2-spaces-3);
@@ -28,6 +27,10 @@ const StyledHelpBar = styled.button`
   font-family: var(--ads-v2-font-family);
   font-size: var(--ads-v2-font-size-4);
   color: var(--ads-v2-color-fg);
+  flex-grow: 0;
+  gap: 8px;
+  min-width: fit-content;
+
   &:hover {
     border: 1px solid var(--ads-v2-color-border-emphasis-plus);
   }
@@ -38,12 +41,18 @@ const StyledHelpBar = styled.button`
   }
 `;
 
-interface Props {
-  toggleShowModal: () => void;
-  isProtectedMode: boolean;
-}
+function HelpBar() {
+  const isProtectedMode = useGitProtectedMode();
 
-function HelpBar({ isProtectedMode, toggleShowModal }: Props) {
+  const dispatch = useDispatch();
+
+  const toggleShowModal = useCallback(() => {
+    AnalyticsUtil.logEvent("OPEN_OMNIBAR", { source: "NAVBAR_CLICK" });
+    dispatch(
+      setGlobalSearchCategory(filterCategories[SEARCH_CATEGORY_ID.INIT]),
+    );
+  }, [dispatch]);
+
   return (
     <StyledHelpBar
       className="t--global-search-modal-trigger"
@@ -51,7 +60,7 @@ function HelpBar({ isProtectedMode, toggleShowModal }: Props) {
       disabled={isProtectedMode}
       onClick={toggleShowModal}
     >
-      <Text type={TextType.P2}>{HELPBAR_PLACEHOLDER()}</Text>
+      <Icon name={"search-line"} size={"md"} />
       <Text italic type={TextType.P3}>
         {modText()} K
       </Text>
@@ -59,17 +68,4 @@ function HelpBar({ isProtectedMode, toggleShowModal }: Props) {
   );
 }
 
-const mapStateToProps = (state: AppState) => ({
-  isProtectedMode: protectedModeSelector(state),
-});
-
-const mapDispatchToProps = (dispatch: any) => ({
-  toggleShowModal: () => {
-    AnalyticsUtil.logEvent("OPEN_OMNIBAR", { source: "NAVBAR_CLICK" });
-    dispatch(
-      setGlobalSearchCategory(filterCategories[SEARCH_CATEGORY_ID.INIT]),
-    );
-  },
-});
-
-export default connect(mapStateToProps, mapDispatchToProps)(HelpBar);
+export default HelpBar;

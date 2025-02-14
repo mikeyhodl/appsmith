@@ -1,5 +1,5 @@
-import { MAIN_THREAD_ACTION } from "@appsmith/workers/Evaluation/evalWorkerActions";
-import { addPlatformFunctionsToEvalContext } from "@appsmith/workers/Evaluation/Actions";
+import { MAIN_THREAD_ACTION } from "ee/workers/Evaluation/evalWorkerActions";
+import { addPlatformFunctionsToEvalContext } from "ee/workers/Evaluation/Actions";
 import { EventType } from "constants/AppsmithActionConstants/ActionConstants";
 import ExecutionMetaData from "../utils/ExecutionMetaData";
 import { evalContext } from "../mock";
@@ -13,10 +13,13 @@ jest.mock("workers/Evaluation/handlers/evalTree", () => ({
 }));
 
 const requestMock = jest.fn();
+
 jest.mock("../utils/Messenger.ts", () => ({
   ...jest.requireActual("../utils/Messenger.ts"),
   get WorkerMessenger() {
     return {
+      // TODO: Fix this the next time the file is edited
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       request: (...args: any) => requestMock(...args),
     };
   },
@@ -26,7 +29,9 @@ describe("Tests for run function in callback styled", () => {
   beforeAll(() => {
     self["$isDataField"] = false;
     ExecutionMetaData.setExecutionMetaData({
-      triggerMeta: {},
+      triggerMeta: {
+        onPageLoad: false,
+      },
       eventType: EventType.ON_PAGE_LOAD,
     });
     addPlatformFunctionsToEvalContext(evalContext);
@@ -44,6 +49,7 @@ describe("Tests for run function in callback styled", () => {
     );
     const successCallback = jest.fn(() => "success");
     const errorCallback = jest.fn(() => "failed");
+
     await evalContext.action1.run(successCallback, errorCallback);
     expect(requestMock).toBeCalledWith({
       method: MAIN_THREAD_ACTION.PROCESS_TRIGGER,
@@ -63,6 +69,7 @@ describe("Tests for run function in callback styled", () => {
         triggerMeta: {
           source: {},
           triggerPropertyName: undefined,
+          onPageLoad: false,
         },
       },
     });
@@ -78,6 +85,7 @@ describe("Tests for run function in callback styled", () => {
     );
     const successCallback = jest.fn(() => "success");
     const errorCallback = jest.fn(() => "failed");
+
     await evalContext.action1.run(successCallback, errorCallback);
     expect(requestMock).toBeCalledWith({
       method: MAIN_THREAD_ACTION.PROCESS_TRIGGER,
@@ -97,6 +105,7 @@ describe("Tests for run function in callback styled", () => {
         triggerMeta: {
           source: {},
           triggerPropertyName: undefined,
+          onPageLoad: false,
         },
       },
     });
@@ -111,8 +120,10 @@ describe("Tests for run function in callback styled", () => {
       }),
     );
     const successCallback = jest.fn();
+
     await (async function () {
       const innerScopeVar = "innerScopeVar";
+
       successCallback.mockImplementation(() => innerScopeVar);
       await evalContext.action1.run(successCallback);
     })();
@@ -121,6 +132,7 @@ describe("Tests for run function in callback styled", () => {
   });
   it("4. Callback should have access to other platform functions and entities at all times", async () => {
     const showAlertMock = jest.fn();
+
     //@ts-expect-error no types
     self.showAlert = showAlertMock;
     requestMock.mockReturnValue(
@@ -136,6 +148,7 @@ describe("Tests for run function in callback styled", () => {
       //@ts-expect-error no types
       self.showAlert(evalContext.action1.actionId),
     );
+
     await evalContext.action1.run(successCallback);
     expect(successCallback).toBeCalledWith("resolved");
     expect(showAlertMock).toBeCalledWith("123");
@@ -146,7 +159,9 @@ describe("Tests for run function in promise styled", () => {
   beforeAll(() => {
     self["$isDataField"] = false;
     ExecutionMetaData.setExecutionMetaData({
-      triggerMeta: {},
+      triggerMeta: {
+        onPageLoad: false,
+      },
       eventType: EventType.ON_PAGE_LOAD,
     });
     addPlatformFunctionsToEvalContext(evalContext);
@@ -160,6 +175,7 @@ describe("Tests for run function in promise styled", () => {
     );
     const successHandler = jest.fn();
     const invocation = evalContext.action1.run();
+
     invocation.then(successHandler);
     expect(requestMock).toBeCalledWith({
       method: MAIN_THREAD_ACTION.PROCESS_TRIGGER,
@@ -177,6 +193,7 @@ describe("Tests for run function in promise styled", () => {
         triggerMeta: {
           source: {},
           triggerPropertyName: undefined,
+          onPageLoad: false,
         },
       },
     });
@@ -192,6 +209,7 @@ describe("Tests for run function in promise styled", () => {
     );
     const successHandler = jest.fn();
     const errorHandler = jest.fn();
+
     await evalContext.action1.run().then(successHandler).catch(errorHandler);
     expect(requestMock).toBeCalledWith({
       method: MAIN_THREAD_ACTION.PROCESS_TRIGGER,
@@ -209,6 +227,7 @@ describe("Tests for run function in promise styled", () => {
         triggerMeta: {
           source: {},
           triggerPropertyName: undefined,
+          onPageLoad: false,
         },
       },
     });

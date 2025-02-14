@@ -6,27 +6,26 @@ import React, {
   useMemo,
 } from "react";
 import styled, { ThemeContext } from "styled-components";
-import type { ApplicationPayload } from "@appsmith/constants/ReduxActionConstants";
-import { ReduxActionTypes } from "@appsmith/constants/ReduxActionConstants";
+import type { ApplicationPayload } from "entities/Application";
 import {
   hasDeleteApplicationPermission,
   isPermitted,
   PERMISSION_TYPE,
-} from "@appsmith/utils/permissionHelpers";
+} from "ee/utils/permissionHelpers";
 import {
   getInitialsAndColorCode,
   getApplicationIcon,
   getRandomPaletteColor,
 } from "utils/AppsmithUtils";
-import type { AppIconName } from "design-system-old";
+import type { AppIconName } from "@appsmith/ads-old";
 import {
   ColorSelector,
   EditableText,
   EditInteractionKind,
   IconSelector,
   SavingState,
-} from "design-system-old";
-import type { MenuItemProps } from "design-system";
+} from "@appsmith/ads-old";
+import type { MenuItemProps } from "@appsmith/ads";
 import {
   Button,
   Menu,
@@ -34,34 +33,30 @@ import {
   MenuContent,
   MenuItem,
   MenuTrigger,
-} from "design-system";
+} from "@appsmith/ads";
 import { useDispatch, useSelector } from "react-redux";
 import type {
   ApplicationPagePayload,
   UpdateApplicationPayload,
-} from "@appsmith/api/ApplicationApi";
+} from "ee/api/ApplicationApi";
 import {
   getIsSavingAppName,
   getIsErroredSavingAppName,
-  getDeletingMultipleApps,
-} from "@appsmith/selectors/applicationSelectors";
+} from "ee/selectors/applicationSelectors";
 import ForkApplicationModal from "./ForkApplicationModal";
-import { getExportAppAPIRoute } from "@appsmith/constants/ApiConstants";
-import { builderURL, viewerURL } from "@appsmith/RouteBuilder";
+import { getExportAppAPIRoute } from "ee/constants/ApiConstants";
+import { builderURL, viewerURL } from "ee/RouteBuilder";
 import history from "utils/history";
-import urlBuilder from "@appsmith/entities/URLRedirect/URLAssembly";
-import { toast } from "design-system";
-import { getAppsmithConfigs } from "@appsmith/configs";
-import { addItemsInContextMenu } from "@appsmith/utils";
+import urlBuilder from "ee/entities/URLRedirect/URLAssembly";
+import { toast } from "@appsmith/ads";
 import { getCurrentUser } from "actions/authActions";
-import Card from "components/common/Card";
+import Card, { ContextMenuTrigger } from "components/common/Card";
 import { generateEditedByText } from "./helpers";
-import {
-  NO_PERMISSION_TO_SELECT_FOR_DELETE,
-  createMessage,
-} from "@appsmith/constants/messages";
-
-const { cloudHosting } = getAppsmithConfigs();
+import { noop } from "lodash";
+import { getLatestGitBranchFromLocal } from "utils/storage";
+import { getCurrentUser as getCurrentUserSelector } from "selectors/usersSelectors";
+import { useFeatureFlag } from "utils/hooks/useFeatureFlag";
+import { FEATURE_FLAG } from "ee/entities/FeatureFlag";
 
 interface ApplicationCardProps {
   application: ApplicationPayload;
@@ -81,15 +76,18 @@ interface ApplicationCardProps {
 
 const IconScrollWrapper = styled.div`
   position: relative;
+
   .t--icon-selected {
     background-color: var(--ads-v2-color-bg-muted);
-    border: var(--ads-v2-border-color);
+    border: var(--ads-v2-color-border);
+
     svg {
       path {
         fill: var(--ads-v2-color-fg);
       }
     }
   }
+
   svg {
     path {
       fill: var(--ads-v2-color-fg);
@@ -102,17 +100,14 @@ export interface ModifiedMenuItemProps extends MenuItemProps {
   "data-testid"?: string;
 }
 
-const ContextMenuTrigger = styled(Button)<{ isHidden?: boolean }>`
-  ${(props) => props.isHidden && "opacity: 0; visibility: hidden;"}
-`;
-
 export function ApplicationCard(props: ApplicationCardProps) {
-  const { isFetchingApplications } = props;
+  const { application, isFetchingApplications } = props;
   const theme = useContext(ThemeContext);
   const isSavingName = useSelector(getIsSavingAppName);
   const isErroredSavingName = useSelector(getIsErroredSavingAppName);
+  const currentUser = useSelector(getCurrentUserSelector);
   const initialsAndColorCode = getInitialsAndColorCode(
-    props.application.name,
+    application.name,
     theme.colors.appCardColors,
   );
   let initials = initialsAndColorCode[0];
@@ -128,24 +123,53 @@ export function ApplicationCard(props: ApplicationCardProps) {
   const [lastUpdatedValue, setLastUpdatedValue] = useState("");
   const dispatch = useDispatch();
 
-  const applicationId = props.application?.id;
-  const showGitBadge = props.application?.gitApplicationMetadata?.branchName;
+  const applicationId = application.id;
+  const baseApplicationId = application.baseId;
+  const showGitBadge = application.gitApplicationMetadata?.branchName;
+  const [editorParams, setEditorParams] = useState({});
+  const isGitPersistBranchEnabled = useFeatureFlag(
+    FEATURE_FLAG.release_git_persist_branch_enabled,
+  );
 
-  const deleteMultipleApplicationObject = useSelector(getDeletingMultipleApps);
-  const isApplicationSelected =
-    deleteMultipleApplicationObject.list?.includes(applicationId);
-  const isEnabledMultipleSelection =
-    !!deleteMultipleApplicationObject.list?.length;
+  useEffect(() => {
+    (async () => {
+      const storedLatestBranch = await getLatestGitBranchFromLocal(
+        currentUser?.email ?? "",
+        baseApplicationId,
+      );
+
+      if (isGitPersistBranchEnabled && storedLatestBranch) {
+        setEditorParams({ branch: storedLatestBranch });
+      } else if (showGitBadge) {
+        setEditorParams({ branch: showGitBadge });
+      }
+    })();
+  }, [
+    baseApplicationId,
+    currentUser?.email,
+    showGitBadge,
+    isGitPersistBranchEnabled,
+  ]);
+
+  const viewerParams = useMemo(() => {
+    if (showGitBadge) {
+      return { branch: showGitBadge };
+    } else {
+      return {};
+    }
+  }, [showGitBadge]);
 
   useEffect(() => {
     let colorCode;
-    if (props.application.color) {
-      colorCode = props.application.color;
+
+    if (application.color) {
+      colorCode = application.color;
     } else {
       colorCode = getRandomPaletteColor(theme.colors.appCardColors);
     }
+
     setSelectedColor(colorCode);
-  }, [props.application.color]);
+  }, [application.color]);
 
   useEffect(() => {
     if (props.share) {
@@ -157,6 +181,7 @@ export function ApplicationCard(props: ApplicationCardProps) {
         "data-testid": "t--share",
       });
     }
+
     // add fork app option to menu
     if (hasEditPermission) {
       moreActionItems.push({
@@ -167,6 +192,7 @@ export function ApplicationCard(props: ApplicationCardProps) {
         "data-testid": "t--fork-app",
       });
     }
+
     if (!!props.enableImportExport && hasExportPermission) {
       moreActionItems.push({
         onSelect: exportApplicationAsJSONFile,
@@ -176,38 +202,28 @@ export function ApplicationCard(props: ApplicationCardProps) {
         "data-testid": "t--export-app",
       });
     }
-    const updatedMoreActionItems: ModifiedMenuItemProps[] =
-      addItemsInContextMenu(
-        [
-          props.permissions?.hasManageWorkspacePermissions || false,
-          props.permissions?.canInviteToWorkspace || false,
-          !cloudHosting,
-        ],
-        history,
-        props.workspaceId,
-        moreActionItems,
-      );
-    setMoreActionItems(updatedMoreActionItems);
+
+    setMoreActionItems(moreActionItems);
     addDeleteOption();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const appIcon = (props.application?.icon ||
+  const appIcon = (application.icon ||
     getApplicationIcon(applicationId)) as AppIconName;
   const hasEditPermission = isPermitted(
-    props.application?.userPermissions ?? [],
+    application.userPermissions ?? [],
     PERMISSION_TYPE.MANAGE_APPLICATION,
   );
   const hasReadPermission = isPermitted(
-    props.application?.userPermissions ?? [],
+    application.userPermissions ?? [],
     PERMISSION_TYPE.READ_APPLICATION,
   );
   const hasExportPermission = isPermitted(
-    props.application?.userPermissions ?? [],
+    application.userPermissions ?? [],
     PERMISSION_TYPE.EXPORT_APPLICATION,
   );
   const hasDeletePermission = hasDeleteApplicationPermission(
-    props.application?.userPermissions,
+    application.userPermissions,
   );
 
   const updateColor = (color: string) => {
@@ -230,19 +246,23 @@ export function ApplicationCard(props: ApplicationCardProps) {
     // there is no straightforward way to handle it with axios/fetch
     const id = `t--export-app-link`;
     const existingLink = document.getElementById(id);
+
     existingLink && existingLink.remove();
     const link = document.createElement("a");
 
-    const branchName = props.application.gitApplicationMetadata?.branchName;
+    const branchName = application.gitApplicationMetadata?.branchName;
+
     link.href = getExportAppAPIRoute(applicationId, branchName);
     link.id = id;
     document.body.appendChild(link);
+
     // @ts-expect-error: Types are not available
     if (!window.Cypress) {
       link.click();
     }
+
     setIsMenuOpen(false);
-    toast.show(`Successfully exported ${props.application.name}`, {
+    toast.show(`Successfully exported ${application.name}`, {
       kind: "success",
     });
   };
@@ -258,6 +278,7 @@ export function ApplicationCard(props: ApplicationCardProps) {
   const askForConfirmation = () => {
     setIsDeleting(true);
     const updatedActionItems = [...moreActionItems];
+
     updatedActionItems.pop();
     updatedActionItems.push({
       onSelect: deleteApp,
@@ -273,9 +294,11 @@ export function ApplicationCard(props: ApplicationCardProps) {
       const index = moreActionItems.findIndex(
         (el) => el.startIcon === "delete-bin-line",
       );
+
       if (index >= 0) {
         moreActionItems.pop();
       }
+
       moreActionItems.push({
         onSelect: askForConfirmation,
         children: "Delete",
@@ -287,14 +310,8 @@ export function ApplicationCard(props: ApplicationCardProps) {
     }
   };
 
-  if (initials.length < 2 && props.application.name.length > 1) {
-    initials += props.application.name[1].toUpperCase() || "";
-  }
-
-  // should show correct branch of application when edit mode
-  const params: any = {};
-  if (showGitBadge) {
-    params.branch = showGitBadge;
+  if (initials.length < 2 && application.name.length > 1) {
+    initials += application.name[1].toUpperCase() || "";
   }
 
   const handleMenuOnClose = (open: boolean) => {
@@ -302,7 +319,8 @@ export function ApplicationCard(props: ApplicationCardProps) {
       setIsMenuOpen(false);
       setShowOverlay(false);
       addDeleteOption();
-      if (lastUpdatedValue && props.application.name !== lastUpdatedValue) {
+
+      if (lastUpdatedValue && application.name !== lastUpdatedValue) {
         props.update &&
           props.update(applicationId, {
             name: lastUpdatedValue,
@@ -321,7 +339,6 @@ export function ApplicationCard(props: ApplicationCardProps) {
           <ContextMenuTrigger
             className="m-0.5"
             data-testid="t--application-card-context-menu"
-            isHidden={isEnabledMultipleSelection}
             isIconButton
             kind="tertiary"
             size="sm"
@@ -339,7 +356,7 @@ export function ApplicationCard(props: ApplicationCardProps) {
             >
               <EditableText
                 className="px-3 pt-2 pb-2 t--application-name"
-                defaultValue={props.application.name}
+                defaultValue={application.name}
                 editInteractionKind={EditInteractionKind.SINGLE}
                 fill
                 hideEditIcon={false}
@@ -394,6 +411,7 @@ export function ApplicationCard(props: ApplicationCardProps) {
           <div className="menu-items-wrapper">
             {moreActionItems.map((item: MenuItemProps) => {
               const { children, key, ...restMenuItem } = item;
+
               return (
                 <MenuItem
                   {...restMenuItem}
@@ -420,108 +438,114 @@ export function ApplicationCard(props: ApplicationCardProps) {
   );
 
   const editedByText = generateEditedByText({
-    modifiedAt: props.application.modifiedAt,
-    modifiedBy: props.application.modifiedBy,
+    modifiedAt: application.modifiedAt,
+    modifiedBy: application.modifiedBy,
   });
 
-  function setURLParams() {
-    const page: ApplicationPagePayload | undefined =
-      props.application.pages.find(
-        (page) => page.id === props.application.defaultPageId,
-      );
+  const setURLParams = useCallback(() => {
+    const page: ApplicationPagePayload | undefined = application.pages.find(
+      (page) => page.id === application.defaultPageId,
+    );
+
     if (!page) return;
+
     urlBuilder.updateURLParams(
       {
-        applicationSlug: props.application.slug,
-        applicationVersion: props.application.applicationVersion,
-        applicationId: props.application.id,
+        applicationSlug: application.slug,
+        applicationVersion: application.applicationVersion,
+        baseApplicationId: application.baseId,
       },
-      props.application.pages.map((page) => ({
+      application.pages.map((page) => ({
         pageSlug: page.slug,
         customSlug: page.customSlug,
-        pageId: page.id,
+        basePageId: page.baseId,
       })),
     );
-  }
+  }, [
+    application.applicationVersion,
+    application.baseId,
+    application.defaultPageId,
+    application.pages,
+    application.slug,
+  ]);
 
   const editModeURL = useMemo(() => {
-    if (!props.application.defaultPageId) return "";
-    return builderURL({
-      pageId: props.application.defaultPageId,
-      params,
-    });
-  }, [props.application.defaultPageId, params]);
+    const basePageId = application.defaultBasePageId;
+
+    if (!basePageId) return "";
+
+    return builderURL({ basePageId, params: editorParams });
+  }, [application.defaultBasePageId, editorParams]);
 
   const viewModeURL = useMemo(() => {
-    if (!props.application.defaultPageId) return "";
-    return viewerURL({
-      pageId: props.application.defaultPageId,
-      params,
-    });
-  }, [props.application.defaultPageId, params]);
+    const basePageId = application.defaultBasePageId;
 
-  const launchApp = useCallback(() => {
-    setURLParams();
-    history.push(
-      viewerURL({
-        pageId: props.application.defaultPageId,
-        params,
-      }),
-    );
-    dispatch(getCurrentUser());
-  }, [props.application.defaultPageId]);
+    if (!basePageId) return "";
 
-  const editApp = useCallback(() => {
-    setURLParams();
-    history.push(
-      builderURL({
-        pageId: props.application.defaultPageId,
-        params,
-      }),
-    );
-    dispatch(getCurrentUser());
-  }, [props.application.defaultPageId]);
+    return viewerURL({ basePageId, params: viewerParams });
+  }, [application.defaultBasePageId, viewerParams]);
 
-  const handleMultipleSelection = (event: any) => {
-    if ((event as MouseEvent).ctrlKey || (event as MouseEvent).metaKey) {
-      if (!hasDeletePermission) {
-        toast.show(createMessage(NO_PERMISSION_TO_SELECT_FOR_DELETE), {
-          kind: "error",
-        });
+  const launchApp = useCallback(
+    (e: React.MouseEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        window.open(viewModeURL, "_blank");
+
         return;
       }
-      dispatch({
-        type: ReduxActionTypes.DELETE_MULTIPLE_APPS_TOGGLE,
-        payload: { id: applicationId },
-      });
-    }
-  };
+
+      setURLParams();
+      history.push(viewModeURL);
+      dispatch(getCurrentUser());
+    },
+    [dispatch, setURLParams, viewModeURL],
+  );
+
+  const editApp = useCallback(
+    (e: React.MouseEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        window.open(editModeURL, "_blank");
+
+        return;
+      }
+
+      setURLParams();
+      history.push(editModeURL);
+      dispatch(getCurrentUser());
+    },
+    [dispatch, editModeURL, setURLParams],
+  );
+
+  const launchMobileApp = useCallback(() => {
+    setURLParams();
+    history.push(viewModeURL);
+    dispatch(getCurrentUser());
+  }, [setURLParams, viewModeURL, dispatch]);
 
   return (
     <Card
       backgroundColor={selectedColor}
       contextMenu={contextMenu}
       editedByText={editedByText}
+      hasEditPermission={hasEditPermission}
       hasReadPermission={hasReadPermission}
       icon={appIcon}
       isContextMenuOpen={isMenuOpen}
       isFetching={isFetchingApplications}
       isMobile={props.isMobile}
-      isSelected={!!isApplicationSelected}
       moreActionItems={moreActionItems}
-      primaryAction={props.isMobile ? launchApp : handleMultipleSelection}
+      primaryAction={props.isMobile ? launchMobileApp : noop}
       setShowOverlay={setShowOverlay}
       showGitBadge={Boolean(showGitBadge)}
-      showOverlay={showOverlay && !isEnabledMultipleSelection}
-      testId="t--application-card"
-      title={props.application.name}
+      showOverlay={showOverlay}
+      testId={`t--application-card ${application.name}`}
+      title={application.name}
       titleTestId="t--app-card-name"
     >
       {hasEditPermission && !isMenuOpen && (
         <Button
           className="t--application-edit-link"
-          href={editModeURL}
           onClick={editApp}
+          renderAs="a"
           size="md"
           startIcon={"pencil-line"}
         >
@@ -531,9 +555,9 @@ export function ApplicationCard(props: ApplicationCardProps) {
       {!isMenuOpen && (
         <Button
           className="t--application-view-link"
-          href={viewModeURL}
           kind="secondary"
           onClick={launchApp}
+          renderAs="a"
           size="md"
           startIcon={"rocket"}
         >

@@ -13,13 +13,11 @@ export function defaultOptionValueValidation(
   let isValid;
   let parsed;
   let message = { name: "", message: "" };
-  const isServerSideFiltered = props.serverSideFiltering;
-  // TODO: validation of defaultOption is dependent on serverSideFiltering and options, this property should reValidated once the dependencies change
-  //this issue is been tracked here https://github.com/appsmithorg/appsmith/issues/15303
-  let options = props.options;
   /*
    * Function to check if the object has `label` and `value`
    */
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const hasLabelValue = (obj: any) => {
     return (
       _.isPlainObject(value) &&
@@ -36,6 +34,7 @@ export function defaultOptionValueValidation(
   if (typeof value === "string") {
     try {
       const parsedValue = JSON.parse(value);
+
       if (_.isObject(parsedValue)) {
         value = parsedValue;
       }
@@ -58,45 +57,6 @@ export function defaultOptionValueValidation(
     };
   }
 
-  if (isValid && !_.isNil(parsed) && parsed !== "") {
-    if (!Array.isArray(options) && typeof options === "string") {
-      try {
-        const parsedOptions = JSON.parse(options);
-        if (Array.isArray(parsedOptions)) {
-          options = parsedOptions;
-        } else {
-          options = [];
-        }
-      } catch (e) {
-        options = [];
-      }
-    }
-    const parsedValue = (parsed as any).hasOwnProperty("value")
-      ? (parsed as any).value
-      : parsed;
-    const valueIndex = _.findIndex(
-      options,
-      (option) => option.value === parsedValue,
-    );
-
-    if (valueIndex === -1) {
-      if (!isServerSideFiltered) {
-        isValid = false;
-        message = {
-          name: "ValidationError",
-          message: `Default value is missing in options. Please update the value.`,
-        };
-      } else {
-        if (!hasLabelValue(parsed)) {
-          isValid = false;
-          message = {
-            name: "ValidationError",
-            message: `Default value is missing in options. Please use {label : <string | num>, value : < string | num>} format to show default for server side data.`,
-          };
-        }
-      }
-    }
-  }
   return {
     isValid,
     parsed,
@@ -178,6 +138,27 @@ export function labelKeyValidation(
       messages: [],
     };
   } else if (_.isArray(value)) {
+    /*
+     * Here assumption is that if evaluated array is all equal, then it is a key,
+     * and we can return the parsed value(from source data) as the options.
+     */
+    const areAllValuesEqual = value.every((item, _, arr) => item === arr[0]);
+
+    if (
+      areAllValuesEqual &&
+      props.sourceData[0].hasOwnProperty(String(value[0]))
+    ) {
+      const parsedValue = props.sourceData.map(
+        (d: Record<string, unknown>) => d[String(value[0])],
+      );
+
+      return {
+        parsed: parsedValue,
+        isValid: true,
+        messages: [],
+      };
+    }
+
     const errorIndex = value.findIndex((d) => !_.isString(d));
 
     return {
@@ -258,6 +239,27 @@ export function valueKeyValidation(
 
     options = sourceData.map((d: Record<string, unknown>) => d[value]);
   } else if (_.isArray(value)) {
+    /*
+     * Here assumption is that if evaluated array is all equal, then it is a key,
+     * and we can return the parsed value(from source data) as the options.
+     */
+    const areAllValuesEqual = value.every((item, _, arr) => item === arr[0]);
+
+    if (
+      areAllValuesEqual &&
+      props.sourceData[0].hasOwnProperty(String(value[0]))
+    ) {
+      const parsedValue = props.sourceData.map(
+        (d: Record<string, unknown>) => d[String(value[0])],
+      );
+
+      return {
+        parsed: parsedValue,
+        isValid: true,
+        messages: [],
+      };
+    }
+
     const errorIndex = value.findIndex(
       (d) =>
         !(_.isString(d) || (_.isNumber(d) && !_.isNaN(d)) || _.isBoolean(d)),

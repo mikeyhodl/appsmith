@@ -7,10 +7,11 @@ export class CommonLocators {
   _chevronDown = "span[contains(@class, 'bp3-icon-chevron-down')]";
   _loading = "#loading";
   _animationSpnner = ".bp3-spinner-animation";
+  _link = ".ads-v2-link";
   _btnSpinner = ".ads-v2-spinner";
   _sidebar = ".t--sidebar";
-  _queryName = ".t--action-name-edit-field span";
-  _queryNameTxt = ".t--action-name-edit-field input";
+  _activeEntityTab = ".editor-tab.active .ads-v2-text";
+  _activeEntityTabInput = ".editor-tab.active .ads-v2-text input";
   _editIcon = ".t--action-name-edit-icon";
   _emptyCanvasCta = "[data-testid='canvas-ctas']";
   _dsName = ".t--edit-datasource-name span";
@@ -64,14 +65,13 @@ export class CommonLocators {
     this._widgetInDeployed("inputwidgetv2") + " textarea";
   _imageWidget = ".t--draggable-imagewidget";
   _backToEditor = ".t--back-to-editor";
-  _newPage = ".pages .t--entity-add-btn";
   _toastMsg = "div.Toastify__toast";
   _toastContainer = "div.Toastify__toast-container";
   _specificToast = (toastText: string) =>
     this._toastMsg + ":contains('" + toastText + "')";
   //_specificToast = (toastText: string | RegExp) => this._toastMsg + ":contains("+ (typeof toastText == 'string' ? "'"+ toastText+"'" : toastText)+ ")"//not working!
   _empty = "span[name='no-response']";
-  _contextMenuInPane = "[data-testid='more-action-trigger']";
+  _contextMenuInPane = "[data-testid='t--more-action-trigger']";
   _contextMenuItem = (item: string) =>
     "//span[text()='" +
     item +
@@ -83,15 +83,15 @@ export class CommonLocators {
   _visibleTextDiv = (divText: string) => "//div[text()='" + divText + "']";
   _visibleTextSpan = (spanText: string, isCss = false) =>
     isCss ? `span:contains("${spanText}")` : `//span[text()="${spanText}"]`;
-  _openWidget = ".widgets .t--entity-add-btn";
   _dropHere = ".t--drop-target";
+  _anvilDnDHighlight = "[data-type=anvil-dnd-highlight]";
   _editPage = "[data-testid=onboarding-tasks-datasource-text], .t--drop-target";
   _crossBtn = "span.cancel-icon";
-  _createNew = ".t--entity-add-btn.group.files button";
+  _createNew = "[data-testid='t--add-item']";
   _uploadFiles = "div.uppy-Dashboard-AddFiles input";
   _uploadBtn = "button.uppy-StatusBar-actionBtn--upload";
-  _errorTab = "[data-testid=t--tab-ERROR]";
-  _responseTab = "[data-testid=t--tab-response]";
+  _errorTab = "[data-testid=t--tab-ERROR_TAB]";
+  _responseTab = "[data-testid=t--tab-RESPONSE_TAB]";
   _modal = ".t--modal-widget";
   _closeModal = "button:contains('Close')";
   _entityProperties = (entityNameinLeftSidebar: string) =>
@@ -103,7 +103,7 @@ export class CommonLocators {
     entityNameinLeftSidebar +
     "']/parent::div[contains(@class, 't--entity-name editing')]/input";
   _jsToggle = (controlToToggle: string) =>
-    ".t--property-control-" + controlToToggle + " .t--js-toggle";
+    `.t--property-control-${controlToToggle} .t--js-toggle, [data-guided-tour-iid='${controlToToggle}']`;
   _buttonByText = (btnVisibleText: string) =>
     `//span[text()="${btnVisibleText}"]/ancestor::button | //button[text()="${btnVisibleText}" or @title="${btnVisibleText}"]`;
   _selectPropPageDropdown = (ddName: string) =>
@@ -119,7 +119,9 @@ export class CommonLocators {
   _actionTextArea = (actionName: string) =>
     "//label[text()='" +
     actionName +
-    "']/following-sibling::div//div[contains(@class, 'CodeMirror')]//textarea";
+    "']/following-sibling::div//div[contains(@class, 'CodeMirror')]//textarea | //label[text()='" +
+    actionName +
+    "']/parent::div/following-sibling::div//div[contains(@class, 'CodeMirror')]//textarea";
   _existingDefaultTextInput =
     ".t--property-control-defaulttext .CodeMirror-code";
   _widgetPageIcon = (widgetType: string) =>
@@ -145,7 +147,9 @@ export class CommonLocators {
     fieldName.replace(/ +/g, "").toLowerCase() +
     "')] | //label[text()='" +
     fieldName +
-    "']/following-sibling::div";
+    "']/following-sibling::div | //label[text()='" +
+    fieldName +
+    "']/parent::div/following-sibling::div";
   _existingFieldValueByName = (fieldName: string) =>
     this._existingFieldTextByName(fieldName) +
     "//div[contains(@class,'CodeMirror-code')]";
@@ -201,10 +205,11 @@ export class CommonLocators {
     `//p[text()='${fieldName}']/parent::div//following-sibling::div//input[@type='checkbox']`;
   _deployedPage = `.t--page-switch-tab`;
   _hints = "ul.CodeMirror-hints li";
+  _hints_apis = "ul.CodeMirror-hints li.Codemirror-commands-apis";
   _tern_doc = ".t--tern-doc";
   _argHintFnName = ".CodeMirror-Tern-tooltip .CodeMirror-Tern-fname";
   _cancelActionExecution = ".t--cancel-action-button";
-  _widgetPane = "[data-testid='widget-sidebar-scrollable-wrapper']";
+  _widgetPane = "[data-testid='t--widget-sidebar-scrollable-wrapper']";
   _sliderThumb = '[data-testid="slider-thumb"]';
   _optionsJsToggle = ".t--property-control-options .t--js-toggle";
   _bottomPaneCollapseIcon = ".t--tabs-collapse-icon";
@@ -224,7 +229,7 @@ export class CommonLocators {
   _dialogCloseButton = ".ads-v2-modal__content-header-close-button";
   _evaluateMsg = ".t--evaluatedPopup-error";
   _evalValuePopover = ".t--CodeEditor-evaluatedValue";
-  _canvas = "[data-testid=widgets-editor]";
+  _canvas = "[data-testid=t--widgets-editor]";
   _enterPreviewMode = "[data-testid='edit-mode']";
   _exitPreviewMode = "[data-testid='preview-mode']";
   _ds_imageSelector = ".ads-dialog-trigger";
@@ -249,7 +254,7 @@ export class CommonLocators {
   _fixedLayout = "#t--layout-conversion-cta:contains('fixed')";
   _forkAppToWorkspaceBtn = ".t--fork-app-to-workspace-button";
   _popoverToolTip = ".bp3-popover-content, .bp3-popover2-content";
-  _selectedWidget = "div[data-testid='t--selected']";
+  _autoLayoutSelectedWidget = "div[data-testid='t--selected']";
   _appsmithWidget = (widgetId: string) => `.appsmith_widget_${widgetId}`;
   _selectionCanvas = (canvasId: string) => `#div-selection-${canvasId}`;
   _sqlKeyword = ".cm-m-sql.cm-keyword";
@@ -287,6 +292,7 @@ export class CommonLocators {
   _buttonWidgetInForm =
     "//*[contains(@class,'t--widget-buttonwidget')]//button[contains(@class,'bp3-button')]";
   _walkthrough_overlay = `.t--walkthrough-overlay`;
+  _autoHeightOverlay = "[data-testid='t--auto-height-overlay']";
   _autoHeightHandles = "[data-testid='t-auto-height-overlay-handles']";
   _autoHeightMin = "[data-testid='t--auto-height-overlay-handles-min']";
   _autoHeightMax = "[data-testid='t--auto-height-overlay-handles-max']";
@@ -311,19 +317,42 @@ export class CommonLocators {
     `.uppy-Informer p:contains('${msg}')`;
   _fileUploadAddMore = ".uppy-DashboardContent-addMore";
   _buttonText = ".bp3-button-text";
-  _richText_TitleBlock = "[title='Blocks']";
+  _richText_TitleBlock = "[aria-label='Block Paragraph']";
   _richText_Heading = "[title='Heading 1']";
   _richText_Label_Text = ".tox-tbtn__select-label";
-  _richText_Text_Color = '[title="Text color"] .tox-split-button__chevron';
-  _richText_color = (value: string) => `[title='${value}']`;
+  _richText_Text_Color = (color: string) =>
+    `[aria-label="Text color ${color}"] .tox-split-button__chevron`;
+  _richText_color = (value: string) => `[title="${value}"]`;
   _richText_line = "#tinymce p span";
   _treeSelectedContent = ".rc-tree-select-selection-item-content";
   _switcherIcon = ".switcher-icon";
   _root = "#root";
-  _pageHeaderToggle = ".mobile-ui-page-header-toggle-icon";
-  _pageHeaderMenuList = ".mobile-ui-page-header-menu-list";
+  _pageHeaderToggle = ".navbar__items > button";
+  _pageHeaderMenuList = ".navbar-sidebar__backdrop";
   _enterFullScreen = ".application-demo-new-dashboard-control-enter-fullscreen";
   _dashboardContainer = ".application-demo-new-dashboard-container";
   _exitFullScreen = ".application-demo-new-dashboard-control-exit-fullscreen";
   _menuItem = ".bp3-menu-item";
+  _slashCommandHintText = ".slash-command-hint-text";
+  _selectionItem = ".rc-select-selection-item";
+  errorPageTitle = ".t--error-page-title";
+  errorPageDescription = ".t--error-page-description";
+  _selectClearButton_testId = "selectbutton.btn.cancel";
+  _selectClearButton_dataTestId = `[data-testid="${this._selectClearButton_testId}"]`;
+  _saveDatasource = `[data-testid='t--store-as-datasource']`;
+  _propertyCollapseBody = ".bp3-collapse-body";
+  _propertyCollapse = ".bp3-collapse";
+  _widgetBorder = ".t--draggable-tabswidget div div div";
+  _modalButtonText = "[data-testid='modal-wrapper'] .bp3-button";
+  _showBoundary = ".show-boundary";
+  _entityItem = "[data-testid='t--entity-item-Api1']";
+  _rowData = "[data-colindex='0'][data-rowindex='0']";
+  _editorTab = ".editor-tab";
+  _entityTestId = (entity: string) =>
+    `[data-testid="t--entity-item-${entity}"]`;
+  _listItemTitle = ".ads-v2-listitem__title";
+  _dropdownOption = ".rc-select-item-option-content";
+  _dropdownActiveOption = ".rc-select-dropdown .rc-select-item-option-active";
+  _homeIcon = "[data-testid='t--default-home-icon']";
+  _widget = (widgetName: string) => `.t--widget-${widgetName}`;
 }

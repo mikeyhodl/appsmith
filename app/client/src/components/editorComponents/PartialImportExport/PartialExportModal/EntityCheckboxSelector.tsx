@@ -1,19 +1,21 @@
-import { Checkbox } from "design-system";
+import { Checkbox } from "@appsmith/ads";
 import React from "react";
 import { CheckBoxGrid, CheckboxWrapper } from "./StyledSheet";
 
 interface Props {
+  containerTestId?: string;
   entities: { id?: string; name: string }[];
   onEntityChecked: (id: string, selected: boolean) => void;
   selectedIds: string[];
 }
 const EntityCheckboxSelector = ({
+  containerTestId,
   entities,
   onEntityChecked,
   selectedIds,
 }: Props) => {
   return (
-    <CheckboxWrapper>
+    <CheckboxWrapper data-testid={containerTestId}>
       <CheckBoxGrid>
         {entities.map((ds) => (
           <Checkbox

@@ -5,7 +5,7 @@ import type { WidgetType } from "constants/WidgetConstants";
 import type {
   ApplicationResponsePayload,
   ApplicationPagePayload,
-} from "@appsmith/api/ApplicationApi";
+} from "ee/api/ApplicationApi";
 import type { Datasource } from "entities/Datasource";
 
 export interface Template {
@@ -22,6 +22,8 @@ export interface Template {
   datasources: string[];
   pages: ApplicationPagePayload[];
   allowPageImport: boolean;
+  templateGridColumnSize?: number;
+  templateGridRowSize?: number;
 }
 
 export type FetchTemplatesResponse = ApiResponse<Template[]>;
@@ -92,12 +94,12 @@ class TemplatesAPI extends Api {
   static async importTemplateToApplication(
     templateId: string,
     applicationId: string,
-    organizationId: string,
+    workspaceId: string,
     body?: string[],
   ): Promise<AxiosPromise<ImportTemplateResponse>> {
     return Api.post(
       TemplatesAPI.baseUrl +
-        `/app-templates/${templateId}/merge/${applicationId}/${organizationId}`,
+        `/app-templates/${templateId}/merge/${applicationId}/${workspaceId}`,
       body,
     );
   }

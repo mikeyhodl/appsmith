@@ -24,7 +24,9 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import static com.appsmith.server.acl.AclPermission.APPLICATION_CREATE_PAGES;
+import static com.appsmith.server.acl.AclPermission.APPLICATION_DELETE_PAGES;
 import static com.appsmith.server.acl.AclPermission.COMMENT_ON_APPLICATIONS;
+import static com.appsmith.server.acl.AclPermission.CONNECT_TO_GIT;
 import static com.appsmith.server.acl.AclPermission.DELETE_ACTIONS;
 import static com.appsmith.server.acl.AclPermission.DELETE_APPLICATIONS;
 import static com.appsmith.server.acl.AclPermission.DELETE_DATASOURCES;
@@ -36,9 +38,12 @@ import static com.appsmith.server.acl.AclPermission.EXPORT_APPLICATIONS;
 import static com.appsmith.server.acl.AclPermission.MAKE_PUBLIC_APPLICATIONS;
 import static com.appsmith.server.acl.AclPermission.MANAGE_ACTIONS;
 import static com.appsmith.server.acl.AclPermission.MANAGE_APPLICATIONS;
+import static com.appsmith.server.acl.AclPermission.MANAGE_AUTO_COMMIT;
 import static com.appsmith.server.acl.AclPermission.MANAGE_DATASOURCES;
+import static com.appsmith.server.acl.AclPermission.MANAGE_DEFAULT_BRANCHES;
 import static com.appsmith.server.acl.AclPermission.MANAGE_INSTANCE_CONFIGURATION;
 import static com.appsmith.server.acl.AclPermission.MANAGE_PAGES;
+import static com.appsmith.server.acl.AclPermission.MANAGE_PROTECTED_BRANCHES;
 import static com.appsmith.server.acl.AclPermission.MANAGE_THEMES;
 import static com.appsmith.server.acl.AclPermission.MANAGE_USERS;
 import static com.appsmith.server.acl.AclPermission.MANAGE_WORKSPACES;
@@ -199,9 +204,15 @@ public class PolicyGeneratorCE {
         hierarchyGraph.addEdge(WORKSPACE_CREATE_APPLICATION, APPLICATION_CREATE_PAGES);
         hierarchyGraph.addEdge(WORKSPACE_DELETE_APPLICATIONS, DELETE_APPLICATIONS);
 
+        hierarchyGraph.addEdge(WORKSPACE_CREATE_APPLICATION, CONNECT_TO_GIT);
+        hierarchyGraph.addEdge(WORKSPACE_CREATE_APPLICATION, MANAGE_PROTECTED_BRANCHES);
+        hierarchyGraph.addEdge(WORKSPACE_CREATE_APPLICATION, MANAGE_DEFAULT_BRANCHES);
+        hierarchyGraph.addEdge(WORKSPACE_CREATE_APPLICATION, MANAGE_AUTO_COMMIT);
+
         // If the user is being given MANAGE_APPLICATION permission, they must also be given READ_APPLICATION perm
         lateralGraph.addEdge(MANAGE_APPLICATIONS, READ_APPLICATIONS);
-
+        // If the user has permission to delete application, they must have permission to delete application-pages,
+        lateralGraph.addEdge(DELETE_APPLICATIONS, APPLICATION_DELETE_PAGES);
         // If the user can read an application, the should be able to comment on it.
         lateralGraph.addEdge(READ_APPLICATIONS, COMMENT_ON_APPLICATIONS);
     }
@@ -220,6 +231,7 @@ public class PolicyGeneratorCE {
         hierarchyGraph.addEdge(MANAGE_APPLICATIONS, MANAGE_PAGES);
         hierarchyGraph.addEdge(READ_APPLICATIONS, READ_PAGES);
         hierarchyGraph.addEdge(DELETE_APPLICATIONS, DELETE_PAGES);
+        hierarchyGraph.addEdge(APPLICATION_DELETE_PAGES, DELETE_PAGES);
         hierarchyGraph.addEdge(APPLICATION_CREATE_PAGES, PAGE_CREATE_PAGE_ACTIONS);
 
         lateralGraph.addEdge(MANAGE_PAGES, READ_PAGES);
@@ -305,6 +317,9 @@ public class PolicyGeneratorCE {
             Set<Policy> policySet,
             Class<? extends BaseDomain> sourceEntity,
             Class<? extends BaseDomain> destinationEntity) {
+        if (policySet == null) {
+            return new HashSet<>();
+        }
         Set<Policy> policies = policySet.stream()
                 .map(policy -> {
                     AclPermission aclPermission =

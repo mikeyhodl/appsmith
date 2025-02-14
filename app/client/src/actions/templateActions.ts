@@ -1,4 +1,4 @@
-import { ReduxActionTypes } from "@appsmith/constants/ReduxActionConstants";
+import { ReduxActionTypes } from "ee/constants/ReduxActionConstants";
 
 export const getAllTemplates = () => ({
   type: ReduxActionTypes.GET_ALL_TEMPLATES_INIT,
@@ -47,9 +47,13 @@ export const getTemplateInformation = (payload: string) => ({
   payload,
 });
 
-export const showTemplatesModal = (payload: boolean) => ({
+export const showTemplatesModal = (payload: { isOpenFromCanvas: boolean }) => ({
   type: ReduxActionTypes.SHOW_TEMPLATES_MODAL,
   payload,
+});
+
+export const hideTemplatesModal = () => ({
+  type: ReduxActionTypes.HIDE_TEMPLATES_MODAL,
 });
 
 export const importTemplateIntoApplication = (
@@ -65,28 +69,11 @@ export const importTemplateIntoApplication = (
   },
 });
 
-export const importStarterBuildingBlockIntoApplication = (
-  templateId: string,
-  templateName: string,
-  templatePageName: string,
+export const setCurrentForkingBuildingBlockName = (
+  buildingBlockName: string,
 ) => ({
-  type: ReduxActionTypes.IMPORT_STARTER_BUILDING_BLOCK_TO_APPLICATION_INIT,
-  payload: {
-    templateId,
-    templateName,
-    pageNames: [templatePageName],
-  },
-});
-
-export const showStarterBuildingBlockDatasourcePrompt = (
-  buildingBlockSourcePageId: string,
-) => ({
-  type: ReduxActionTypes.SHOW_STARTER_BUILDING_BLOCK_DATASOURCE_PROMPT,
-  payload: buildingBlockSourcePageId,
-});
-
-export const hideStarterBuildingBlockDatasourcePrompt = () => ({
-  type: ReduxActionTypes.HIDE_STARTER_BUILDING_BLOCK_DATASOURCE_PROMPT,
+  type: ReduxActionTypes.SET_CURRENT_FORKING_BUILDING_BLOCK_NAME,
+  payload: buildingBlockName,
 });
 
 export const getTemplateFilters = () => ({

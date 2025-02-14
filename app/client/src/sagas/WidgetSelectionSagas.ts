@@ -1,84 +1,62 @@
-import { builderURL, widgetURL } from "@appsmith/RouteBuilder";
-import { importPartialApplicationSuccess } from "@appsmith/actions/applicationActions";
-import ApplicationApi, {
-  type exportApplicationRequest,
-} from "@appsmith/api/ApplicationApi";
-import type {
-  ApplicationPayload,
-  ReduxAction,
-} from "@appsmith/constants/ReduxActionConstants";
+import { widgetURL } from "ee/RouteBuilder";
+import type { ReduxAction } from "actions/ReduxActionTypes";
 import {
   ReduxActionErrorTypes,
   ReduxActionTypes,
-} from "@appsmith/constants/ReduxActionConstants";
-import { getCurrentApplication } from "@appsmith/selectors/applicationSelectors";
-import {
-  getAppMode,
-  getCanvasWidgets,
-} from "@appsmith/selectors/entitiesSelector";
-import { pasteWidget, showModal } from "actions/widgetActions";
+} from "ee/constants/ReduxActionConstants";
+import { getAppMode, getCanvasWidgets } from "ee/selectors/entitiesSelector";
+import { showModal } from "actions/widgetActions";
 import type {
   SetSelectedWidgetsPayload,
   WidgetSelectionRequestPayload,
 } from "actions/widgetSelectionActions";
 import {
-  selectWidgetInitAction,
   setEntityExplorerAncestry,
   setSelectedWidgetAncestry,
   setSelectedWidgets,
 } from "actions/widgetSelectionActions";
-import type { ApiResponse } from "api/ApiResponses";
-import { getCurrentWorkspaceId } from "@appsmith/selectors/workspaceSelectors";
-import { toast } from "design-system";
+import { MAIN_CONTAINER_WIDGET_ID } from "constants/WidgetConstants";
 import { APP_MODE } from "entities/App";
-import { getFlexLayersForSelectedWidgets } from "layoutSystems/autolayout/utils/AutoLayoutUtils";
-import type { FlexLayer } from "layoutSystems/autolayout/utils/types";
-import type {
-  CanvasWidgetsReduxState,
-  FlattenedWidgetProps,
-} from "reducers/entityReducers/canvasWidgetsReducer";
-import {
-  all,
-  call,
-  fork,
-  put,
-  select,
-  take,
-  takeLatest,
-} from "redux-saga/effects";
+import type { CanvasWidgetsReduxState } from "reducers/entityReducers/canvasWidgetsReducer";
+import { all, call, put, select, take, takeLatest } from "redux-saga/effects";
 import type { SetSelectionResult } from "sagas/WidgetSelectUtils";
 import {
-  SelectionRequestType,
   assertParentId,
   getWidgetAncestry,
   isInvalidSelectionRequest,
   pushPopWidgetSelection,
   selectAllWidgetsInCanvasSaga,
+  SelectionRequestType,
   selectMultipleWidgets,
   selectOneWidget,
   shiftSelectWidgets,
   unselectWidget,
 } from "sagas/WidgetSelectUtils";
 import {
-  getCurrentApplicationId,
-  getCurrentPageId,
+  getCurrentBasePageId,
   getIsEditorInitialized,
   getIsFetchingPage,
   snipingModeSelector,
 } from "selectors/editorSelectors";
-import { getLastSelectedWidget, getSelectedWidgets } from "selectors/ui";
+import {
+  getLastSelectedWidget,
+  getSelectedWidgets,
+  getWidgetSelectionBlock,
+} from "selectors/ui";
 import { areArraysEqual } from "utils/AppsmithUtils";
 import { quickScrollToWidget } from "utils/helpers";
 import history, { NavigationMethod } from "utils/history";
-import { getCopiedWidgets, saveCopiedWidgets } from "utils/storage";
-import { validateResponse } from "./ErrorSagas";
-import { postPageAdditionSaga } from "./TemplatesSagas";
-import { createWidgetCopy } from "./WidgetOperationUtils";
 import {
   getWidgetIdsByType,
   getWidgetImmediateChildren,
+  getWidgetMetaProps,
   getWidgets,
 } from "./selectors";
+import { getModalWidgetType } from "selectors/widgetSelectors";
+import { getWidgetSelectorByWidgetId } from "selectors/layoutSystemSelectors";
+import { getAppViewerPageIdFromPath } from "ee/pages/Editor/Explorer/helpers";
+import AnalyticsUtil from "ee/utils/AnalyticsUtil";
+import { getIsAnvilLayout } from "layoutSystems/anvil/integrations/selectors";
 
 // The following is computed to be used in the entity explorer
 // Every time a widget is selected, we need to expand widget entities
@@ -86,13 +64,24 @@ import {
 function* selectWidgetSaga(action: ReduxAction<WidgetSelectionRequestPayload>) {
   try {
     const {
+      basePageId,
       invokedBy,
-      pageId,
+      parentId,
       payload = [],
       selectionRequestType,
     } = action.payload;
+    /**
+     * Apart from the normal selection request by a user on canvas, there are other ways which can trigger selection
+     * e.g. when a modal closes in the editor -> we select the main container.
+     * One way modal closes is because user navigates to home page using the appsmith icon. In this case, we don't want the selection process to trigger.
+     * This also safeguards against the case where the selection process is triggered by a non-canvas click where user moves out of editor.
+     * */
 
-    if (payload.some(isInvalidSelectionRequest)) {
+    const isOnEditorURL = !!getAppViewerPageIdFromPath(
+      window.location.pathname,
+    );
+
+    if (payload.some(isInvalidSelectionRequest) || !isOnEditorURL) {
       // Throw error
       return;
     }
@@ -106,8 +95,9 @@ function* selectWidgetSaga(action: ReduxAction<WidgetSelectionRequestPayload>) {
     // It is possible that the payload is empty.
     // These properties can be used for a finding sibling widgets for certain types of selections
     const widgetId = payload[0];
-    const parentId: string | undefined =
-      widgetId in allWidgets ? allWidgets[widgetId].parentId : undefined;
+    const finalParentId: string | undefined =
+      parentId ||
+      (widgetId in allWidgets ? allWidgets[widgetId].parentId : undefined);
 
     if (
       widgetId &&
@@ -119,15 +109,16 @@ function* selectWidgetSaga(action: ReduxAction<WidgetSelectionRequestPayload>) {
 
     switch (selectionRequestType) {
       case SelectionRequestType.Empty: {
-        newSelection = [];
+        newSelection = [MAIN_CONTAINER_WIDGET_ID];
         break;
       }
       case SelectionRequestType.UnsafeSelect: {
         newSelection = payload;
         break;
       }
-      case SelectionRequestType.One: {
-        assertParentId(parentId);
+      case SelectionRequestType.One:
+      case SelectionRequestType.Create: {
+        assertParentId(finalParentId);
         newSelection = selectOneWidget(payload);
         break;
       }
@@ -136,11 +127,12 @@ function* selectWidgetSaga(action: ReduxAction<WidgetSelectionRequestPayload>) {
         break;
       }
       case SelectionRequestType.ShiftSelect: {
-        assertParentId(parentId);
+        assertParentId(finalParentId);
         const siblingWidgets: string[] = yield select(
           getWidgetImmediateChildren,
-          parentId,
+          finalParentId,
         );
+
         newSelection = shiftSelectWidgets(
           payload,
           siblingWidgets,
@@ -150,11 +142,12 @@ function* selectWidgetSaga(action: ReduxAction<WidgetSelectionRequestPayload>) {
         break;
       }
       case SelectionRequestType.PushPop: {
-        assertParentId(parentId);
+        assertParentId(finalParentId);
         const siblingWidgets: string[] = yield select(
           getWidgetImmediateChildren,
-          parentId,
+          finalParentId,
         );
+
         newSelection = pushPopWidgetSelection(
           payload,
           selectedWidgets,
@@ -163,7 +156,17 @@ function* selectWidgetSaga(action: ReduxAction<WidgetSelectionRequestPayload>) {
         break;
       }
       case SelectionRequestType.Unselect: {
-        newSelection = unselectWidget(payload, selectedWidgets);
+        const isParentExists = finalParentId
+          ? finalParentId in allWidgets
+          : false;
+
+        if (isParentExists) {
+          assertParentId(finalParentId);
+          newSelection = [finalParentId];
+        } else {
+          newSelection = unselectWidget(payload, selectedWidgets);
+        }
+
         break;
       }
       case SelectionRequestType.All: {
@@ -183,11 +186,13 @@ function* selectWidgetSaga(action: ReduxAction<WidgetSelectionRequestPayload>) {
     ) {
       const selectionWidgetId = newSelection[0];
       const parentId = allWidgets[selectionWidgetId].parentId;
+
       if (parentId) {
         const selectionSiblingWidgets: string[] = yield select(
           getWidgetImmediateChildren,
           parentId,
         );
+
         newSelection = newSelection.filter((each) =>
           selectionSiblingWidgets.includes(each),
         );
@@ -196,9 +201,17 @@ function* selectWidgetSaga(action: ReduxAction<WidgetSelectionRequestPayload>) {
 
     if (areArraysEqual([...newSelection], [...selectedWidgets])) {
       yield put(setSelectedWidgets(newSelection));
+
       return;
     }
-    yield call(appendSelectedWidgetToUrlSaga, newSelection, pageId, invokedBy);
+
+    yield call(
+      appendSelectedWidgetToUrlSaga,
+      newSelection,
+      selectionRequestType,
+      basePageId,
+      invokedBy,
+    );
   } catch (error) {
     yield put({
       type: ReduxActionErrorTypes.WIDGET_SELECTION_ERROR,
@@ -213,36 +226,52 @@ function* selectWidgetSaga(action: ReduxAction<WidgetSelectionRequestPayload>) {
 /**
  * Append Selected widgetId as hash to the url path
  * @param selectedWidgets
- * @param pageId
+ * @param type
+ * @param basePageId
  * @param invokedBy
  */
 function* appendSelectedWidgetToUrlSaga(
   selectedWidgets: string[],
-  pageId?: string,
+  type: SelectionRequestType,
+  basePageId?: string,
   invokedBy?: NavigationMethod,
 ) {
   const isSnipingMode: boolean = yield select(snipingModeSelector);
+  const isWidgetSelectionBlocked: boolean = yield select(
+    getWidgetSelectionBlock,
+  );
   const appMode: APP_MODE = yield select(getAppMode);
   const viewMode = appMode === APP_MODE.PUBLISHED;
+
   if (isSnipingMode || viewMode) return;
+
   const { pathname } = window.location;
-  const currentPageId: string = yield select(getCurrentPageId);
+  const currentBasePageId: string = yield select(getCurrentBasePageId);
   const currentURL = pathname;
   const newUrl = selectedWidgets.length
     ? widgetURL({
-        pageId: pageId ?? currentPageId,
+        basePageId: basePageId ?? currentBasePageId,
         persistExistingParams: true,
+        add: type === SelectionRequestType.Create,
         selectedWidgets,
       })
-    : builderURL({
-        pageId: pageId ?? currentPageId,
+    : widgetURL({
+        basePageId: basePageId ?? currentBasePageId,
         persistExistingParams: true,
+        selectedWidgets: [MAIN_CONTAINER_WIDGET_ID],
       });
+
+  if (invokedBy === NavigationMethod.CanvasClick && isWidgetSelectionBlocked) {
+    AnalyticsUtil.logEvent("CODE_MODE_WIDGET_SELECTION");
+  }
+
   if (currentURL !== newUrl) {
     history.push(newUrl, { invokedBy });
   }
 }
 
+// TODO: Fix this the next time the file is edited
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function* waitForInitialization(saga: any, action: ReduxAction<unknown>) {
   const isEditorInitialized: boolean = yield select(getIsEditorInitialized);
   const appMode: APP_MODE = yield select(getAppMode);
@@ -256,6 +285,7 @@ function* waitForInitialization(saga: any, action: ReduxAction<unknown>) {
   // Wait until we're done fetching the page
   // This is so that we can reliably assume that the Editor and the Canvas have loaded
   const isPageFetching: boolean = yield select(getIsFetchingPage);
+
   if (isPageFetching) {
     yield take(ReduxActionTypes.FETCH_PAGE_SUCCESS);
   }
@@ -273,15 +303,27 @@ function* handleWidgetSelectionSaga(
 }
 
 function* openOrCloseModalSaga(action: ReduxAction<{ widgetIds: string[] }>) {
-  if (action.payload.widgetIds.length !== 1) return;
+  const widgetsToSelect = action.payload.widgetIds;
+
+  if (widgetsToSelect.length !== 1) return;
+
+  if (
+    widgetsToSelect.length === 1 &&
+    widgetsToSelect[0] === MAIN_CONTAINER_WIDGET_ID
+  ) {
+    // for cases where a widget inside modal is deleted and main canvas gets selected post that.
+    return;
+  }
 
   // Let's assume that the payload widgetId is a modal widget and we need to open the modal as it is selected
   let modalWidgetToOpen: string = action.payload.widgetIds[0];
 
+  const modalWidgetType: string = yield select(getModalWidgetType);
+
   // Get all modal widget ids
   const modalWidgetIds: string[] = yield select(
     getWidgetIdsByType,
-    "MODAL_WIDGET",
+    modalWidgetType,
   );
 
   // Get all widgets
@@ -302,6 +344,7 @@ function* openOrCloseModalSaga(action: ReduxAction<{ widgetIds: string[] }>) {
     const indexOfParentModalWidget: number = widgetAncestry.findIndex((id) =>
       modalWidgetIds.includes(id),
     );
+
     // If we found a modal widget in the ancestry, we want to open that modal
     if (indexOfParentModalWidget > -1) {
       // Set the flag to true, so that we can open the modal
@@ -310,17 +353,49 @@ function* openOrCloseModalSaga(action: ReduxAction<{ widgetIds: string[] }>) {
     }
   }
 
+  const isAnvilLayout: boolean = yield select(getIsAnvilLayout);
+
+  if (isAnvilLayout) {
+    // If widget is modal and modal is already open, skip opening it
+    const modalProps = allWidgets[modalWidgetToOpen];
+    const metaProps: Record<string, unknown> = yield select(
+      getWidgetMetaProps,
+      modalProps,
+    );
+
+    if (
+      (widgetIsModal || widgetIsChildOfModal) &&
+      metaProps?.isVisible === true
+    ) {
+      return;
+    }
+  }
+
   if (widgetIsModal || widgetIsChildOfModal) {
     yield put(showModal(modalWidgetToOpen));
+  }
+
+  if (!widgetIsModal && !widgetIsChildOfModal) {
+    yield put({
+      type: ReduxActionTypes.CLOSE_MODAL,
+      payload: {},
+    });
   }
 }
 
 function* focusOnWidgetSaga(action: ReduxAction<{ widgetIds: string[] }>) {
   if (action.payload.widgetIds.length > 1) return;
+
   const widgetId = action.payload.widgetIds[0];
+
   if (widgetId) {
     const allWidgets: CanvasWidgetsReduxState = yield select(getCanvasWidgets);
-    quickScrollToWidget(widgetId, allWidgets);
+    const widgetIdSelector: string = yield select(
+      getWidgetSelectorByWidgetId,
+      widgetId,
+    );
+
+    quickScrollToWidget(widgetId, widgetIdSelector, allWidgets);
   }
 }
 
@@ -345,6 +420,7 @@ function* setWidgetAncestry(action: ReduxAction<SetSelectedWidgetsPayload>) {
   } else {
     yield put(setSelectedWidgetAncestry(widgetAncestry));
   }
+
   yield put(setEntityExplorerAncestry(widgetAncestry));
 }
 
@@ -357,171 +433,4 @@ export function* widgetSelectionSagas() {
       handleWidgetSelectionSaga,
     ),
   ]);
-}
-
-export interface PartialExportParams {
-  jsObjects: string[];
-  datasources: string[];
-  customJSLibs: string[];
-  widgets: string[];
-  queries: string[];
-}
-
-export function* partialExportSaga(action: ReduxAction<PartialExportParams>) {
-  try {
-    const canvasWidgets: unknown = yield partialExportWidgetSaga(
-      action.payload.widgets,
-    );
-    const applicationId: string = yield select(getCurrentApplicationId);
-    const currentPageId: string = yield select(getCurrentPageId);
-
-    const body: exportApplicationRequest = {
-      actionList: action.payload.queries,
-      actionCollectionList: action.payload.jsObjects,
-      datasourceList: action.payload.datasources,
-      customJsLib: action.payload.customJSLibs,
-      widget: JSON.stringify(canvasWidgets),
-    };
-
-    const response: unknown = yield call(
-      ApplicationApi.exportPartialApplication,
-      applicationId,
-      currentPageId,
-      body,
-    );
-    const isValid: boolean = yield validateResponse(response);
-    if (isValid) {
-      const application: ApplicationPayload = yield select(
-        getCurrentApplication,
-      );
-
-      (function downloadJSON(response: unknown) {
-        const dataStr =
-          "data:text/json;charset=utf-8," +
-          encodeURIComponent(JSON.stringify(response));
-        const downloadAnchorNode = document.createElement("a");
-        downloadAnchorNode.setAttribute("href", dataStr);
-        downloadAnchorNode.setAttribute("download", `${application.name}.json`);
-        document.body.appendChild(downloadAnchorNode); // required for firefox
-        downloadAnchorNode.click();
-        downloadAnchorNode.remove();
-      })((response as { data: unknown }).data);
-      yield put({
-        type: ReduxActionTypes.PARTIAL_EXPORT_SUCCESS,
-      });
-    }
-  } catch (e) {
-    toast.show(`Error exporting application. Please try again.`, {
-      kind: "error",
-    });
-    yield put({
-      type: ReduxActionErrorTypes.PARTIAL_EXPORT_ERROR,
-      payload: {
-        error: "Error exporting application",
-      },
-    });
-  }
-}
-
-export function* partialExportWidgetSaga(widgetIds: string[]) {
-  const canvasWidgets: {
-    [widgetId: string]: FlattenedWidgetProps;
-  } = yield select(getWidgets);
-  const selectedWidgets = widgetIds.map((each) => canvasWidgets[each]);
-
-  if (!selectedWidgets || !selectedWidgets.length) return;
-
-  const widgetListsToStore: {
-    widgetId: string;
-    parentId: string;
-    list: FlattenedWidgetProps[];
-  }[] = yield all(
-    selectedWidgets.map((widget) => call(createWidgetCopy, widget)),
-  );
-
-  const canvasId = selectedWidgets?.[0]?.parentId || "";
-
-  const flexLayers: FlexLayer[] = getFlexLayersForSelectedWidgets(
-    widgetIds,
-    canvasId ? canvasWidgets[canvasId] : undefined,
-  );
-  const widgetsDSL = {
-    widgets: widgetListsToStore,
-    flexLayers,
-  };
-  return widgetsDSL;
-}
-
-async function readJSONFile(file: File) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      try {
-        const json = JSON.parse(reader.result as string);
-        resolve(json);
-      } catch (e) {
-        reject(e);
-      }
-    };
-    reader.readAsText(file);
-  });
-}
-
-function* partialImportWidgetsSaga(file: File) {
-  const existingCopiedWidgets: unknown = yield call(getCopiedWidgets);
-  try {
-    // assume that action.payload.applicationFile is a JSON file. Parse it and extract widgets property
-    const userUploadedJSON: { widgets: string } = yield call(
-      readJSONFile,
-      file,
-    );
-    if ("widgets" in userUploadedJSON && userUploadedJSON.widgets.length > 0) {
-      yield saveCopiedWidgets(userUploadedJSON.widgets);
-      yield put(selectWidgetInitAction(SelectionRequestType.Empty));
-      yield put(pasteWidget(false, { x: 0, y: 0 }));
-    }
-  } finally {
-    if (existingCopiedWidgets) {
-      yield call(saveCopiedWidgets, JSON.stringify(existingCopiedWidgets));
-    }
-  }
-}
-
-export function* partialImportSaga(
-  action: ReduxAction<{ applicationFile: File }>,
-) {
-  try {
-    // Step1: Import widgets from file, in parallel
-    yield fork(partialImportWidgetsSaga, action.payload.applicationFile);
-    // Step2: Send backend request to import pending items.
-    const workspaceId: string = yield select(getCurrentWorkspaceId);
-    const pageId: string = yield select(getCurrentPageId);
-    const applicationId: string = yield select(getCurrentApplicationId);
-    const response: ApiResponse = yield call(
-      ApplicationApi.importPartialApplication,
-      {
-        applicationFile: action.payload.applicationFile,
-        workspaceId,
-        pageId,
-        applicationId,
-      },
-    );
-
-    const isValidResponse: boolean = yield validateResponse(response);
-
-    if (isValidResponse) {
-      yield call(postPageAdditionSaga, applicationId);
-      toast.show("Partial Application imported successfully", {
-        kind: "success",
-      });
-      yield put(importPartialApplicationSuccess());
-    }
-  } catch (error) {
-    yield put({
-      type: ReduxActionErrorTypes.PARTIAL_IMPORT_ERROR,
-      payload: {
-        error,
-      },
-    });
-  }
 }

@@ -1,15 +1,16 @@
-import React from "react";
-import styled from "styled-components";
-import { Text, TextType } from "design-system-old";
-import { Button } from "design-system";
+import { Button } from "@appsmith/ads";
+import { Text, TextType } from "@appsmith/ads-old";
 import RequestTemplateSvg from "assets/images/request-template.svg";
 import {
   COULDNT_FIND_TEMPLATE,
-  createMessage,
   COULDNT_FIND_TEMPLATE_DESCRIPTION,
+  createMessage,
+  REQUEST_BUILDING_BLOCK,
   REQUEST_TEMPLATE,
-} from "@appsmith/constants/messages";
-import AnalyticsUtil from "utils/AnalyticsUtil";
+} from "ee/constants/messages";
+import AnalyticsUtil from "ee/utils/AnalyticsUtil";
+import React from "react";
+import styled from "styled-components";
 
 const Wrapper = styled.div`
   border: 1px solid var(--ads-v2-color-border);
@@ -47,10 +48,18 @@ const StyledImage = styled.img`
   border-radius: var(--ads-v2-border-radius);
 `;
 
-const REQUEST_TEMPLATE_URL =
+export const REQUEST_TEMPLATE_URL =
   "https://app.appsmith.com/app/request-templates/request-list-6241c12fc99df2369931a714";
 
-function RequestTemplate() {
+export interface RequestTemplateProps {
+  isBuildingBlock?: boolean;
+}
+
+function RequestTemplate(props: RequestTemplateProps) {
+  const REQUEST_TEXT = props.isBuildingBlock
+    ? createMessage(REQUEST_BUILDING_BLOCK)
+    : createMessage(REQUEST_TEMPLATE);
+
   const onClick = () => {
     AnalyticsUtil.logEvent("REQUEST_NEW_TEMPLATE");
     window.open(REQUEST_TEMPLATE_URL);
@@ -66,7 +75,7 @@ function RequestTemplate() {
         {createMessage(COULDNT_FIND_TEMPLATE_DESCRIPTION)}
       </Text>
       <Button className="button" onClick={onClick} size="md">
-        {createMessage(REQUEST_TEMPLATE)}
+        {REQUEST_TEXT}
       </Button>
     </Wrapper>
   );

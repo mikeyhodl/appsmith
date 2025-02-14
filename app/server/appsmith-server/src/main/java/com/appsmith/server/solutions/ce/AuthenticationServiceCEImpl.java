@@ -4,12 +4,15 @@ import com.appsmith.external.constants.Authentication;
 import com.appsmith.external.exceptions.BaseException;
 import com.appsmith.external.exceptions.pluginExceptions.AppsmithPluginError;
 import com.appsmith.external.exceptions.pluginExceptions.AppsmithPluginException;
+import com.appsmith.external.git.constants.ce.RefType;
 import com.appsmith.external.helpers.SSLHelper;
+import com.appsmith.external.helpers.restApiUtils.helpers.OAuth2Utils;
 import com.appsmith.external.models.AuthenticationDTO;
 import com.appsmith.external.models.AuthenticationResponse;
+import com.appsmith.external.models.BaseDomain;
+import com.appsmith.external.models.CreatorContextType;
 import com.appsmith.external.models.Datasource;
 import com.appsmith.external.models.DatasourceStorage;
-import com.appsmith.external.models.DefaultResources;
 import com.appsmith.external.models.OAuth2;
 import com.appsmith.external.models.OAuth2ResponseDTO;
 import com.appsmith.external.models.PluginType;
@@ -20,12 +23,15 @@ import com.appsmith.server.constants.FieldName;
 import com.appsmith.server.constants.Url;
 import com.appsmith.server.datasources.base.DatasourceService;
 import com.appsmith.server.datasourcestorages.base.DatasourceStorageService;
+import com.appsmith.server.domains.Config;
 import com.appsmith.server.domains.NewPage;
 import com.appsmith.server.domains.Plugin;
 import com.appsmith.server.dtos.AuthorizationCodeCallbackDTO;
 import com.appsmith.server.dtos.IntegrationDTO;
+import com.appsmith.server.dtos.RequestAppsmithTokenDTO;
 import com.appsmith.server.exceptions.AppsmithError;
 import com.appsmith.server.exceptions.AppsmithException;
+import com.appsmith.server.helpers.InstanceConfigHelper;
 import com.appsmith.server.helpers.PluginExecutorHelper;
 import com.appsmith.server.helpers.RedirectHelper;
 import com.appsmith.server.newpages.base.NewPageService;
@@ -36,13 +42,16 @@ import com.appsmith.server.solutions.PagePermission;
 import com.appsmith.util.WebClientUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.util.StringUtils;
 import org.springframework.web.reactive.function.BodyInserters;
+import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.util.UriComponentsBuilder;
 import reactor.core.publisher.Mono;
@@ -72,6 +81,7 @@ import static com.appsmith.external.constants.Authentication.RESPONSE_TYPE;
 import static com.appsmith.external.constants.Authentication.SCOPE;
 import static com.appsmith.external.constants.Authentication.STATE;
 import static com.appsmith.external.constants.Authentication.SUCCESS;
+import static org.springframework.util.StringUtils.hasText;
 
 @RequiredArgsConstructor
 @Slf4j
@@ -87,6 +97,7 @@ public class AuthenticationServiceCEImpl implements AuthenticationServiceCE {
     private final PagePermission pagePermission;
     private final PluginExecutorHelper pluginExecutorHelper;
     private final DatasourceStorageService datasourceStorageService;
+    private final InstanceConfigHelper instanceConfigHelper;
     private static final String FILE_SPECIFIC_DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
     private static final String ACCESS_TOKEN_KEY = "access_token";
 
@@ -95,27 +106,31 @@ public class AuthenticationServiceCEImpl implements AuthenticationServiceCE {
      * when hitting the authorization url and redirect to it from the controller.
      *
      * @param datasourceId  required to validate the details in the request and populate redirect url
-     * @param environmentId
-     * @param pageId        Required to populate redirect url
-     * @param httpRequest   Used to find the redirect domain
+     * @param environmentId environment from which the datasource authentication has started.
+     * @param branchedPageId required to populate redirect url
+     * @param httpRequest   used to find the redirect domain
      * @return a url String to continue the authorization flow
      */
     public Mono<String> getAuthorizationCodeURLForGenericOAuth2(
-            String datasourceId,
-            String environmentId,
-            String pageId,
-            String branchName,
-            ServerHttpRequest httpRequest) {
+            String datasourceId, String environmentId, String branchedPageId, ServerHttpRequest httpRequest) {
         // This is the only database access that is controlled by ACL
         // The rest of the queries in this flow will not have context information
 
         Mono<Datasource> datasourceMonoCached = datasourceService
                 .findById(datasourceId, datasourcePermission.getEditPermission())
                 .cache();
+
         Mono<String> trueEnvironmentIdCached = datasourceMonoCached
                 .flatMap(datasource -> datasourceService.getTrueEnvironmentId(
                         datasource.getWorkspaceId(), environmentId, datasource.getPluginId(), null))
                 .cache();
+
+        Mono<NewPage> newPageMono = newPageService
+                .findById(branchedPageId, pagePermission.getReadPermission())
+                .switchIfEmpty(Mono.error(
+                        new AppsmithException(AppsmithError.NO_RESOURCE_FOUND, FieldName.PAGE, branchedPageId)));
+
+        Mono<String> workspaceIdMono = datasourceMonoCached.map(Datasource::getWorkspaceId);
 
         return datasourceMonoCached
                 .zipWith(trueEnvironmentIdCached)
@@ -126,17 +141,36 @@ public class AuthenticationServiceCEImpl implements AuthenticationServiceCE {
                 })
                 .switchIfEmpty(Mono.error(
                         new AppsmithException(AppsmithError.NO_RESOURCE_FOUND, FieldName.DATASOURCE, datasourceId)))
-                .flatMap(this::validateRequiredFieldsForGenericOAuth2)
-                .zipWith(trueEnvironmentIdCached)
+                .flatMap(ds -> this.validateRequiredFieldsForGenericOAuth2(ds)
+                        .zipWith(Mono.zip(workspaceIdMono, trueEnvironmentIdCached, newPageMono)))
                 .flatMap(tuple2 -> {
                     DatasourceStorage datasourceStorage = tuple2.getT1();
-                    String trueEnvironmentId = tuple2.getT2();
+                    String workspaceId = tuple2.getT2().getT1();
+                    String trueEnvironmentId = tuple2.getT2().getT2();
+                    NewPage branchedPage = tuple2.getT2().getT3();
+                    String refName = null;
+                    RefType refType = null;
+
+                    if (hasText(branchedPage.getRefName())) {
+                        refType = branchedPage.getRefType();
+                        refName = branchedPage.getRefName();
+                    }
+                    String basePageId = branchedPage.getBaseIdOrFallback();
+
                     OAuth2 oAuth2 = (OAuth2)
                             datasourceStorage.getDatasourceConfiguration().getAuthentication();
                     final String redirectUri = redirectHelper.getRedirectDomain(httpRequest.getHeaders());
-                    final String state = StringUtils.hasText(branchName)
-                            ? String.join(",", pageId, datasourceId, trueEnvironmentId, redirectUri, branchName)
-                            : String.join(",", pageId, datasourceId, trueEnvironmentId, redirectUri);
+                    final String state = StringUtils.hasText(refName)
+                            ? String.join(
+                                    ",",
+                                    basePageId,
+                                    datasourceId,
+                                    trueEnvironmentId,
+                                    redirectUri,
+                                    workspaceId,
+                                    refType.name(),
+                                    refName)
+                            : String.join(",", basePageId, datasourceId, trueEnvironmentId, redirectUri, workspaceId);
                     // Adding basic uri components
                     UriComponentsBuilder uriComponentsBuilder = UriComponentsBuilder.fromUriString(
                                     oAuth2.getAuthorizationUrl())
@@ -291,16 +325,7 @@ public class AuthenticationServiceCEImpl implements AuthenticationServiceCE {
                                 if (issuedAtResponse != null) {
                                     issuedAt = Instant.ofEpochMilli(Long.parseLong((String) issuedAtResponse));
                                 }
-                                // We expect at least one of the following to be present
-                                Object expiresAtResponse = response.get(Authentication.EXPIRES_AT);
-                                Object expiresInResponse = response.get(Authentication.EXPIRES_IN);
-                                Instant expiresAt = null;
-                                if (expiresAtResponse != null) {
-                                    expiresAt =
-                                            Instant.ofEpochSecond(Long.parseLong(String.valueOf(expiresAtResponse)));
-                                } else if (expiresInResponse != null) {
-                                    expiresAt = issuedAt.plusSeconds(Long.parseLong(String.valueOf(expiresInResponse)));
-                                }
+                                Instant expiresAt = OAuth2Utils.getAuthenticationExpiresAt(oAuth2, response, issuedAt);
                                 authenticationResponse.setExpiresAt(expiresAt);
                                 // Replacing with returned scope instead
                                 if (scope != null && !scope.isBlank()) {
@@ -328,29 +353,33 @@ public class AuthenticationServiceCEImpl implements AuthenticationServiceCE {
     private Mono<String> getPageRedirectUrl(String state, String error) {
         final String[] splitState = state.split(",");
 
-        final String pageId = splitState[0];
+        final String basePageId = splitState[0];
         final String datasourceId = splitState[1];
         final String environmentId = splitState[2];
         final String redirectOrigin = splitState[3];
-        final String branchName = splitState.length == 5 ? splitState[4] : null;
+        final String workspaceId = splitState[4];
+        final String refName = splitState.length == 7 ? splitState[6] : null;
         String response = SUCCESS;
         if (error != null) {
             response = error;
         }
         final String responseStatus = response;
         return newPageService
-                .findByIdAndBranchName(pageId, branchName)
-                .map(newPage -> redirectOrigin + Entity.SLASH + Entity.APPLICATIONS
-                        + Entity.SLASH + newPage.getApplicationId()
-                        + Entity.SLASH + Entity.PAGES
-                        + Entity.SLASH + newPage.getId()
-                        + Entity.SLASH + "edit"
-                        + Entity.SLASH + Entity.DATASOURCE
-                        + Entity.SLASH + datasourceId
-                        + "?response_status="
-                        + responseStatus
-                        + "&view_mode=true"
-                        + (StringUtils.hasText(branchName) ? "&branch=" + branchName : ""))
+                .findById(basePageId, pagePermission.getReadPermission())
+                .map(basePage -> {
+                    return redirectOrigin + Entity.SLASH + Entity.APPLICATIONS
+                            + Entity.SLASH + basePage.getApplicationId()
+                            + Entity.SLASH + Entity.PAGES
+                            + Entity.SLASH + basePage.getId()
+                            + Entity.SLASH + "edit"
+                            + Entity.SLASH + Entity.DATASOURCE
+                            + Entity.SLASH + datasourceId
+                            + "?response_status="
+                            + responseStatus
+                            + "&view_mode=true"
+                            + (StringUtils.hasText(workspaceId) ? "&workspaceId=" + workspaceId : "")
+                            + (StringUtils.hasText(refName) ? "&branch=" + refName : "");
+                })
                 .onErrorResume(e -> Mono.just(redirectOrigin + Entity.SLASH + Entity.APPLICATIONS
                         + "?response_status="
                         + responseStatus + "&view_mode=true"));
@@ -360,9 +389,8 @@ public class AuthenticationServiceCEImpl implements AuthenticationServiceCE {
     public Mono<String> getAppsmithToken(
             String datasourceId,
             String environmentId,
-            String pageId,
-            String branchName,
-            ServerHttpRequest request,
+            RequestAppsmithTokenDTO requestAppsmithTokenDTO,
+            HttpHeaders headers,
             String importForGit) {
         // Check whether user has access to manage the datasource
         // Validate the datasource according to plugin type as well
@@ -387,37 +415,24 @@ public class AuthenticationServiceCEImpl implements AuthenticationServiceCE {
                     return datasourceStorageService.findByDatasourceAndEnvironmentId(datasource, trueEnvironmentId);
                 });
 
-        final String redirectUri = redirectHelper.getRedirectDomain(request.getHeaders());
+        final String redirectUri = redirectHelper.getRedirectDomain(headers);
 
         return datasourceStorageMonoCached
                 .switchIfEmpty(Mono.error(
                         new AppsmithException(AppsmithError.NO_RESOURCE_FOUND, FieldName.DATASOURCE, datasourceId)))
                 .flatMap(this::validateRequiredFieldsForGenericOAuth2)
                 .flatMap(datasource -> Mono.zip(
-                                newPageService.findById(pageId, pagePermission.getReadPermission()),
-                                configService.getInstanceId(),
-                                pluginService.findById(datasource.getPluginId()))
-                        .map(tuple -> {
+                                configService.getInstanceId(), pluginService.findById(datasource.getPluginId()))
+                        .flatMap(tuple -> {
+                            String instanceId = tuple.getT1();
+                            Plugin plugin = tuple.getT2();
                             IntegrationDTO integrationDTO = new IntegrationDTO();
-                            integrationDTO.setInstallationKey(tuple.getT2());
-                            NewPage page = tuple.getT1();
-
-                            DefaultResources defaultResourceIds = page.getDefaultResources();
-                            String defaultPageId = StringUtils.hasLength(defaultResourceIds.getPageId())
-                                    ? defaultResourceIds.getPageId()
-                                    : page.getId();
-
-                            String defaultApplicationId = StringUtils.hasLength(defaultResourceIds.getApplicationId())
-                                    ? defaultResourceIds.getApplicationId()
-                                    : page.getApplicationId();
-
-                            integrationDTO.setPageId(defaultPageId);
-                            integrationDTO.setApplicationId(defaultApplicationId);
-                            integrationDTO.setBranch(branchName);
+                            integrationDTO.setInstallationKey(instanceId);
                             integrationDTO.setImportForGit(importForGit);
-                            final Plugin plugin = tuple.getT3();
+                            integrationDTO.setWorkspaceId(datasource.getWorkspaceId());
                             integrationDTO.setPluginName(plugin.getPluginName());
                             integrationDTO.setPluginVersion(plugin.getVersion());
+                            integrationDTO.setContextType(requestAppsmithTokenDTO.getContextType());
                             // TODO add authenticationDTO
                             integrationDTO.setDatasourceId(datasourceId);
                             integrationDTO.setScope(((OAuth2) datasource
@@ -425,22 +440,62 @@ public class AuthenticationServiceCEImpl implements AuthenticationServiceCE {
                                             .getAuthentication())
                                     .getScope());
                             integrationDTO.setRedirectionDomain(redirectUri);
-                            return integrationDTO;
+                            return getContext(
+                                            requestAppsmithTokenDTO.getContextId(),
+                                            requestAppsmithTokenDTO.getContextType())
+                                    .map(context -> associateIntegrationDTOWithContext(
+                                            integrationDTO, context, requestAppsmithTokenDTO.getContextType()));
                         }))
                 .flatMap(integrationDTO -> {
-                    return WebClientUtils.create(
+                    Mono<ClientResponse> clientResponseMono = WebClientUtils.create(
                                     cloudServicesConfig.getBaseUrl() + "/api/v1/integrations/oauth/appsmith")
                             .method(HttpMethod.POST)
                             .body(BodyInserters.fromValue(integrationDTO))
-                            .exchange()
+                            .exchange();
+
+                    return clientResponseMono
                             .flatMap(response -> {
                                 if (response.statusCode().is2xxSuccessful()) {
                                     return response.bodyToMono(Map.class);
                                 } else {
-                                    log.debug("Unable to retrieve appsmith token with error {}", response.statusCode());
-                                    return Mono.error(new AppsmithException(
-                                            AppsmithError.AUTHENTICATION_FAILURE,
-                                            "Unable to retrieve appsmith token with error " + response.statusCode()));
+                                    if (response.statusCode().equals(HttpStatus.FORBIDDEN)) {
+                                        // Instance is not registered with CS, hence re-registering it
+                                        Mono<? extends Config> registerInstanceMono =
+                                                instanceConfigHelper.registerInstance();
+                                        return registerInstanceMono
+                                                .flatMap(config -> clientResponseMono.flatMap(res -> {
+                                                    if (res.statusCode().is2xxSuccessful()) {
+                                                        // After re-registering the instance, the appsmith token request
+                                                        // is successful
+                                                        return res.bodyToMono(Map.class);
+                                                    } else {
+                                                        // After re-registering the instance, the appsmith token request
+                                                        // has failed
+                                                        log.debug(
+                                                                "Unable to retrieve appsmith token with error {}",
+                                                                res.statusCode());
+                                                        return Mono.error(new AppsmithException(
+                                                                AppsmithError.AUTHENTICATION_FAILURE,
+                                                                "Unable to retrieve appsmith token with error "
+                                                                        + res.statusCode()));
+                                                    }
+                                                }))
+                                                .onErrorResume(e -> {
+                                                    log.error("Error while registering instance", e.getMessage());
+                                                    return Mono.error(new AppsmithException(
+                                                            AppsmithError.AUTHENTICATION_FAILURE,
+                                                            "Appsmith Instance Not Registered with Cloud Services "
+                                                                    + response.statusCode()));
+                                                });
+                                    } else {
+                                        log.debug(
+                                                "Unable to retrieve appsmith token with error {}",
+                                                response.statusCode());
+                                        return Mono.error(new AppsmithException(
+                                                AppsmithError.AUTHENTICATION_FAILURE,
+                                                "Unable to retrieve appsmith token with error "
+                                                        + response.statusCode()));
+                                    }
                                 }
                             })
                             .map(body -> String.valueOf(body.get("data")))
@@ -473,6 +528,50 @@ public class AuthenticationServiceCEImpl implements AuthenticationServiceCE {
                                     .save(datasourceStorage)
                                     .then(Mono.error(error));
                         }));
+    }
+
+    /**
+     * Finds the new page from which the appsmith token request has been made
+     * @param branchedContextId : id of the branched Context, only applicable for git, else base id is used.
+     * @param contextType : context type of the request, in this case it's NewPage
+     * @return : An newPage for which the id is provided
+     */
+    protected Mono<? extends BaseDomain> getContext(String branchedContextId, CreatorContextType contextType) {
+        return newPageService
+                .findById(branchedContextId, pagePermission.getReadPermission())
+                .flatMap(branchedPage -> {
+                    // this would be the case for non git connected apps or base branch of a
+                    // git connected app
+                    if (branchedPage.getId().equals(branchedPage.getBaseIdOrFallback())) {
+                        return Mono.just(branchedPage);
+                    }
+
+                    return newPageService
+                            .findById(branchedPage.getBaseIdOrFallback(), pagePermission.getReadPermission())
+                            .map(basePage -> {
+                                NewPage pageRedirectionDTO = new NewPage();
+                                pageRedirectionDTO.setId(basePage.getId());
+                                pageRedirectionDTO.setBaseId(basePage.getBaseId());
+                                pageRedirectionDTO.setApplicationId(basePage.getApplicationId());
+                                // the ref name should come from the ref page as it is required for redirecting
+                                pageRedirectionDTO.setRefName(branchedPage.getRefName());
+                                pageRedirectionDTO.setRefType(branchedPage.getRefType());
+                                return pageRedirectionDTO;
+                            });
+                });
+    }
+
+    protected IntegrationDTO associateIntegrationDTOWithContext(
+            IntegrationDTO integrationDTO, BaseDomain baseDomain, CreatorContextType contextType) {
+        NewPage pageRedirectionDTO = (NewPage) baseDomain;
+        integrationDTO.setPageId(pageRedirectionDTO.getBaseIdOrFallback());
+        integrationDTO.setApplicationId(pageRedirectionDTO.getApplicationId());
+
+        if (hasText(pageRedirectionDTO.getRefName())) {
+            integrationDTO.setRefType(pageRedirectionDTO.getRefType());
+            integrationDTO.setRefName(pageRedirectionDTO.getRefName());
+        }
+        return integrationDTO;
     }
 
     public Mono<OAuth2ResponseDTO> getAccessTokenFromCloud(

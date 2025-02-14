@@ -1,5 +1,5 @@
 import type { APIResponseError } from "api/ApiResponses";
-import type { ActionConfig, Property } from "entities/Action";
+import type { ActionConfig, Property, StoredDatasource } from "entities/Action";
 import _ from "lodash";
 import type { SSL } from "./RestAPIForm";
 
@@ -29,7 +29,7 @@ export enum ActionType {
   DOCUMENTATION = "documentation",
 }
 
-/* 
+/*
   Types of messages that can be shown in the toast of the datasource configuration page
   EMPTY_TOAST_MESSAGE: No message to be shown
   TEST_DATASOURCE_SUCCESS: Test datasource success message
@@ -66,6 +66,7 @@ export interface DatasourceKeys {
   name: string;
   type: string;
   columnNames: string[];
+  fromColumns: string[];
 }
 
 export interface DatasourceStructure {
@@ -100,16 +101,27 @@ interface BaseDatasource {
   isMock?: boolean;
 }
 
+export const isEmbeddedAIDataSource = (datasource: StoredDatasource) => {
+  return !datasource.id;
+};
+
 export const isEmbeddedRestDatasource = (
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   val: any,
 ): val is EmbeddedRestDatasource => {
   if (!_.isObject(val)) return false;
+
   if (!("datasourceConfiguration" in val)) return false;
+
   val = <EmbeddedRestDatasource>val;
+
   // Object should exist and have value
   if (!val.datasourceConfiguration) return false;
+
   //url might exist as a key but not have value, so we won't check value
   if (!("url" in val.datasourceConfiguration)) return false;
+
   return true;
 };
 
@@ -128,7 +140,7 @@ export enum DatasourceConnectionMode {
 
 export interface DatasourceConfiguration {
   url: string;
-  authentication?: DatasourceAuthentication;
+  authentication?: ExternalSaasDSAuthentication | DatasourceAuthentication;
   properties?: Property[];
   headers?: Property[];
   queryParameters?: Property[];
@@ -189,9 +201,19 @@ export const DEFAULT_DATASOURCE = (
 });
 
 export enum DatasourceStructureContext {
-  EXPLORER = "entity-explorer",
   QUERY_EDITOR = "query-editor",
   DATASOURCE_VIEW_MODE = "datasource-view-mode",
   // this does not exist yet, but in case it does in the future.
   API_EDITOR = "api-editor",
+}
+
+export interface ExternalSaasDSAuthentication extends DatasourceAuthentication {
+  integrationId: string;
+  credentialId: string;
+  integrationType: string;
+  providerData?: { key: string; value: string | boolean | number }[];
+}
+
+export enum AuthenticationType {
+  EXTERNAL_SAAS_AUTHENTICATION = "externalSaasAuth",
 }

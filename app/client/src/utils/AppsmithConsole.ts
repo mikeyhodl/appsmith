@@ -4,12 +4,10 @@ import {
   debuggerLogInit,
   deleteErrorLogsInit,
 } from "actions/debuggerActions";
-import type { ReduxAction } from "@appsmith/constants/ReduxActionConstants";
+import type { ReduxAction } from "actions/ReduxActionTypes";
 import type { LogActionPayload, Log } from "entities/AppsmithConsole";
 import { Severity, LOG_CATEGORY } from "entities/AppsmithConsole";
-import moment from "moment";
 import store from "store";
-import AnalyticsUtil from "./AnalyticsUtil";
 import { isEmpty } from "lodash";
 
 // * @param payload - payload of the error
@@ -26,17 +24,11 @@ function dispatchAction(action: ReduxAction<unknown>) {
 }
 
 function log(ev: Log) {
-  if (ev.category === LOG_CATEGORY.USER_GENERATED) {
-    AnalyticsUtil.logEvent("CONSOLE_LOG_CREATED", {
-      entityName: ev.source?.name,
-      entityType: ev.source?.type,
-    });
-  }
   dispatchAction(debuggerLogInit([ev]));
 }
 
 function getTimeStamp() {
-  return moment().format("HH:mm:ss");
+  return Date.now().toString();
 }
 
 function addLogs(logs: Log[]) {
@@ -94,10 +86,11 @@ function error(
 // Function used to add errors to the error tab of the debugger
 function addErrors(errors: ErrorObject[]) {
   if (isEmpty(errors)) return;
+
   const refinedErrors = errors.map((error) => ({
     ...error.payload,
     severity: error.severity ?? Severity.ERROR,
-    timestamp: Date.now().toString(),
+    timestamp: getTimeStamp(),
     occurrenceCount: 1,
     category: error.category ?? LOG_CATEGORY.PLATFORM_GENERATED,
     isExpanded: false,
@@ -109,6 +102,7 @@ function addErrors(errors: ErrorObject[]) {
 // This is used to remove errors from the error tab of the debugger
 function deleteErrors(errors: { id: string; analytics?: Log["analytics"] }[]) {
   if (isEmpty(errors)) return;
+
   dispatchAction(deleteErrorLogsInit(errors));
 }
 

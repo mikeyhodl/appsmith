@@ -1,7 +1,7 @@
 {
   "imageWidget": ".t--draggable-imagewidget",
   "chartWidget": ".t--draggable-chartwidget",
-  "chartType": ".t--property-control-charttype input",
+  "chartType": ".t--property-control-charttype",
   "chartTypeText": ".t--property-control-charttype",
   "mapType": ".t--property-control-maptype .rc-select-selection-item",
   "destin": ".appsmith_widget_01ewdomru7",
@@ -34,6 +34,6 @@
   "Chartlabel": ".t--draggable-chartwidget g text",
   "FusionChartlabel": ".t--draggable-chartwidget g:nth-child(5) text",
   "pickMyLocation": ".t--draggable-mapwidget div[title='Pick My Location']",
-  "mapChartEntityLabels": ".t--draggable-mapchartwidget g[class*='-entityLabels'] text",
+  "mapChartEntityLabels": ".t--draggable-mapchartwidget text",
   "listWidget": ".t--draggable-listwidget"
 }

@@ -1,30 +1,24 @@
-import clsx from "clsx";
+import { Text } from "@appsmith/wds";
 import React, { forwardRef } from "react";
+import type { ForwardedRef } from "react";
+import { Checkbox as HeadlessCheckbox } from "react-aria-components";
 
-import type {
-  SwitchRef as HeadlessSwitchRef,
-  SwitchProps as HeadlessSwitchProps,
-} from "@design-system/headless";
-import { Switch as HeadlessSwitch } from "@design-system/headless";
+import styles from "./styles.module.css";
+import type { SwitchProps } from "./types";
 
-import { Text } from "../../Text";
-import switchStyles from "./styles.module.css";
-import { inlineLabelStyles } from "../../../styles";
-
-export type SwitchProps = Omit<HeadlessSwitchProps, "icon" | "isIndeterminate">;
-
-const _Switch = (props: SwitchProps, ref: HeadlessSwitchRef) => {
-  const { children, labelPosition = "right", ...rest } = props;
+const _Switch = (props: SwitchProps, ref: ForwardedRef<HTMLLabelElement>) => {
+  const { children, labelPosition = "end", ...rest } = props;
 
   return (
-    <HeadlessSwitch
-      className={clsx(switchStyles.switch, inlineLabelStyles["inline-label"])}
-      labelPosition={labelPosition}
+    <HeadlessCheckbox
       ref={ref}
       {...rest}
+      className={styles.switch}
+      data-label-position={labelPosition}
     >
-      {Boolean(children) && <Text>{children}</Text>}
-    </HeadlessSwitch>
+      <span aria-hidden="true" data-icon="" role="presentation" />
+      <Text lineClamp={1}>{children}</Text>
+    </HeadlessCheckbox>
   );
 };
 

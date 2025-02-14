@@ -10,8 +10,8 @@ import React, {
 import { Collapse } from "@blueprintjs/core";
 import styled from "styled-components";
 import { Colors } from "constants/Colors";
-import { Icon, Tag } from "design-system";
-import type { AppState } from "@appsmith/reducers";
+import { Icon, Tag } from "@appsmith/ads";
+import type { AppState } from "ee/reducers";
 import { useDispatch, useSelector } from "react-redux";
 import { getPropertySectionState } from "selectors/editorContextSelectors";
 import { getCurrentWidgetId } from "selectors/propertyPaneSelectors";
@@ -80,6 +80,8 @@ interface PropertySectionProps {
   children?: ReactNode;
   childrenWrapperRef?: React.RefObject<HTMLDivElement>;
   className?: string;
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   hidden?: (props: any, propertyPath: string) => boolean;
   isDefaultOpen?: boolean;
   propertyPath?: string;
@@ -97,7 +99,7 @@ export const CollapseContext: Context<boolean> = createContext<boolean>(false);
 export const PropertySection = memo((props: PropertySectionProps) => {
   const dispatch = useDispatch();
   const currentWidgetId = useSelector(getCurrentWidgetId);
-  const { isDefaultOpen = true } = props;
+  const { isDefaultOpen } = props;
   const isContextOpen = useSelector((state: AppState) =>
     getPropertySectionState(state, {
       key: `${currentWidgetId}.${props.id}`,
@@ -126,12 +128,14 @@ export const PropertySection = memo((props: PropertySectionProps) => {
             props.panelPropertyPath,
           ),
         );
+
         return !x;
       });
   }, [props.collapsible, props.id, currentWidgetId]);
 
   useEffect(() => {
     let initialIsOpenState = true;
+
     if (isSearchResult) {
       initialIsOpenState = true;
     } else if (isContextOpen !== undefined) {
@@ -153,6 +157,7 @@ export const PropertySection = memo((props: PropertySectionProps) => {
       const isWidgetIdTableDataExist = document.querySelector(
         `#${PROPERTY_PANE_ID} [id='${btoa(widgetId + ".tableData")}']`,
       );
+
       if (isWidgetIdTableDataExist) {
         if (className === "data") {
           setIsOpen(true);
@@ -194,8 +199,8 @@ export const PropertySection = memo((props: PropertySectionProps) => {
         )}
         {props.collapsible && (
           <Icon
-            className={`ml-auto t--chevron-icon ${isOpen ? "rotate-180" : ""}`}
-            name="arrow-up-s-line"
+            className={`ml-auto t--chevron-icon`}
+            name={isOpen ? "expand-less" : "expand-more"}
             size="md"
           />
         )}
@@ -219,6 +224,8 @@ export const PropertySection = memo((props: PropertySectionProps) => {
 
 PropertySection.displayName = "PropertySection";
 
+// TODO: Fix this the next time the file is edited
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 (PropertySection as any).whyDidYouRender = {
   logOnDifferentValues: false,
 };

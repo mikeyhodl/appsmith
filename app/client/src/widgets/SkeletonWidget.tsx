@@ -1,3 +1,4 @@
+import type { AnvilConfig } from "WidgetProvider/constants";
 import React from "react";
 import styled from "styled-components";
 import type { WidgetProps, WidgetState } from "./BaseWidget";
@@ -25,6 +26,29 @@ class SkeletonWidget extends BaseWidget<SkeletonWidgetProps, WidgetState> {
       columns: 4,
       widgetName: "Skeleton",
       version: 1,
+    };
+  }
+
+  static getAutoLayoutConfig() {
+    return {
+      widgetSize: [
+        {
+          viewportMinWidth: 0,
+          configuration: () => {
+            return {};
+          },
+        },
+      ],
+    };
+  }
+
+  static getAnvilConfig(): AnvilConfig | null {
+    return {
+      isLargeWidget: false,
+      widgetSize: {
+        minHeight: { base: "auto" },
+        minWidth: { base: "auto" },
+      },
     };
   }
 

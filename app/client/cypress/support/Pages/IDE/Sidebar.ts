@@ -2,7 +2,7 @@ export class Sidebar {
   buttons: string[];
   locators = {
     sidebar: ".t--sidebar",
-    sidebarButton: (name: string) => `.t--sidebar-${name}`,
+    sidebarButton: (name: string) => `[data-testid='t--sidebar-${name}']`,
   };
 
   constructor(buttons: string[]) {
@@ -10,14 +10,19 @@ export class Sidebar {
   }
 
   navigate(button: string, willFail = false) {
-    this.assertVisible();
+    this.assertVisible(Cypress.config().pageLoadTimeout);
     cy.get(this.locators.sidebar)
       .find(this.locators.sidebarButton(button))
-      .click({ force: true })
-      .should("have.attr", "data-selected", willFail ? "false" : "true");
+      .as("navigateBtn")
+      .click({ force: true });
+    cy.get("@navigateBtn").should(
+      "have.attr",
+      "data-selected",
+      willFail ? "false" : "true",
+    );
   }
 
-  assertVisible() {
-    cy.get(this.locators.sidebar).should("be.visible");
+  assertVisible(timeout: number = 60000) {
+    cy.get(this.locators.sidebar, { timeout }).should("be.visible");
   }
 }

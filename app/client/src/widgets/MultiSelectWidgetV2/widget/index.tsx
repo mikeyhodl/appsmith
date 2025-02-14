@@ -4,7 +4,7 @@ import { EventType } from "constants/AppsmithActionConstants/ActionConstants";
 import { Layers } from "constants/Layers";
 import { ValidationTypes } from "constants/WidgetValidation";
 import type { SetterConfig, Stylesheet } from "entities/AppTheming";
-import { EvaluationSubstitutionType } from "entities/DataTree/dataTreeFactory";
+import { EvaluationSubstitutionType } from "ee/entities/DataTree/types";
 import equal from "fast-deep-equal/es6";
 import { isArray, isFinite, isString, xorWith } from "lodash";
 import type { DraftValueType, LabelInValueType } from "rc-select/lib/Select";
@@ -46,8 +46,10 @@ import { FILL_WIDGET_MIN_WIDTH } from "constants/minWidthConstants";
 import { ResponsiveBehavior } from "layoutSystems/common/utils/constants";
 import { DynamicHeight } from "utils/WidgetFeatures";
 import IconSVG from "../icon.svg";
+import ThumbnailSVG from "../thumbnail.svg";
 import { WIDGET_TAGS, layoutConfigurations } from "constants/WidgetConstants";
-import { FEATURE_FLAG } from "@appsmith/entities/FeatureFlag";
+import { FEATURE_FLAG } from "ee/entities/FeatureFlag";
+import type { DynamicPath } from "utils/DynamicBindingUtils";
 
 class MultiSelectWidget extends BaseWidget<
   MultiSelectWidgetProps,
@@ -59,6 +61,7 @@ class MultiSelectWidget extends BaseWidget<
     return {
       name: "MultiSelect",
       iconSVG: IconSVG,
+      thumbnailSVG: ThumbnailSVG,
       tags: [WIDGET_TAGS.SELECT],
       needsMeta: true,
       searchTags: ["dropdown", "tags"],
@@ -161,6 +164,10 @@ class MultiSelectWidget extends BaseWidget<
       ) {
         let modify;
 
+        const dynamicPropertyPathList: DynamicPath[] = [
+          ...(widget.dynamicPropertyPathList || []),
+        ];
+
         if (queryConfig.select) {
           modify = {
             sourceData: queryConfig.select.data,
@@ -172,10 +179,15 @@ class MultiSelectWidget extends BaseWidget<
             serverSideFiltering: true,
             onFilterUpdate: queryConfig.select.run,
           };
+
+          dynamicPropertyPathList.push({ key: "sourceData" });
         }
 
         return {
           modify,
+          dynamicUpdates: {
+            dynamicPropertyPathList,
+          },
         };
       },
     };
@@ -212,7 +224,6 @@ class MultiSelectWidget extends BaseWidget<
   static getDependencyMap(): Record<string, string[]> {
     return {
       optionValue: ["sourceData"],
-      defaultOptionValue: ["serverSideFiltering", "options"],
     };
   }
 
@@ -358,6 +369,12 @@ class MultiSelectWidget extends BaseWidget<
               },
             },
             dependencies: ["serverSideFiltering", "options"],
+            helperText: (
+              <div className="leading-5" style={{ marginTop: "10px" }}>
+                Make sure the default value(s) are present in the source data to
+                have it selected by default in the UI.
+              </div>
+            ),
           },
         ],
       },
@@ -752,6 +769,8 @@ class MultiSelectWidget extends BaseWidget<
     };
   }
 
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   static getMetaPropertiesMap(): Record<string, any> {
     return {
       selectedOptions: undefined,
@@ -763,9 +782,12 @@ class MultiSelectWidget extends BaseWidget<
   componentDidUpdate(prevProps: MultiSelectWidgetProps): void {
     // Check if defaultOptionValue is string
     let isStringArray = false;
+
     if (
       this.props.defaultOptionValue &&
       this.props.defaultOptionValue.some(
+        // TODO: Fix this the next time the file is edited
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (value: any) => isString(value) || isFinite(value),
       )
     ) {
@@ -872,6 +894,7 @@ class MultiSelectWidget extends BaseWidget<
         type: EventType.ON_OPTION_CHANGE,
       },
     });
+
     if (!this.props.isDirty) {
       this.props.updateWidgetMetaProperty("isDirty", true);
     }
@@ -882,8 +905,10 @@ class MultiSelectWidget extends BaseWidget<
     if (!this.props.selectedOptionLabels || !this.props.selectedOptionValues) {
       return [];
     }
+
     const labels = [...this.props.selectedOptionLabels];
     const values = [...this.props.selectedOptionValues];
+
     return values.map((value, index) => ({
       value,
       label: labels[index],
@@ -928,10 +953,12 @@ class MultiSelectWidget extends BaseWidget<
     }
   };
 }
+
 export interface OptionValue {
   label: string;
   value: string;
 }
+
 export interface DropdownOption extends OptionValue {
   disabled?: boolean;
 }

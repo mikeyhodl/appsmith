@@ -1,9 +1,9 @@
 export class DataManager {
   environments = ["Production", "Staging"];
   defaultEnviorment = this.environments[0];
-  GITEA_API_BASE_TED = "localhost";
-  GITEA_API_PORT_TED = "3001";
-  GITEA_API_URL_TED = "git@host.docker.internal:Cypress";
+
+  GIT_API_BASE = "localhost:4200";
+  GIT_CLONE_URL = "git@host.docker.internal:Cypress";
 
   dsValues: Record<string, any> = {
     Production: {
@@ -13,7 +13,7 @@ export class DataManager {
       mongo_databaseName: "mongo_prod",
 
       postgres_host: "host.docker.internal",
-      postgres_port: 5432,
+      postgres_port: 5433,
       postgres_databaseName: "fakeapi",
       postgres_username: "docker",
       postgres_password: "docker",
@@ -74,14 +74,21 @@ export class DataManager {
       mockApiUrl: "http://host.docker.internal:5001/v1/mock-api?records=10",
       mockGenderAge:
         "http://host.docker.internal:5001/v1/genderize_agify?name=",
+      mockGzipApi: "http://host.docker.internal:5001/v1/gzip",
 
       mockApiObjectUrl:
         "http://host.docker.internal:5001/v1/mock-api-object?records=10",
       echoApiUrl: "http://host.docker.internal:5001/v1/mock-api/echo",
       randomCatfactUrl: "http://host.docker.internal:5001/v1/catfact/random",
+      multipartAPI:
+        "http://host.docker.internal:5001/v1/mock-api/echo-multipart",
       randomTrumpApi:
         "http://host.docker.internal:5001/v1/whatdoestrumpthink/random",
       mockHttpCodeUrl: "http://host.docker.internal:5001/v1/mock-http-codes/",
+      flowerImageUrl1:
+        "http://host.docker.internal:4200/photo-1503469432756-4aae2e18d881.jpeg",
+      flowerImageUrl2:
+        "http://host.docker.internal:4200/photo-1492529029602-33e53698f407.jpeg",
       AirtableBaseForME: "appubHrVbovcudwN6",
       AirtableTableForME: "tblsFCQSskVFf7xNd",
       ApiUrlME: "http://host.docker.internal:5001/v1/production",
@@ -90,20 +97,25 @@ export class DataManager {
       firestore_projectID: "appsmith-22e8b",
       firestore_serviceaccountkey: Cypress.env("FIRESTORE_PRIVATE_KEY"),
 
-      restapi_url: "https://my-json-server.typicode.com/typicode/demo/posts",
-      connection_type: "Replica set",
-
       mockHostAddress: "fake_api.cvuydmurdlas.us-east-1.rds.amazonaws.com",
       mockDatabaseName: "fakeapi",
       mockDatabaseUsername: "fakeapi",
       mockDatabasePassword: "LimitedAccess123#",
       readonly: "readonly",
-      authenticatedApiUrl: "https://fakeapi.com",
+      authenticatedApiUrl: "http://host.docker.internal:5001",
 
-      GraphqlApiUrl_TED: "http://host.docker.internal:5000/graphql",
+      GraphqlApiUrl_TED: "http://host.docker.internal:4200/graphql",
 
       twilio_username: "random-username",
       twilio_password: "random-password",
+
+      Snowflake_accountName: Cypress.env("SNOWFLAKE_ACCOUNT_NAME"),
+      Snowflake_warehouseName: "COMPUTE_WH",
+      Snowflake_databaseName: "TESTDB",
+      Snowflake_defaultSchema: "PUBLIC",
+      Snowflake_role: "SYSADMIN",
+      Snowflake_username: Cypress.env("SNOWFLAKE_USERNAME"),
+      Snowflake_password: Cypress.env("SNOWFLAKE_PASSWORD"),
     },
 
     Staging: {
@@ -113,7 +125,7 @@ export class DataManager {
       mongo_databaseName: "mongo_staging",
 
       postgres_host: "host.docker.internal",
-      postgres_port: 5432,
+      postgres_port: 5433,
       postgres_databaseName: "stagingdb",
       postgres_username: "dockerstaging",
       postgres_password: "dockerstaging",
@@ -174,6 +186,8 @@ export class DataManager {
       mockApiUrl: "http://host.docker.internal:5001/v1/mock-api?records=10",
       echoApiUrl: "http://host.docker.internal:5001/v1/mock-api/echo",
       randomCatfactUrl: "http://host.docker.internal:5001/v1/catfact/random",
+      multipartAPI:
+        "http://host.docker.internal:5001/v1/mock-api/echo-multipart",
       mockHttpCodeUrl: "http://host.docker.internal:5001/v1/mock-http-codes/",
       AirtableBaseForME: "appubHrVbovcudwN6",
       AirtableTableForME: "tblsFCQSskVFf7xNd",
@@ -183,20 +197,25 @@ export class DataManager {
       firestore_projectID: "appsmith-dummy",
       firestore_serviceaccountkey: "dummy_service_creds_key",
 
-      restapi_url: "https://my-json-server.typicode.com/typicode/demo/posts",
-      connection_type: "Replica set",
-
       mockHostAddress: "fake_api.cvuydmurdlas.us-east-1.rds.amazonaws.com",
       mockDatabaseName: "fakeapi",
       mockDatabaseUsername: "fakeapi",
       mockDatabasePassword: "LimitedAccess123#",
       readonly: "readonly",
-      authenticatedApiUrl: "https://fakeapi.com",
+      authenticatedApiUrl: "http://host.docker.internal:5001",
 
-      GraphqlApiUrl_TED: "http://host.docker.internal:5000/graphql",
+      GraphqlApiUrl_TED: "http://host.docker.internal:4200/graphql",
 
       twilio_username: "random-username",
       twilio_password: "random-password",
+
+      Snowflake_accountName: Cypress.env("SNOWFLAKE_ACCOUNT_NAME"),
+      Snowflake_warehouseName: "COMPUTE_WH",
+      Snowflake_databaseName: "TESTDB",
+      Snowflake_defaultSchema: "PUBLIC",
+      Snowflake_role: "SYSADMIN",
+      Snowflake_username: Cypress.env("SNOWFLAKE_USERNAME"),
+      Snowflake_password: Cypress.env("SNOWFLAKE_PASSWORD"),
     },
   };
 

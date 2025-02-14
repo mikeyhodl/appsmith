@@ -43,10 +43,7 @@ export const DatasourceListContainer = styled.div`
   height: 100%;
   display: flex;
   flex-direction: column;
-  padding-left: var(--ads-v2-spaces-5);
-  .t--entity.datasourceStructure-datasource-view-mode {
-    padding-right: var(--ads-v2-spaces-5);
-  }
+  padding: 0 var(--ads-v2-spaces-5);
   &.t--gsheet-structure {
     padding-bottom: var(--ads-v2-spaces-8);
     .t--gsheet-structure-list {
@@ -138,6 +135,8 @@ export const SchemaStateMessageWrapper = styled.div`
   flex-direction: column;
   align-items: center;
   position: relative;
+  text-align: center;
+  padding: 0 var(--ads-spaces-3);
   img {
     padding-bottom: var(--ads-v2-spaces-7);
   }
@@ -198,15 +197,17 @@ export const TableWrapper = styled.div`
 `;
 
 export const DatasourceStructureSearchContainer = styled.div`
-  margin: var(--ads-v2-spaces-3) 0 var(--ads-v2-spaces-4) 0;
+  margin: var(--ads-v2-spaces-3) 0 var(--ads-v2-spaces-2) 0;
   background: white;
   flex-shrink: 0;
-  padding-right: var(--ads-v2-spaces-5);
+  display: flex;
+  align-items: center;
+  gap: var(--ads-v2-spaces-2);
   &.t--gsheet-search-container {
     margin-top: var(--ads-v2-spaces-4);
-    margin-bottom: var(--ads-v2-spaces-3);
+    margin-bottom: var(--ads-v2-spaces-2);
   }
   &.t--search-container--query-editor {
-    padding-right: 0;
+    margin: 0;
   }
 `;

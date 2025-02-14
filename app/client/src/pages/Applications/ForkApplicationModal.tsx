@@ -1,12 +1,8 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import {
-  getUserApplicationsWorkspaces,
-  getIsFetchingApplications,
-} from "@appsmith/selectors/applicationSelectors";
-import { hasCreateNewAppPermission } from "@appsmith/utils/permissionHelpers";
-import { ReduxActionTypes } from "@appsmith/constants/ReduxActionConstants";
-import type { AppState } from "@appsmith/reducers";
+import { hasCreateNewAppPermission } from "ee/utils/permissionHelpers";
+import { ReduxActionTypes } from "ee/constants/ReduxActionConstants";
+import type { AppState } from "ee/reducers";
 import {
   Button,
   Modal,
@@ -15,7 +11,7 @@ import {
   Spinner,
   Select,
   Option,
-} from "design-system";
+} from "@appsmith/ads";
 import { ButtonWrapper, SpinnerWrapper } from "./ForkModalStyles";
 import {
   CANCEL,
@@ -24,8 +20,10 @@ import {
   FORK_APP_MODAL_EMPTY_TITLE,
   FORK_APP_MODAL_LOADING_TITLE,
   FORK_APP_MODAL_SUCCESS_TITLE,
-} from "@appsmith/constants/messages";
-import { getAllApplications } from "@appsmith/actions/applicationActions";
+} from "ee/constants/messages";
+import { getFetchedWorkspaces } from "ee/selectors/workspaceSelectors";
+import { getIsFetchingApplications } from "ee/selectors/selectedWorkspaceSelectors";
+import { fetchAllWorkspaces } from "ee/actions/workspaceActions";
 
 interface ForkApplicationModalProps {
   applicationId: string;
@@ -45,7 +43,7 @@ function ForkApplicationModal(props: ForkApplicationModalProps) {
     value: string;
   }>({ label: "", value: "" });
   const dispatch = useDispatch();
-  const userWorkspaces = useSelector(getUserApplicationsWorkspaces);
+  const workspaces = useSelector(getFetchedWorkspaces);
   const forkingApplication = useSelector(
     (state: AppState) => state.ui.applications.forkingApplication,
   );
@@ -57,6 +55,7 @@ function ForkApplicationModal(props: ForkApplicationModalProps) {
     // is getting controlled from outside, then we always load workspaces
     if (isModalOpen) {
       getApplicationsListAndOpenModal();
+
       return;
     }
   }, [isModalOpen]);
@@ -88,36 +87,36 @@ function ForkApplicationModal(props: ForkApplicationModalProps) {
   };
 
   const workspaceList = useMemo(() => {
-    const filteredUserWorkspaces = userWorkspaces.filter((item) => {
-      const permitted = hasCreateNewAppPermission(
-        item.workspace.userPermissions ?? [],
-      );
+    const filteredUserWorkspaces = workspaces.filter((item) => {
+      const permitted = hasCreateNewAppPermission(item.userPermissions ?? []);
+
       return permitted;
     });
 
     if (filteredUserWorkspaces.length) {
       selectWorkspace({
-        label: filteredUserWorkspaces[0].workspace.name,
-        value: filteredUserWorkspaces[0].workspace.id,
+        label: filteredUserWorkspaces[0].name,
+        value: filteredUserWorkspaces[0].id,
       });
     }
 
     return filteredUserWorkspaces.map((workspace) => {
       return {
-        label: workspace.workspace.name,
-        value: workspace.workspace.id,
+        label: workspace.name,
+        value: workspace.id,
       };
     });
-  }, [userWorkspaces]);
+  }, [workspaces]);
 
   const modalHeading = isFetchingApplications
     ? createMessage(FORK_APP_MODAL_LOADING_TITLE)
     : !workspaceList.length
-    ? createMessage(FORK_APP_MODAL_EMPTY_TITLE)
-    : createMessage(FORK_APP_MODAL_SUCCESS_TITLE);
+      ? createMessage(FORK_APP_MODAL_EMPTY_TITLE)
+      : createMessage(FORK_APP_MODAL_SUCCESS_TITLE);
 
   const getApplicationsListAndOpenModal = () => {
-    !workspaceList.length && dispatch(getAllApplications());
+    !workspaceList.length &&
+      dispatch(fetchAllWorkspaces({ fetchEntities: true }));
     handleOpen && handleOpen();
   };
 

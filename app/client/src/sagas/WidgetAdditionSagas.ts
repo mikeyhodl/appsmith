@@ -1,69 +1,76 @@
-import type { WidgetAddChild } from "actions/pageActions";
-import { updateAndSaveLayout } from "actions/pageActions";
-import type { ReduxAction } from "@appsmith/constants/ReduxActionConstants";
+import type { ReduxAction } from "actions/ReduxActionTypes";
 import {
   ReduxActionErrorTypes,
   ReduxActionTypes,
   WidgetReduxActionTypes,
-} from "@appsmith/constants/ReduxActionConstants";
-import { RenderModes } from "constants/WidgetConstants";
-import { ENTITY_TYPE } from "entities/AppsmithConsole";
+} from "ee/constants/ReduxActionConstants";
+import { ENTITY_TYPE } from "ee/entities/AppsmithConsole/utils";
+import type { WidgetBlueprint } from "WidgetProvider/constants";
+import {
+  BlueprintOperationTypes,
+  GRID_DENSITY_MIGRATION_V1,
+} from "WidgetProvider/constants";
+import WidgetFactory from "WidgetProvider/factory";
+import { generateAutoHeightLayoutTreeAction } from "actions/autoHeightActions";
+import type { WidgetAddChild } from "actions/pageActions";
+import { updateAndSaveLayout } from "actions/pageActions";
+import {
+  BUILDING_BLOCK_EXPLORER_TYPE,
+  RenderModes,
+} from "constants/WidgetConstants";
+import { toast } from "@appsmith/ads";
+import type { DataTree } from "entities/DataTree/dataTreeTypes";
+import { create } from "mutative";
+import { klona as clone } from "klona/full";
+import { getWidgetMinMaxDimensionsInPixel } from "layoutSystems/autolayout/utils/flexWidgetUtils";
+import { ResponsiveBehavior } from "layoutSystems/common/utils/constants";
+import { isFunction } from "lodash";
+import omit from "lodash/omit";
+import log from "loglevel";
 import type {
   CanvasWidgetsReduxState,
   FlattenedWidgetProps,
 } from "reducers/entityReducers/canvasWidgetsReducer";
-import type { WidgetBlueprint } from "WidgetProvider/constants";
 import { all, call, put, select, takeEvery } from "redux-saga/effects";
+import { getDataTree } from "selectors/dataTreeSelectors";
+import {
+  getCanvasWidth,
+  getIsAutoLayout,
+  getIsAutoLayoutMobileBreakPoint,
+} from "selectors/editorSelectors";
 import AppsmithConsole from "utils/AppsmithConsole";
 import { getNextEntityName } from "utils/AppsmithUtils";
 import { generateWidgetProps } from "utils/WidgetPropsUtils";
-import { getWidget, getWidgets } from "./selectors";
+import { generateReactKey } from "utils/generators";
+import type { WidgetProps } from "widgets/BaseWidget";
+import { isStack } from "../layoutSystems/autolayout/utils/AutoLayoutUtils";
 import {
   buildWidgetBlueprint,
   executeWidgetBlueprintBeforeOperations,
   executeWidgetBlueprintOperations,
   traverseTreeAndExecuteBlueprintChildOperations,
 } from "./WidgetBlueprintSagas";
-import log from "loglevel";
-import { getDataTree } from "selectors/dataTreeSelectors";
-import { generateReactKey } from "utils/generators";
-import type { WidgetProps } from "widgets/BaseWidget";
-import WidgetFactory from "WidgetProvider/factory";
-import omit from "lodash/omit";
-import produce from "immer";
-import {
-  GRID_DENSITY_MIGRATION_V1,
-  BlueprintOperationTypes,
-} from "WidgetProvider/constants";
 import { getPropertiesToUpdate } from "./WidgetOperationSagas";
-import { klona as clone } from "klona/full";
-import type { DataTree } from "entities/DataTree/dataTreeTypes";
-import { generateAutoHeightLayoutTreeAction } from "actions/autoHeightActions";
-import { toast } from "design-system";
-import { ResponsiveBehavior } from "layoutSystems/common/utils/constants";
-import { isStack } from "../layoutSystems/autolayout/utils/AutoLayoutUtils";
-import {
-  getCanvasWidth,
-  getIsAutoLayout,
-  getIsAutoLayoutMobileBreakPoint,
-} from "selectors/editorSelectors";
-import { getWidgetMinMaxDimensionsInPixel } from "layoutSystems/autolayout/utils/flexWidgetUtils";
-import { isFunction } from "lodash";
+import { getWidget, getWidgets } from "./selectors";
+import { addBuildingBlockToCanvasSaga } from "./BuildingBlockSagas/BuildingBlockAdditionSagas";
 
 const WidgetTypes = WidgetFactory.widgetTypes;
 
-interface GeneratedWidgetPayload {
+export interface GeneratedWidgetPayload {
   widgetId: string;
   widgets: { [widgetId: string]: FlattenedWidgetProps };
 }
 
 interface WidgetAddTabChild {
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   tabs: any;
   widgetId: string;
 }
 
 function* getEntityNames() {
   const evalTree: DataTree = yield select(getDataTree);
+
   return Object.keys(evalTree);
 }
 
@@ -94,6 +101,7 @@ function* getChildWidgetProps(
       ...entityNames,
     ]);
   }
+
   if (type === "CANVAS_WIDGET") {
     columns =
       (parent.rightColumn - parent.leftColumn) * parent.parentColumnSpace;
@@ -104,7 +112,7 @@ function* getChildWidgetProps(
     // if (props) props.children = [];
 
     if (props) {
-      props = produce(props, (draft: WidgetProps) => {
+      props = create(props, (draft) => {
         if (!draft.children || !Array.isArray(draft.children)) {
           draft.children = [];
         }
@@ -115,6 +123,7 @@ function* getChildWidgetProps(
   const isAutoLayout = isStack(widgets, parent);
   const isFillWidget =
     restDefaultConfig?.responsiveBehavior === ResponsiveBehavior.Fill;
+
   if (isAutoLayout && isFillWidget) columns = 64;
 
   const widgetProps = {
@@ -151,6 +160,7 @@ function* getChildWidgetProps(
   );
 
   let { disableResizeHandles } = WidgetFactory.getWidgetAutoLayoutConfig(type);
+
   if (isFunction(disableResizeHandles)) {
     disableResizeHandles = disableResizeHandles(widget);
   }
@@ -169,6 +179,26 @@ function* getChildWidgetProps(
   }
 
   widget.widgetId = newWidgetId;
+  // Remove props that don't belong in the DSL and can be accessed using
+  // the widget type's static methods and configurations
+  // Fixes #21825
+  widget.rows = undefined;
+  widget.columns = undefined;
+  widget.name = undefined;
+  widget.iconSVG = undefined;
+  widget.thumbnailSVG = undefined;
+  widget.hideCard = undefined;
+  widget.isDeprecated = undefined;
+  widget.needsMeta = undefined;
+  widget.searchTags = undefined;
+  widget.tags = undefined;
+  widget.displayName = undefined;
+  widget.onCanvasUI = undefined;
+  widget.eagerRender = undefined;
+  widget.needsHeightForContent = undefined;
+  widget.features = undefined;
+  widget.replacement = undefined;
+
   /**
    * un-evaluated childStylesheet used by widgets; so they are to be excluded
    * from the dynamicBindingPathList and they are not included as a part of
@@ -199,6 +229,7 @@ function* getChildWidgetProps(
       ...dynamicBindingPathList,
       ...params.dynamicBindingPathList,
     ];
+
     widget.dynamicBindingPathList = mergedDynamicBindingPathLists;
   } else {
     widget.dynamicBindingPathList = clone(dynamicBindingPathList);
@@ -212,6 +243,8 @@ export function* generateChildWidgets(
   params: WidgetAddChild,
   widgets: { [widgetId: string]: FlattenedWidgetProps },
   propsBlueprint?: WidgetBlueprint,
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): any {
   // Get the props for the widget
   const widget = yield getChildWidgetProps(parent, params, widgets);
@@ -251,6 +284,7 @@ export function* generateChildWidgets(
         );
       }),
     );
+
     // Start children array from scratch
     widget.children = [];
     childPropsList.forEach((props: GeneratedWidgetPayload) => {
@@ -359,9 +393,16 @@ export function* getUpdateDslAfterCreatingChild(
  *
  * @param addChildAction
  */
-export function* addChildSaga(addChildAction: ReduxAction<WidgetAddChild>) {
+export function* addChildSaga(
+  addChildAction: ReduxAction<
+    WidgetAddChild & {
+      shouldReplay?: boolean;
+    }
+  >,
+) {
   try {
     const start = performance.now();
+
     toast.dismiss();
     const stateWidgets: CanvasWidgetsReduxState = yield select(getWidgets);
     const { newWidgetId, type, widgetId } = addChildAction.payload;
@@ -381,7 +422,11 @@ export function* addChildSaga(addChildAction: ReduxAction<WidgetAddChild>) {
       [widgetId: string]: FlattenedWidgetProps;
     } = yield call(getUpdateDslAfterCreatingChild, addChildAction.payload);
 
-    yield put(updateAndSaveLayout(updatedWidgets));
+    yield put(
+      updateAndSaveLayout(updatedWidgets, {
+        shouldReplay: addChildAction.payload.shouldReplay,
+      }),
+    );
     yield put({
       type: ReduxActionTypes.RECORD_RECENTLY_ADDED_WIDGET,
       payload: [addChildAction.payload.newWidgetId],
@@ -397,6 +442,7 @@ export function* addChildSaga(addChildAction: ReduxAction<WidgetAddChild>) {
       payload: {
         action: WidgetReduxActionTypes.WIDGET_ADD_CHILD,
         error,
+        logToDebugger: true,
       },
     });
   }
@@ -416,6 +462,7 @@ const getChildTabData = (
   const rows =
     (tabProps.bottomRow - tabProps.topRow - GRID_DENSITY_MIGRATION_V1) *
     tabProps.parentRowSpace;
+
   return {
     type: WidgetTypes.CANVAS_WIDGET,
     columns: columns,
@@ -449,6 +496,8 @@ function* addNewTabChildSaga(
   const newTabId = generateReactKey({ prefix: "tab" });
   const newTabLabel = getNextEntityName(
     "Tab ",
+    // TODO: Fix this the next time the file is edited
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     tabsArray.map((tab: any) => tab.label),
   );
 
@@ -462,6 +511,8 @@ function* addNewTabChildSaga(
       isVisible: true,
     },
   };
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const newTabProps: any = getChildTabData(tabProps, {
     id: newTabId,
     label: newTabLabel,
@@ -472,13 +523,36 @@ function* addNewTabChildSaga(
     getUpdateDslAfterCreatingChild,
     isAutoLayout ? { ...newTabProps, topRow: 0 } : newTabProps,
   );
+
   updatedWidgets[widgetId]["tabsObj"] = tabs;
   yield put(updateAndSaveLayout(updatedWidgets));
 }
 
+function* addUIEntitySaga(addEntityAction: ReduxAction<WidgetAddChild>) {
+  try {
+    const { payload } = addEntityAction;
+    const { type } = payload;
+
+    if (type === BUILDING_BLOCK_EXPLORER_TYPE) {
+      yield call(addBuildingBlockToCanvasSaga, addEntityAction);
+    } else {
+      yield call(addChildSaga, addEntityAction);
+    }
+  } catch (error) {
+    yield put({
+      type: ReduxActionErrorTypes.WIDGET_OPERATION_ERROR,
+      payload: {
+        action: WidgetReduxActionTypes.WIDGET_ADD_CHILD,
+        error,
+        logToDebugger: true,
+      },
+    });
+  }
+}
+
 export default function* widgetAdditionSagas() {
   yield all([
-    takeEvery(WidgetReduxActionTypes.WIDGET_ADD_CHILD, addChildSaga),
+    takeEvery(WidgetReduxActionTypes.WIDGET_ADD_CHILD, addUIEntitySaga),
     takeEvery(ReduxActionTypes.WIDGET_ADD_NEW_TAB_CHILD, addNewTabChildSaga),
   ]);
 }

@@ -1,9 +1,11 @@
 import { createImmerReducer } from "utils/ReducerUtils";
-import { ReduxActionTypes } from "@appsmith/constants/ReduxActionConstants";
+import { ReduxActionTypes } from "ee/constants/ReduxActionConstants";
 import type { FocusEntityInfo } from "navigation/FocusEntity";
 
 export interface FocusState {
   entityInfo: FocusEntityInfo;
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   state: Record<string, any>;
 }
 
@@ -29,7 +31,16 @@ const focusHistoryReducer = createImmerReducer(initialState, {
     action: { payload: { key: string; focusState: FocusState } },
   ) => {
     const { focusState, key } = action.payload;
+
     state.history[key] = focusState;
+  },
+  [ReduxActionTypes.REMOVE_FOCUS_HISTORY]: (
+    state: FocusHistoryState,
+    action: { payload: { key: string } },
+  ) => {
+    const { key } = action.payload;
+
+    delete state.history[key];
   },
 });
 

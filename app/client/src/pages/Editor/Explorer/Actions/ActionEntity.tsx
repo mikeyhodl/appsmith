@@ -3,64 +3,62 @@ import { useSelector } from "react-redux";
 import Entity, { EntityClassNames } from "../Entity";
 import ActionEntityContextMenu from "./ActionEntityContextMenu";
 import history, { NavigationMethod } from "utils/history";
-import { saveActionName } from "actions/pluginActionActions";
-import PerformanceTracker, {
-  PerformanceTransactionName,
-} from "utils/PerformanceTracker";
 import {
-  getAction,
+  getActionByBaseId,
   getDatasource,
   getPlugins,
-} from "@appsmith/selectors/entitiesSelector";
+} from "ee/selectors/entitiesSelector";
 import type { Action, StoredDatasource } from "entities/Action";
-import { PluginType } from "entities/Action";
+import { PluginType } from "entities/Plugin";
 import { keyBy } from "lodash";
 import { getActionConfig } from "./helpers";
-import AnalyticsUtil from "utils/AnalyticsUtil";
+import AnalyticsUtil from "ee/utils/AnalyticsUtil";
 import { useLocation } from "react-router";
 import type { Datasource } from "entities/Datasource";
 import {
   getHasDeleteActionPermission,
   getHasManageActionPermission,
-} from "@appsmith/utils/BusinessFeatures/permissionPageHelpers";
+} from "ee/utils/BusinessFeatures/permissionPageHelpers";
 import { useFeatureFlag } from "utils/hooks/useFeatureFlag";
-import { FEATURE_FLAG } from "@appsmith/entities/FeatureFlag";
-
-const getUpdateActionNameReduxAction = (id: string, name: string) => {
-  return saveActionName({ id, name });
-};
+import { FEATURE_FLAG } from "ee/entities/FeatureFlag";
+import { saveActionNameBasedOnIdeType } from "ee/actions/helpers";
+import { convertToBaseParentEntityIdSelector } from "selectors/pageListSelectors";
+import { getIDETypeByUrl } from "ee/entities/IDE/utils";
 
 interface ExplorerActionEntityProps {
   step: number;
   searchKeyword?: string;
-  id: string;
+  baseId: string;
   type: PluginType;
   isActive: boolean;
   parentEntityId: string;
 }
 
 export const ExplorerActionEntity = memo((props: ExplorerActionEntityProps) => {
-  const action = useSelector((state) => getAction(state, props.id)) as Action;
+  const action = useSelector((state) =>
+    getActionByBaseId(state, props.baseId),
+  ) as Action;
   const plugins = useSelector(getPlugins);
   const pluginGroups = useMemo(() => keyBy(plugins, "id"), [plugins]);
   const location = useLocation();
   const datasource = useSelector((state) =>
     getDatasource(state, (action?.datasource as StoredDatasource)?.id),
   ) as Datasource;
+  const baseParentEntityId = useSelector((state) =>
+    convertToBaseParentEntityIdSelector(state, props.parentEntityId),
+  );
+  const ideType = getIDETypeByUrl(location.pathname);
 
   const config = getActionConfig(props.type);
   const url = config?.getURL(
-    props.parentEntityId,
-    action.id,
+    baseParentEntityId ?? "",
+    action.baseId,
     action.pluginType,
     pluginGroups[action.pluginId],
   );
   const icon = config?.getIcon(action, pluginGroups[action.pluginId]);
 
   const switchToAction = useCallback(() => {
-    PerformanceTracker.startTracking(PerformanceTransactionName.OPEN_ACTION, {
-      url,
-    });
     url && history.push(url, { invokedBy: NavigationMethod.EntityExplorer });
     AnalyticsUtil.logEvent("ENTITY_EXPLORER_CLICK", {
       type: "QUERIES/APIs",
@@ -98,8 +96,10 @@ export const ExplorerActionEntity = memo((props: ExplorerActionEntityProps) => {
       className={EntityClassNames.CONTEXT_MENU}
       id={action.id}
       name={action.name}
+      pluginType={action.pluginType}
     />
   );
+
   return (
     <Entity
       action={switchToAction}
@@ -113,7 +113,9 @@ export const ExplorerActionEntity = memo((props: ExplorerActionEntityProps) => {
       name={action.name}
       searchKeyword={props.searchKeyword}
       step={props.step}
-      updateEntityName={getUpdateActionNameReduxAction}
+      updateEntityName={(id, name) =>
+        saveActionNameBasedOnIdeType(id, name, ideType)
+      }
     />
   );
 });

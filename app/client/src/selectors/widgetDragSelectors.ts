@@ -1,10 +1,9 @@
-import type { AppState } from "@appsmith/reducers";
+import type { AppState } from "ee/reducers";
 import { createSelector } from "reselect";
 import { getIsAppSettingsPaneWithNavigationTabOpen } from "./appSettingsPaneSelectors";
-import {
-  combinedPreviewModeSelector,
-  snipingModeSelector,
-} from "./editorSelectors";
+import { snipingModeSelector } from "./editorSelectors";
+import { getWidgetSelectionBlock } from "./ui";
+import { selectCombinedPreviewMode } from "./gitModSelectors";
 
 export const getIsDragging = (state: AppState) =>
   state.ui.widgetDragResize.isDragging;
@@ -22,9 +21,10 @@ export const getShouldAllowDrag = createSelector(
   getIsResizing,
   getIsDragging,
   getIsDraggingDisabledInEditor,
-  combinedPreviewModeSelector,
+  selectCombinedPreviewMode,
   snipingModeSelector,
   getIsAppSettingsPaneWithNavigationTabOpen,
+  getWidgetSelectionBlock,
   (
     isResizing,
     isDragging,
@@ -32,6 +32,7 @@ export const getShouldAllowDrag = createSelector(
     isPreviewMode,
     isSnipingMode,
     isAppSettingsPaneWithNavigationTabOpen,
+    widgetSelectionIsBlocked,
   ) => {
     return (
       !isResizing &&
@@ -39,7 +40,8 @@ export const getShouldAllowDrag = createSelector(
       !isDraggingDisabled &&
       !isSnipingMode &&
       !isPreviewMode &&
-      !isAppSettingsPaneWithNavigationTabOpen
+      !isAppSettingsPaneWithNavigationTabOpen &&
+      !widgetSelectionIsBlocked
     );
   },
 );

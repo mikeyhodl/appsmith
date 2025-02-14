@@ -8,8 +8,8 @@ import { useDispatch, useSelector } from "react-redux";
 import {
   revokeGit,
   setDisconnectingGitApplication,
+  setGitSettingsModalOpenAction,
   setIsDisconnectGitModalOpen,
-  setIsGitSyncModalOpen,
 } from "actions/gitSyncActions";
 import {
   Button,
@@ -21,7 +21,7 @@ import {
   ModalFooter,
   ModalHeader,
   Text,
-} from "design-system";
+} from "@appsmith/ads";
 import {
   APPLICATION_NAME,
   createMessage,
@@ -30,17 +30,12 @@ import {
   GO_BACK,
   NONE_REVERSIBLE_MESSAGE,
   REVOKE,
-} from "@appsmith/constants/messages";
-import AnalyticsUtil from "utils/AnalyticsUtil";
+} from "ee/constants/messages";
+import AnalyticsUtil from "ee/utils/AnalyticsUtil";
 import { Space } from "./components/StyledComponents";
-import { GitSyncModalTab } from "entities/GitSync";
-import { useFeatureFlag } from "utils/hooks/useFeatureFlag";
-import { FEATURE_FLAG } from "@appsmith/entities/FeatureFlag";
+import { GitSettingsTab } from "reducers/uiReducers/gitSyncReducer";
 
 function DisconnectGitModal() {
-  const isGitConnectV2Enabled = useFeatureFlag(
-    FEATURE_FLAG.release_git_connect_v2_enabled,
-  );
   const dispatch = useDispatch();
   const isModalOpen = useSelector(getIsDisconnectGitModalOpen);
   const disconnectingApp = useSelector(getDisconnectingGitApplication);
@@ -51,11 +46,9 @@ function DisconnectGitModal() {
   const handleClickOnBack = useCallback(() => {
     dispatch(setIsDisconnectGitModalOpen(false));
     dispatch(
-      setIsGitSyncModalOpen({
-        isOpen: true,
-        tab: isGitConnectV2Enabled
-          ? GitSyncModalTab.SETTINGS
-          : GitSyncModalTab.GIT_CONNECTION,
+      setGitSettingsModalOpenAction({
+        open: true,
+        tab: GitSettingsTab.GENERAL,
       }),
     );
     dispatch(setDisconnectingGitApplication({ id: "", name: "" }));
@@ -100,6 +93,8 @@ function DisconnectGitModal() {
           <Input
             className="t--git-app-name-input"
             label={createMessage(APPLICATION_NAME)}
+            // TODO: Fix this the next time the file is edited
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             onBlur={(event: React.FocusEvent<any, Element>) => {
               AnalyticsUtil.logEvent(
                 "GS_MATCHING_REPO_NAME_ON_GIT_DISCONNECT_MODAL",

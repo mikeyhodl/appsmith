@@ -7,10 +7,9 @@ import { featureFlagIntercept } from "../../../../support/Objects/FeatureFlags";
 
 describe(
   "Datasource structure schema preview data",
-  { tags: ["@tag.Datasource"] },
+  { tags: ["@tag.Datasource", "@tag.Git", "@tag.AccessControl"] },
   () => {
     before(() => {
-      featureFlagIntercept({ ab_gsheet_schema_enabled: true });
       dataSources.CreateDataSource("Postgres");
     });
 

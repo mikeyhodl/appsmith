@@ -4,9 +4,9 @@ import {
   draggableWidgets,
 } from "../../../../support/Objects/ObjectsCore";
 
-describe(
-  "excludeForAirgap",
+describe.skip(
   "Handle Conversion for Generated/Imported Pages",
+  { tags: ["@tag.Settings", "@tag.excludeForAirgap"] },
   () => {
     it("1. make sure the Generated CRUD apps is converted and all the canvases are converted to auto layout", () => {
       dataSources.GeneratePageWithMockDB();

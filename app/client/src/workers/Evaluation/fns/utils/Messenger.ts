@@ -1,10 +1,12 @@
 /* eslint-disable no-console */
-import { WorkerErrorTypes } from "@appsmith/workers/common/types";
+import { WorkerErrorTypes } from "ee/workers/common/types";
 import { uniqueId } from "lodash";
 import { MessageType, sendMessage } from "utils/MessageUtil";
 import { getErrorMessage } from "workers/Evaluation/errorModifier";
 type TPromiseResponse =
   | {
+      // TODO: Fix this the next time the file is edited
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       data: any;
       error: null;
     }
@@ -17,25 +19,29 @@ async function responseHandler(requestId: string): Promise<TPromiseResponse> {
   return new Promise((resolve) => {
     const listener = (event: MessageEvent) => {
       const { body, messageId, messageType } = event.data;
+
       if (messageId === requestId && messageType === MessageType.RESPONSE) {
         resolve(body.data);
         self.removeEventListener("message", listener);
       }
     };
+
     self.addEventListener("message", listener);
   });
 }
 
 export type TransmissionErrorHandler = (
   messageId: string,
-  timeTaken: number,
+  startTime: number,
+  endTime: number,
   responseData: unknown,
   e: unknown,
 ) => void;
 
 const defaultErrorHandler: TransmissionErrorHandler = (
   messageId: string,
-  timeTaken: number,
+  startTime: number,
+  endTime: number,
   responseData: unknown,
   e: unknown,
 ) => {
@@ -44,7 +50,8 @@ const defaultErrorHandler: TransmissionErrorHandler = (
     messageId,
     messageType: MessageType.RESPONSE,
     body: {
-      timeTaken: timeTaken.toFixed(2),
+      startTime,
+      endTime,
       data: {
         errors: [
           {
@@ -63,17 +70,23 @@ const defaultErrorHandler: TransmissionErrorHandler = (
 };
 
 export class WorkerMessenger {
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   static async request(payload: any) {
     const messageId = uniqueId(`request-${payload.method}-`);
+
     sendMessage.call(self, {
       messageId,
       messageType: MessageType.REQUEST,
       body: payload,
     });
     const response = await responseHandler(messageId);
+
     return response;
   }
 
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   static ping(payload: any) {
     try {
       sendMessage.call(self, {
@@ -102,21 +115,23 @@ export class WorkerMessenger {
   static respond(
     messageId: string,
     data: unknown,
-    timeTaken: number,
+    startTime: number,
+    endTime: number,
     onErrorHandler?: TransmissionErrorHandler,
   ) {
     try {
       sendMessage.call(self, {
         messageId,
         messageType: MessageType.RESPONSE,
-        body: { data, timeTaken },
+        body: { data, startTime, endTime },
       });
     } catch (e) {
       const errorHandler = onErrorHandler || defaultErrorHandler;
+
       try {
-        errorHandler(messageId, timeTaken, data, e);
+        errorHandler(messageId, startTime, endTime, data, e);
       } catch {
-        defaultErrorHandler(messageId, timeTaken, data, e);
+        defaultErrorHandler(messageId, startTime, endTime, data, e);
       }
     }
   }

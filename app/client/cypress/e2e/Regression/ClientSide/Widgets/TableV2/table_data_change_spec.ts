@@ -62,7 +62,7 @@ const TABLE_DATA_2 = `[
       "name": "Barty Crouch",
       "status": "APPROVED",
       "gender": "",
-      "avatar": "https://robohash.org/sednecessitatibuset.png?size=100x100&set=set1",
+      "avatar": "http://host.docker.internal:4200/clouddefaultImage.png",
       "email": "barty.crouch@gmail.com",
       "address": "St Petersberg #911 4th main",
       "createdAt": "2020-03-16T18:00:05.000Z",
@@ -73,7 +73,7 @@ const TABLE_DATA_2 = `[
       "name": "Jenelle Kibbys",
       "status": "APPROVED",
       "gender": "Female",
-      "avatar": "https://robohash.org/quiaasperiorespariatur.bmp?size=100x100&set=set1",
+      "avatar": "http://host.docker.internal:4200/453-200x300.jpg",
       "email": "jkibby1@hp.com",
       "address": "85 Tennessee Plaza",
       "createdAt": "2019-10-04T03:22:23.000Z",
@@ -84,7 +84,7 @@ const TABLE_DATA_2 = `[
       "name": "Demetre",
       "status": "APPROVED",
       "gender": "Male",
-      "avatar": "https://robohash.org/iustooptiocum.jpg?size=100x100&set=set1",
+      "avatar": "http://host.docker.internal:4200/clouddefaultImage.png",
       "email": "aaaa@bbb.com",
       "address": "262 Saint Paul Park",
       "createdAt": "2020-05-01T17:30:50.000Z",
@@ -95,120 +95,130 @@ const TABLE_DATA_2 = `[
       "name": "Tobin Shellibeer",
       "status": "APPROVED",
       "gender": "Male",
-      "avatar": "https://robohash.org/odioeumdolores.png?size=100x100&set=set1",
+      "avatar": "http://host.docker.internal:4200/453-200x300.jpg",
       "email": "tshellibeer9@ihg.com",
       "address": "4 Ridgeway Lane",
       "createdAt": "2019-11-27T06:09:41.000Z",
       "updatedAt": "2019-09-07T16:35:48.000Z"
     }]`;
 
-describe("Table widget v2: tableData change test", function () {
-  before(() => {
-    agHelper.ClearLocalStorageCache();
-  });
+describe(
+  "Table widget v2: tableData change test",
+  { tags: ["@tag.Widget", "@tag.Table", "@tag.Binding"] },
+  function () {
+    before(() => {
+      agHelper.ClearLocalStorageCache();
+    });
 
-  it("1. should test that the number of columns needs to be same when table data changes in depoyed app", function () {
-    entityExplorer.DragDropWidgetNVerify(draggableWidgets.TABLE, 300, 100);
-    propPane.EnterJSContext(
-      "Table data",
-      `{{appsmith.store.test === '0' ? ${TABLE_DATA_1} : ${TABLE_DATA_2}}}`,
-    );
-
-    entityExplorer.DragDropWidgetNVerify(draggableWidgets.BUTTON, 500, 500);
-    propPane.UpdatePropertyFieldValue("Label", "Set table data 1");
-    propPane.SelectPlatformFunction("onClick", "Store value");
-    agHelper.EnterActionValue("Key", "test");
-    agHelper.EnterActionValue("Value", "0");
-
-    // add a success callback
-    agHelper.GetNClick(propPane._actionAddCallback("success"));
-    agHelper.GetNClick(locators._dropDownValue("Show alert"));
-    agHelper.EnterActionValue("Message", "table data 1 set");
-
-    entityExplorer.DragDropWidgetNVerify(draggableWidgets.BUTTON, 500, 600);
-    propPane.UpdatePropertyFieldValue("Label", "Set table data 2");
-    propPane.SelectPlatformFunction("onClick", "Store value");
-    agHelper.EnterActionValue("Key", "test");
-    agHelper.EnterActionValue("Value", "1");
-
-    // add a success callback
-    agHelper.GetNClick(propPane._actionAddCallback("success"));
-    agHelper.GetNClick(locators._dropDownValue("Show alert"));
-    agHelper.EnterActionValue("Message", "table data 2 set");
-
-    deployMode.DeployApp();
-
-    agHelper.ClickButton("Set table data 1");
-
-    agHelper.WaitUntilToastDisappear("table data 1 set");
-    table.AssertTableHeaderOrder("statussteptaskaction");
-    let tableLocalColumnOrder = readTableLocalColumnOrder(
-      "tableWidgetColumnOrder",
-    );
-    if (tableLocalColumnOrder)
-      expect(tableLocalColumnOrder.columnOrder.join("")).equal(
-        "statussteptaskaction",
+    it("1. should test that the number of columns needs to be same when table data changes in depoyed app", function () {
+      entityExplorer.DragDropWidgetNVerify(draggableWidgets.TABLE, 300, 100);
+      propPane.EnterJSContext(
+        "Table data",
+        `{{appsmith.store.test === '0' ? ${TABLE_DATA_1} : ${TABLE_DATA_2}}}`,
       );
 
-    agHelper.ClickButton("Set table data 2");
+      entityExplorer.DragDropWidgetNVerify(draggableWidgets.BUTTON, 500, 500);
+      propPane.UpdatePropertyFieldValue("Label", "Set table data 1");
+      propPane.SelectPlatformFunction("onClick", "Store value");
+      agHelper.EnterActionValue("Key", "test");
+      agHelper.EnterActionValue("Value", "0");
 
-    agHelper.WaitUntilToastDisappear("table data 2 set");
+      // add a success callback
+      agHelper.GetNClick(propPane._actionAddCallback("success"));
+      agHelper.GetNClick(locators._dropDownValue("Show alert"));
+      agHelper.EnterActionValue("Message", "table data 1 set");
 
-    table.AssertTableHeaderOrder(
-      "statusidnamegenderavataremailaddresscreatedAtupdatedAt",
-    );
-    tableLocalColumnOrder = readTableLocalColumnOrder("tableWidgetColumnOrder");
-    if (tableLocalColumnOrder)
-      expect(tableLocalColumnOrder.columnOrder.join("")).equal(
+      entityExplorer.DragDropWidgetNVerify(draggableWidgets.BUTTON, 500, 600);
+      propPane.UpdatePropertyFieldValue("Label", "Set table data 2");
+      propPane.SelectPlatformFunction("onClick", "Store value");
+      agHelper.EnterActionValue("Key", "test");
+      agHelper.EnterActionValue("Value", "1");
+
+      // add a success callback
+      agHelper.GetNClick(propPane._actionAddCallback("success"));
+      agHelper.GetNClick(locators._dropDownValue("Show alert"));
+      agHelper.EnterActionValue("Message", "table data 2 set");
+
+      deployMode.DeployApp();
+
+      agHelper.ClickButton("Set table data 1");
+
+      agHelper.WaitUntilToastDisappear("table data 1 set");
+      table.AssertTableHeaderOrder("statussteptaskaction");
+      let tableLocalColumnOrder = readTableLocalColumnOrder(
+        "tableWidgetColumnOrder",
+      );
+      if (tableLocalColumnOrder)
+        expect(tableLocalColumnOrder.columnOrder.join("")).equal(
+          "statussteptaskaction",
+        );
+
+      agHelper.ClickButton("Set table data 2");
+
+      agHelper.WaitUntilToastDisappear("table data 2 set");
+
+      table.AssertTableHeaderOrder(
         "statusidnamegenderavataremailaddresscreatedAtupdatedAt",
       );
-
-    /**
-     * Flow: Check the above flow for frozen columns
-     * 1. Freeze columns with table data 1.
-     * 2. Refresh the page.
-     * 3. Check if the frozen columns are same.
-     * 4. Similarly do the same thing for table data 2.
-     */
-
-    agHelper.ClickButton("Set table data 1");
-
-    agHelper.WaitUntilToastDisappear("table data 1 set");
-
-    table.AssertTableHeaderOrder("statussteptaskaction");
-    tableLocalColumnOrder = readTableLocalColumnOrder("tableWidgetColumnOrder");
-    if (tableLocalColumnOrder)
-      expect(tableLocalColumnOrder.columnOrder.join("")).equal(
-        "statussteptaskaction",
+      tableLocalColumnOrder = readTableLocalColumnOrder(
+        "tableWidgetColumnOrder",
       );
+      if (tableLocalColumnOrder)
+        expect(tableLocalColumnOrder.columnOrder.join("")).equal(
+          "statusidnamegenderavataremailaddresscreatedAtupdatedAt",
+        );
 
-    freezeColumnFromDropdown("status", "left");
-    freezeColumnFromDropdown("action", "right");
+      /**
+       * Flow: Check the above flow for frozen columns
+       * 1. Freeze columns with table data 1.
+       * 2. Refresh the page.
+       * 3. Check if the frozen columns are same.
+       * 4. Similarly do the same thing for table data 2.
+       */
 
-    agHelper.RefreshPage("viewPage");
+      agHelper.ClickButton("Set table data 1");
 
-    checkIfColumnIsFrozenViaCSS("status");
-    checkIfColumnIsFrozenViaCSS("action");
+      agHelper.WaitUntilToastDisappear("table data 1 set");
 
-    agHelper.ClickButton("Set table data 2");
+      table.AssertTableHeaderOrder("statussteptaskaction");
+      tableLocalColumnOrder = readTableLocalColumnOrder(
+        "tableWidgetColumnOrder",
+      );
+      if (tableLocalColumnOrder)
+        expect(tableLocalColumnOrder.columnOrder.join("")).equal(
+          "statussteptaskaction",
+        );
 
-    agHelper.WaitUntilToastDisappear("table data 2 set");
+      freezeColumnFromDropdown("status", "left");
+      freezeColumnFromDropdown("action", "right");
 
-    table.AssertTableHeaderOrder(
-      "statusidnamegenderavataremailaddresscreatedAtupdatedAt",
-    );
-    tableLocalColumnOrder = readTableLocalColumnOrder("tableWidgetColumnOrder");
-    if (tableLocalColumnOrder)
-      expect(tableLocalColumnOrder.columnOrder.join("")).equal(
+      agHelper.RefreshPage("getConsolidatedData");
+
+      checkIfColumnIsFrozenViaCSS("status");
+      checkIfColumnIsFrozenViaCSS("action");
+
+      agHelper.ClickButton("Set table data 2");
+
+      agHelper.WaitUntilToastDisappear("table data 2 set");
+
+      table.AssertTableHeaderOrder(
         "statusidnamegenderavataremailaddresscreatedAtupdatedAt",
       );
+      tableLocalColumnOrder = readTableLocalColumnOrder(
+        "tableWidgetColumnOrder",
+      );
+      if (tableLocalColumnOrder)
+        expect(tableLocalColumnOrder.columnOrder.join("")).equal(
+          "statusidnamegenderavataremailaddresscreatedAtupdatedAt",
+        );
 
-    freezeColumnFromDropdown("id", "left");
-    freezeColumnFromDropdown("updatedAt", "right");
+      freezeColumnFromDropdown("id", "left");
+      freezeColumnFromDropdown("updatedAt", "right");
 
-    agHelper.RefreshPage("viewPage");
+      agHelper.RefreshPage("getConsolidatedData");
 
-    checkIfColumnIsFrozenViaCSS("id");
-    checkIfColumnIsFrozenViaCSS("updatedAt");
-  });
-});
+      checkIfColumnIsFrozenViaCSS("id");
+      checkIfColumnIsFrozenViaCSS("updatedAt");
+    });
+  },
+);

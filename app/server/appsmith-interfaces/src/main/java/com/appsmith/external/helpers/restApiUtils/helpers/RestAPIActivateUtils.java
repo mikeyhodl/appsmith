@@ -30,6 +30,7 @@ import org.springframework.web.reactive.function.client.ExchangeStrategies;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.Exceptions;
 import reactor.core.publisher.Mono;
+import reactor.netty.http.HttpProtocol;
 import reactor.netty.http.client.HttpClient;
 import reactor.netty.resources.ConnectionProvider;
 
@@ -70,7 +71,8 @@ public class RestAPIActivateUtils {
             ObjectMapper objectMapper,
             Set<String> hintMessages,
             ActionExecutionResult errorResult,
-            RequestCaptureFilter requestCaptureFilter) {
+            RequestCaptureFilter requestCaptureFilter,
+            DatasourceConfiguration datasourceConfiguration) {
         return httpCall(client, httpMethod, uri, requestBody, 0)
                 .flatMap(clientResponse -> clientResponse.toEntity(byte[].class))
                 .map(stringResponseEntity -> {
@@ -93,7 +95,7 @@ public class RestAPIActivateUtils {
                     // Set the request fields
                     boolean isBodySentWithApiRequest = requestBody == null ? false : true;
                     result.setRequest(requestCaptureFilter.populateRequestFields(
-                            actionExecutionRequest, isBodySentWithApiRequest));
+                            actionExecutionRequest, isBodySentWithApiRequest, datasourceConfiguration));
 
                     result.setStatusCode(statusCode.toString());
 
@@ -244,7 +246,7 @@ public class RestAPIActivateUtils {
 
     public WebClient.Builder getWebClientBuilder(
             ActionConfiguration actionConfiguration, DatasourceConfiguration datasourceConfiguration) {
-        HttpClient httpClient = getHttpClient(datasourceConfiguration);
+        HttpClient httpClient = getHttpClient(datasourceConfiguration, actionConfiguration.getHttpVersion());
         WebClient.Builder webClientBuilder = WebClientUtils.builder(httpClient);
         addAllHeaders(webClientBuilder, actionConfiguration, datasourceConfiguration);
         addSecretKey(webClientBuilder, datasourceConfiguration);
@@ -299,7 +301,10 @@ public class RestAPIActivateUtils {
                 .forEach(header -> webClientBuilder.defaultHeader(header.getKey(), (String) header.getValue()));
     }
 
-    protected HttpClient getHttpClient(DatasourceConfiguration datasourceConfiguration) {
+    protected HttpClient getHttpClient(DatasourceConfiguration datasourceConfiguration, HttpProtocol httpProtocol) {
+        if (httpProtocol == null) {
+            httpProtocol = HttpProtocol.HTTP11;
+        }
         // Initializing webClient to be used for http call
         final ConnectionProvider provider = ConnectionProvider.builder("rest-api-provider")
                 .maxIdleTime(Duration.ofSeconds(600))
@@ -307,6 +312,7 @@ public class RestAPIActivateUtils {
                 .build();
 
         HttpClient httpClient = HttpClient.create(provider)
+                .protocol(httpProtocol)
                 .secure(SSLHelper.sslCheckForHttpClient(datasourceConfiguration))
                 .compress(true);
 

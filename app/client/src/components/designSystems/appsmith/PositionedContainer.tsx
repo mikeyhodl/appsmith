@@ -21,6 +21,7 @@ import { POSITIONED_WIDGET } from "constants/componentClassNameConstants";
 import equal from "fast-deep-equal";
 import { widgetTypeClassname } from "widgets/WidgetUtils";
 import { checkIsDropTarget } from "WidgetProvider/factory/helpers";
+import { useHoverToFocusWidget } from "utils/hooks/useHoverToFocusWidget";
 
 const PositionedWidget = styled.div<{
   zIndexOnHover: number;
@@ -30,6 +31,7 @@ const PositionedWidget = styled.div<{
     z-index: ${(props) => props.zIndexOnHover} !important;
   }
 `;
+
 export interface PositionedContainerProps {
   componentWidth: number;
   componentHeight: number;
@@ -154,8 +156,14 @@ export function PositionedContainer(
       ...reflowDimensionsStyles,
       ...dropTargetStyles,
     };
+
     return styles;
   }, [style, isReflowEffected, onHoverZIndex, zIndex, reflowedPosition]);
+
+  const [handleMouseOver, handleMouseLeave] = useHoverToFocusWidget(
+    props.widgetId,
+    props.resizeDisabled,
+  );
 
   // TODO: Experimental fix for sniping mode. This should be handled with a single event
   return (
@@ -168,6 +176,8 @@ export function PositionedContainer(
       id={props.widgetId}
       key={`positioned-container-${props.widgetId}`}
       onClickCapture={clickToSelectWidget}
+      onMouseLeave={handleMouseLeave}
+      onMouseOver={handleMouseOver}
       ref={ref}
       //Before you remove: This is used by property pane to reference the element
       style={containerStyle}

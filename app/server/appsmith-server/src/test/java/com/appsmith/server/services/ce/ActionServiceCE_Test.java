@@ -1,26 +1,24 @@
 package com.appsmith.server.services.ce;
 
 import com.appsmith.external.dtos.DslExecutableDTO;
-import com.appsmith.external.helpers.AppsmithBeanUtils;
 import com.appsmith.external.helpers.AppsmithEventContext;
 import com.appsmith.external.helpers.AppsmithEventContextType;
 import com.appsmith.external.models.ActionConfiguration;
 import com.appsmith.external.models.ActionDTO;
-import com.appsmith.external.models.AnalyticsInfo;
 import com.appsmith.external.models.Datasource;
 import com.appsmith.external.models.DatasourceConfiguration;
 import com.appsmith.external.models.DatasourceStorageDTO;
-import com.appsmith.external.models.DefaultResources;
 import com.appsmith.external.models.PaginationType;
 import com.appsmith.external.models.Policy;
 import com.appsmith.external.models.Property;
 import com.appsmith.external.plugins.PluginExecutor;
 import com.appsmith.server.acl.AclPermission;
 import com.appsmith.server.applications.base.ApplicationService;
+import com.appsmith.server.constants.ArtifactType;
 import com.appsmith.server.constants.FieldName;
 import com.appsmith.server.datasources.base.DatasourceService;
 import com.appsmith.server.domains.Application;
-import com.appsmith.server.domains.GitApplicationMetadata;
+import com.appsmith.server.domains.GitArtifactMetadata;
 import com.appsmith.server.domains.Layout;
 import com.appsmith.server.domains.NewAction;
 import com.appsmith.server.domains.PermissionGroup;
@@ -30,14 +28,16 @@ import com.appsmith.server.domains.Workspace;
 import com.appsmith.server.dtos.ActionMoveDTO;
 import com.appsmith.server.dtos.ActionViewDTO;
 import com.appsmith.server.dtos.ApplicationAccessDTO;
+import com.appsmith.server.dtos.ApplicationJson;
+import com.appsmith.server.dtos.CreateActionMetaDTO;
 import com.appsmith.server.dtos.LayoutDTO;
 import com.appsmith.server.dtos.PageDTO;
 import com.appsmith.server.exceptions.AppsmithError;
 import com.appsmith.server.exceptions.AppsmithException;
-import com.appsmith.server.exports.internal.ExportApplicationService;
+import com.appsmith.server.exports.internal.ExportService;
 import com.appsmith.server.helpers.MockPluginExecutor;
 import com.appsmith.server.helpers.PluginExecutorHelper;
-import com.appsmith.server.imports.internal.ImportApplicationService;
+import com.appsmith.server.imports.internal.ImportService;
 import com.appsmith.server.layouts.UpdateLayoutService;
 import com.appsmith.server.newactions.base.NewActionService;
 import com.appsmith.server.newpages.base.NewPageService;
@@ -64,7 +64,6 @@ import net.minidev.json.JSONObject;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -73,7 +72,6 @@ import org.springframework.boot.test.mock.mockito.SpyBean;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.test.context.support.WithUserDetails;
 import org.springframework.test.annotation.DirtiesContext;
-import org.springframework.test.context.junit.jupiter.SpringExtension;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
@@ -97,13 +95,12 @@ import static com.appsmith.server.acl.AclPermission.READ_ACTIONS;
 import static com.appsmith.server.acl.AclPermission.READ_DATASOURCES;
 import static com.appsmith.server.acl.AclPermission.READ_PAGES;
 import static com.appsmith.server.acl.AclPermission.READ_WORKSPACES;
+import static com.appsmith.server.constants.CommonConstants.EVALUATION_VERSION;
 import static com.appsmith.server.constants.FieldName.ADMINISTRATOR;
 import static com.appsmith.server.constants.FieldName.DEVELOPER;
 import static com.appsmith.server.constants.FieldName.VIEWER;
-import static com.appsmith.server.services.ce.ApplicationPageServiceCEImpl.EVALUATION_VERSION;
 import static org.assertj.core.api.Assertions.assertThat;
 
-@ExtendWith(SpringExtension.class)
 @SpringBootTest
 @Slf4j
 @DirtiesContext
@@ -148,10 +145,10 @@ public class ActionServiceCE_Test {
     DatasourceService datasourceService;
 
     @Autowired
-    ImportApplicationService importApplicationService;
+    ImportService importService;
 
     @Autowired
-    ExportApplicationService exportApplicationService;
+    ExportService exportService;
 
     @SpyBean
     PluginService pluginService;
@@ -252,28 +249,29 @@ public class ActionServiceCE_Test {
 
         Application newApp = new Application();
         newApp.setName(UUID.randomUUID().toString());
-        GitApplicationMetadata gitData = new GitApplicationMetadata();
-        gitData.setBranchName("actionServiceTest");
+        GitArtifactMetadata gitData = new GitArtifactMetadata();
+        gitData.setRefName("actionServiceTest");
         newApp.setGitApplicationMetadata(gitData);
         gitConnectedApp = applicationPageService
                 .createApplication(newApp, workspaceId)
                 .flatMap(application2 -> {
                     application2.getGitApplicationMetadata().setDefaultApplicationId(application2.getId());
-                    return applicationService
-                            .save(application2)
-                            .zipWhen(application1 -> exportApplicationService.exportApplicationById(
-                                    application1.getId(), gitData.getBranchName()));
+                    return applicationService.save(application2).zipWhen(application1 -> exportService
+                            .exportByArtifactIdAndBranchName(
+                                    application1.getId(), gitData.getRefName(), ArtifactType.APPLICATION)
+                            .map(artifactExchangeJson -> (ApplicationJson) artifactExchangeJson));
                 })
                 // Assign the branchName to all the resources connected to the application
-                .flatMap(tuple -> importApplicationService.importApplicationInWorkspaceFromGit(
-                        workspaceId, tuple.getT2(), tuple.getT1().getId(), gitData.getBranchName()))
+                .flatMap(tuple -> importService.importArtifactInWorkspaceFromGit(
+                        workspaceId, tuple.getT1().getId(), tuple.getT2(), gitData.getRefName()))
+                .map(importableArtifact -> (Application) importableArtifact)
                 .block();
 
         gitConnectedPage = newPageService
                 .findPageById(gitConnectedApp.getPages().get(0).getId(), READ_PAGES, false)
                 .block();
 
-        branchName = gitConnectedApp.getGitApplicationMetadata().getBranchName();
+        branchName = gitConnectedApp.getGitApplicationMetadata().getRefName();
 
         datasource = new Datasource();
         datasource.setName("Default Database");
@@ -309,17 +307,12 @@ public class ActionServiceCE_Test {
         action.setActionConfiguration(actionConfiguration);
         action.setDatasource(datasource);
 
-        Mono<NewAction> actionMono = layoutActionService
-                .createSingleActionWithBranch(action, branchName)
-                .flatMap(createdAction -> newActionService.findByBranchNameAndDefaultActionId(
-                        branchName, createdAction.getId(), READ_ACTIONS));
+        Mono<ActionDTO> actionMono = layoutActionService.createSingleAction(action);
 
         StepVerifier.create(actionMono)
-                .assertNext(newAction -> {
-                    assertThat(newAction.getUnpublishedAction().getPageId()).isEqualTo(gitConnectedPage.getId());
-                    assertThat(newAction.getDefaultResources().getActionId()).isEqualTo(newAction.getId());
-                    assertThat(newAction.getDefaultResources().getApplicationId())
-                            .isEqualTo(gitConnectedApp.getId());
+                .assertNext(actionDTO -> {
+                    assertThat(actionDTO.getPageId()).isEqualTo(gitConnectedPage.getId());
+                    assertThat(actionDTO.getBaseId()).isEqualTo(actionDTO.getId());
                 })
                 .verifyComplete();
     }
@@ -420,19 +413,14 @@ public class ActionServiceCE_Test {
         action.setActionConfiguration(actionConfiguration);
         action.setDatasource(datasource);
 
-        Mono<ActionDTO> actionMono = layoutActionService.createSingleActionWithBranch(action, branchName);
+        Mono<ActionDTO> actionMono = layoutActionService.createSingleAction(action);
 
         StepVerifier.create(Mono.zip(actionMono, defaultPermissionGroupsMono))
                 .assertNext(tuple -> {
                     ActionDTO createdAction = tuple.getT1();
                     assertThat(createdAction.getExecuteOnLoad()).isFalse();
-                    assertThat(createdAction.getDefaultResources()).isNotNull();
                     assertThat(createdAction.getUserPermissions()).isNotEmpty();
-                    assertThat(createdAction.getDefaultResources().getActionId())
-                            .isEqualTo(createdAction.getId());
-                    assertThat(createdAction.getDefaultResources().getPageId()).isEqualTo(gitConnectedPage.getId());
-                    assertThat(createdAction.getDefaultResources().getApplicationId())
-                            .isEqualTo(gitConnectedPage.getApplicationId());
+                    assertThat(createdAction.getBaseId()).isEqualTo(createdAction.getId());
 
                     List<PermissionGroup> permissionGroups = tuple.getT2();
                     PermissionGroup adminPermissionGroup = permissionGroups.stream()
@@ -524,9 +512,7 @@ public class ActionServiceCE_Test {
         PageDTO newPage = new PageDTO();
         newPage.setName("Destination Page");
         newPage.setApplicationId(gitConnectedApp.getId());
-        PageDTO destinationPage = applicationPageService
-                .createPageWithBranchName(newPage, branchName)
-                .block();
+        PageDTO destinationPage = applicationPageService.createPage(newPage).block();
 
         ActionDTO action = new ActionDTO();
         action.setName("validAction");
@@ -536,17 +522,14 @@ public class ActionServiceCE_Test {
         action.setActionConfiguration(actionConfiguration);
         action.setDatasource(datasource);
 
-        Mono<ActionDTO> createActionMono = layoutActionService
-                .createSingleActionWithBranch(action, branchName)
-                .cache();
-        DefaultResources sourceActionDefaultRes = new DefaultResources();
+        Mono<ActionDTO> createActionMono =
+                layoutActionService.createSingleAction(action).cache();
 
         Mono<ActionDTO> movedActionMono = createActionMono.flatMap(savedAction -> {
             ActionMoveDTO actionMoveDTO = new ActionMoveDTO();
             actionMoveDTO.setAction(savedAction);
             actionMoveDTO.setDestinationPageId(destinationPage.getId());
-            AppsmithBeanUtils.copyNestedNonNullProperties(savedAction.getDefaultResources(), sourceActionDefaultRes);
-            return layoutActionService.moveAction(actionMoveDTO, branchName);
+            return layoutActionService.moveAction(actionMoveDTO);
         });
 
         StepVerifier.create(Mono.zip(createActionMono, movedActionMono))
@@ -558,13 +541,6 @@ public class ActionServiceCE_Test {
                     assertThat(movedAction.getName()).isEqualTo(originalAction.getName());
                     assertThat(movedAction.getPolicies()).containsAll(originalAction.getPolicies());
                     assertThat(movedAction.getPageId()).isEqualTo(destinationPage.getId());
-
-                    // Check if the defaultIds are updated as per destination page default Id
-                    assertThat(movedAction.getDefaultResources()).isNotNull();
-                    assertThat(movedAction.getDefaultResources().getPageId())
-                            .isEqualTo(destinationPage.getDefaultResources().getPageId());
-                    assertThat(sourceActionDefaultRes.getPageId())
-                            .isEqualTo(gitConnectedPage.getDefaultResources().getPageId());
                 })
                 .verifyComplete();
     }
@@ -656,7 +632,7 @@ public class ActionServiceCE_Test {
         ActionConfiguration actionConfiguration = new ActionConfiguration();
         actionConfiguration.setHttpMethod(HttpMethod.GET);
         action.setActionConfiguration(actionConfiguration);
-        Mono<ActionDTO> actionMono = layoutActionService.createSingleActionWithBranch(action, branchName);
+        Mono<ActionDTO> actionMono = layoutActionService.createSingleAction(action);
 
         StepVerifier.create(actionMono)
                 .expectErrorMatches(throwable -> throwable instanceof AppsmithException
@@ -680,25 +656,6 @@ public class ActionServiceCE_Test {
                         && throwable
                                 .getMessage()
                                 .equals(AppsmithError.NO_RESOURCE_FOUND.getMessage("page", "invalid page id here")))
-                .verify();
-    }
-
-    @Test
-    @WithUserDetails(value = "api_user")
-    public void createAction_forGitConnectedAppWithInvalidBranchName_throwException() {
-        ActionDTO action = new ActionDTO();
-        action.setName("randomActionName");
-        action.setPageId(gitConnectedPage.getId());
-        ActionConfiguration actionConfiguration = new ActionConfiguration();
-        actionConfiguration.setHttpMethod(HttpMethod.GET);
-        action.setActionConfiguration(actionConfiguration);
-        Mono<ActionDTO> actionMono = layoutActionService.createSingleActionWithBranch(action, "randomTestBranch");
-        StepVerifier.create(actionMono)
-                .expectErrorMatches(throwable -> throwable instanceof AppsmithException
-                        && throwable
-                                .getMessage()
-                                .equals(AppsmithError.NO_RESOURCE_FOUND.getMessage(
-                                        FieldName.PAGE, action.getPageId() + ", randomTestBranch")))
                 .verify();
     }
 
@@ -803,7 +760,7 @@ public class ActionServiceCE_Test {
                     assertThat(actionViewDTO.getTimeoutInMillisecond()).isNotNull();
                     assertThat(actionViewDTO.getPageId()).isNotNull();
                     assertThat(actionViewDTO.getConfirmBeforeExecute()).isNotNull();
-                    assertThat(actionViewDTO.getJsonPathKeys().size()).isEqualTo(1);
+                    assertThat(actionViewDTO.getJsonPathKeys()).hasSize(1);
                 })
                 .verifyComplete();
     }
@@ -864,6 +821,57 @@ public class ActionServiceCE_Test {
 
     @Test
     @WithUserDetails(value = "api_user")
+    public void updateActionShouldSetUpdatedAtField() {
+        Mockito.when(pluginExecutorHelper.getPluginExecutor(Mockito.any()))
+                .thenReturn(Mono.just(new MockPluginExecutor()));
+
+        Datasource externalDatasource = new Datasource();
+        externalDatasource.setName("updateActionShouldSetUpdatedAtField Database");
+        externalDatasource.setWorkspaceId(workspaceId);
+        Plugin installed_plugin =
+                pluginRepository.findByPackageName("installed-plugin").block();
+        externalDatasource.setPluginId(installed_plugin.getId());
+        DatasourceConfiguration datasourceConfiguration = new DatasourceConfiguration();
+        datasourceConfiguration.setUrl("some url here");
+
+        HashMap<String, DatasourceStorageDTO> storages = new HashMap<>();
+        storages.put(
+                defaultEnvironmentId, new DatasourceStorageDTO(null, defaultEnvironmentId, datasourceConfiguration));
+        externalDatasource.setDatasourceStorages(storages);
+        Datasource savedDs = datasourceService.create(externalDatasource).block();
+
+        ActionDTO action = new ActionDTO();
+        action.setName("updateActionShouldSetUpdatedAtField");
+        action.setPageId(testPage.getId());
+        ActionConfiguration actionConfiguration = new ActionConfiguration();
+        actionConfiguration.setHttpMethod(HttpMethod.GET);
+        action.setActionConfiguration(actionConfiguration);
+        action.setDatasource(savedDs);
+
+        Mono<ActionDTO> newActionMono =
+                layoutActionService.createSingleAction(action, Boolean.FALSE).cache();
+
+        Mono<ActionDTO> updateActionMono = newActionMono.flatMap(preUpdateAction -> {
+            ActionDTO actionUpdate = action;
+            actionUpdate.getActionConfiguration().setBody("New Body");
+            return layoutActionService
+                    .updateSingleAction(preUpdateAction.getId(), actionUpdate)
+                    .flatMap(updatedAction -> updateLayoutService
+                            .updatePageLayoutsByPageId(updatedAction.getPageId())
+                            .thenReturn(updatedAction));
+        });
+
+        StepVerifier.create(updateActionMono)
+                .assertNext(updatedAction -> {
+                    assertThat(updatedAction).isNotNull();
+                    assertThat(updatedAction.getUpdatedAt()).isNotNull();
+                    assertThat(updatedAction.getActionConfiguration().getBody()).isEqualTo("New Body");
+                })
+                .verifyComplete();
+    }
+
+    @Test
+    @WithUserDetails(value = "api_user")
     public void testActionWithGraphQLDatasourceMoustacheBinding() {
         Mockito.when(pluginExecutorHelper.getPluginExecutor(Mockito.any()))
                 .thenReturn(Mono.just(new MockPluginExecutor()));
@@ -898,7 +906,7 @@ public class ActionServiceCE_Test {
         StepVerifier.create(newActionMono)
                 .assertNext(actionDTO -> {
                     assertThat(actionDTO).isNotNull();
-                    assertThat(actionDTO.getJsonPathKeys().size()).isEqualTo(1);
+                    assertThat(actionDTO.getJsonPathKeys()).hasSize(1);
                     assertThat(actionDTO.getJsonPathKeys()).isEqualTo(Set.of("one.text"));
                 })
                 .verifyComplete();
@@ -946,7 +954,7 @@ public class ActionServiceCE_Test {
                 .assertNext(actionDTO -> {
                     assertThat(actionDTO).isNotNull();
                     assertThat(actionDTO.getActionConfiguration().getBody()).isEqualTo("New Body");
-                    assertThat(actionDTO.getJsonPathKeys().size()).isEqualTo(1);
+                    assertThat(actionDTO.getJsonPathKeys()).hasSize(1);
                     assertThat(actionDTO.getJsonPathKeys()).isEqualTo(Set.of("two.text"));
                 })
                 .verifyComplete();
@@ -987,7 +995,7 @@ public class ActionServiceCE_Test {
         StepVerifier.create(newActionMono)
                 .assertNext(actionDTO -> {
                     assertThat(actionDTO).isNotNull();
-                    assertThat(actionDTO.getJsonPathKeys().size()).isEqualTo(0);
+                    assertThat(actionDTO.getJsonPathKeys()).hasSize(0);
                 })
                 .verifyComplete();
     }
@@ -1022,7 +1030,8 @@ public class ActionServiceCE_Test {
         applicationAccessDTO.setPublicAccess(true);
 
         Mono<Application> publicAppMono = applicationService
-                .changeViewAccess(createdApplication.getId(), applicationAccessDTO)
+                .changeViewAccessForSingleBranchByBranchedApplicationId(
+                        createdApplication.getId(), applicationAccessDTO)
                 .cache();
 
         Datasource datasource = new Datasource();
@@ -1169,7 +1178,10 @@ public class ActionServiceCE_Test {
         action.setDatasource(datasource);
 
         AppsmithEventContext eventContext = new AppsmithEventContext(AppsmithEventContextType.CLONE_PAGE);
-        Mono<ActionDTO> actionMono = layoutActionService.createAction(action, eventContext, Boolean.FALSE);
+        CreateActionMetaDTO createActionMetaDTO = new CreateActionMetaDTO();
+        createActionMetaDTO.setEventContext(eventContext);
+        createActionMetaDTO.setIsJsAction(Boolean.FALSE);
+        Mono<ActionDTO> actionMono = layoutActionService.createAction(action, createActionMetaDTO);
         StepVerifier.create(actionMono)
                 .assertNext(createdAction -> {
                     // executeOnLoad is expected to be set to false in case of default context
@@ -1270,7 +1282,7 @@ public class ActionServiceCE_Test {
         Mono<ActionDTO> actionMono = layoutActionService
                 .createSingleAction(action, Boolean.FALSE)
                 .flatMap(createdAction -> newActionService.findById(createdAction.getId(), READ_ACTIONS))
-                .flatMap(newAction -> newActionService.generateActionByViewMode(newAction, false));
+                .map(newAction -> newActionService.generateActionByViewMode(newAction, false));
 
         StepVerifier.create(actionMono)
                 .assertNext(createdAction -> {
@@ -1302,7 +1314,7 @@ public class ActionServiceCE_Test {
         Mono<ActionDTO> actionMono = layoutActionService
                 .createSingleAction(action, Boolean.FALSE)
                 .flatMap(createdAction -> newActionService.findById(createdAction.getId(), READ_ACTIONS))
-                .flatMap(newAction -> newActionService.generateActionByViewMode(newAction, false));
+                .map(newAction -> newActionService.generateActionByViewMode(newAction, false));
 
         StepVerifier.create(actionMono)
                 .assertNext(createdAction -> {
@@ -1358,17 +1370,8 @@ public class ActionServiceCE_Test {
 
                     return Mono.zip(monos, objects -> page1);
                 })
-                .zipWhen(page1 -> {
-                    Layout layout = new Layout();
-
-                    JSONObject obj = new JSONObject(Map.of("key", "value"));
-                    layout.setDsl(obj);
-
-                    return layoutService.createLayout(page1.getId(), layout);
-                })
-                .flatMap(tuple2 -> {
-                    final PageDTO page1 = tuple2.getT1();
-                    final Layout layout = tuple2.getT2();
+                .flatMap(page1 -> {
+                    final Layout layout = page1.getLayouts().get(0);
 
                     Layout newLayout = new Layout();
 
@@ -1416,45 +1419,6 @@ public class ActionServiceCE_Test {
     }
 
     @Test
-    @WithUserDetails(value = "api_user")
-    public void updateAction_withoutWorkspaceId_withOrganizationId() {
-
-        Mockito.when(pluginExecutorHelper.getPluginExecutor(Mockito.any()))
-                .thenReturn(Mono.just(new MockPluginExecutor()));
-
-        ActionDTO action = new ActionDTO();
-        action.setName("validAction_nestedDatasource");
-        action.setPageId(testPage.getId());
-        action.setExecuteOnLoad(true);
-        ActionConfiguration actionConfiguration = new ActionConfiguration();
-        actionConfiguration.setHttpMethod(HttpMethod.GET);
-        action.setActionConfiguration(actionConfiguration);
-        action.setDatasource(datasource);
-
-        Mono<ActionDTO> createActionMono =
-                layoutActionService.createSingleAction(action, Boolean.FALSE).cache();
-
-        ActionDTO updateAction = new ActionDTO();
-        Datasource nestedDatasource = new Datasource();
-        nestedDatasource.setOrganizationId(workspaceId);
-        nestedDatasource.setName("DEFAULT_REST_DATASOURCE");
-        nestedDatasource.setPluginId(datasource.getPluginId());
-        nestedDatasource.setDatasourceConfiguration(new DatasourceConfiguration());
-
-        updateAction.setDatasource(nestedDatasource);
-        Mono<ActionDTO> actionMono = createActionMono.flatMap(
-                savedAction -> layoutActionService.updateAction(savedAction.getId(), updateAction));
-
-        StepVerifier.create(actionMono)
-                .assertNext(updatedAction -> {
-                    Datasource datasource1 = updatedAction.getDatasource();
-                    assertThat(datasource1.getWorkspaceId()).isNotNull();
-                    assertThat(datasource1.getInvalids()).isEmpty();
-                })
-                .verifyComplete();
-    }
-
-    @Test
     @WithUserDetails("api_user")
     public void validateAndSaveActionToRepository_noDatasourceEditPermission() {
         Mockito.when(pluginExecutorHelper.getPluginExecutor(Mockito.any()))
@@ -1487,42 +1451,30 @@ public class ActionServiceCE_Test {
     }
 
     @Test
-    @WithUserDetails(value = "api_user")
-    public void createCopyActionWithAnalyticsData_validateAnalyticsDataPersistsInResponse() {
+    @WithUserDetails("api_user")
+    public void validateAndSaveActionToRepository_ActionDTOHasCreatedAtUpdatedAtFieldsPresent() {
         Mockito.when(pluginExecutorHelper.getPluginExecutor(Mockito.any()))
                 .thenReturn(Mono.just(new MockPluginExecutor()));
-
+        Mockito.when(pluginService.getEditorConfigLabelMap(Mockito.anyString())).thenReturn(Mono.just(new HashMap<>()));
+        Mockito.when(pluginExecutor.getHintMessages(Mockito.any(), Mockito.any()))
+                .thenReturn(Mono.zip(Mono.just(new HashSet<>()), Mono.just(new HashSet<>())));
         ActionDTO action = new ActionDTO();
-        action.setName("CopyOfQuery1");
-        action.setPageId(testPage.getId());
-        action.setDatasource(datasource);
         ActionConfiguration actionConfiguration = new ActionConfiguration();
-        actionConfiguration.setPluginSpecifiedTemplates(List.of(new Property(null, true)));
-
-        AnalyticsInfo analyticsInfo = new AnalyticsInfo();
-        Map<String, Object> analyticsData = new HashMap<>();
-        String keyOriginalActionId = "originalActionId";
-        String valueOriginalActionId = "xyz";
-        analyticsData.put(keyOriginalActionId, valueOriginalActionId);
-        analyticsInfo.setAnalyticsData(analyticsData);
-        action.setEventData(analyticsInfo);
-
+        actionConfiguration.setHttpMethod(HttpMethod.POST);
+        actionConfiguration.setBody("random-request-body");
+        actionConfiguration.setHeaders(List.of(new Property("random-header-key", "random-header-value")));
         action.setActionConfiguration(actionConfiguration);
+        action.setPageId(testPage.getId());
+        action.setName("testActionFields");
+        action.setDatasource(datasource);
+        ActionDTO createdAction =
+                layoutActionService.createSingleAction(action, Boolean.FALSE).block();
 
-        Mono<ActionDTO> actionMono =
-                Mono.just(action).flatMap(action1 -> layoutActionService.createSingleAction(action1, Boolean.FALSE));
-        StepVerifier.create(actionMono)
-                .assertNext(createdAction -> {
-                    assertThat(createdAction.getId()).isNotEmpty();
-                    assertThat(createdAction.getName()).isEqualTo(action.getName());
-                    assertThat(createdAction.getIsValid()).isTrue();
-                    assertThat(createdAction
-                            .getEventData()
-                            .getAnalyticsData()
-                            .get(keyOriginalActionId)
-                            .toString()
-                            .equalsIgnoreCase(valueOriginalActionId));
-                })
-                .verifyComplete();
+        NewAction newAction = newActionService.findById(createdAction.getId()).block();
+        ActionDTO savedAction =
+                newActionService.validateAndSaveActionToRepository(newAction).block();
+        assertThat(savedAction.getIsValid()).isTrue();
+        assertThat(savedAction.getCreatedAt()).isNotNull();
+        assertThat(savedAction.getUpdatedAt()).isNotNull();
     }
 }

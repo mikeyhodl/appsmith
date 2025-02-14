@@ -1,7 +1,7 @@
 import styled, { createGlobalStyle } from "styled-components";
 import { get, startCase } from "lodash";
 import { useDispatch, useSelector } from "react-redux";
-import React, { useCallback, useState } from "react";
+import React, { useCallback } from "react";
 
 import ThemeCard from "./ThemeCard";
 import {
@@ -15,19 +15,18 @@ import {
   updateSelectedAppThemeAction,
 } from "actions/appThemingActions";
 import SettingSection from "./SettingSection";
-import SaveThemeModal from "./SaveThemeModal";
 import type { AppTheme } from "entities/AppTheming";
-import AnalyticsUtil from "utils/AnalyticsUtil";
+import AnalyticsUtil from "ee/utils/AnalyticsUtil";
 import ThemeFontControl from "./controls/ThemeFontControl";
 import ThemeColorControl from "./controls/ThemeColorControl";
-import { Classes as CsClasses } from "design-system-old";
+import { Classes as CsClasses } from "@appsmith/ads-old";
 import {
   Button,
   Menu,
   MenuContent,
   MenuTrigger,
   MenuItem,
-} from "design-system";
+} from "@appsmith/ads";
 import ThemeBoxShadowControl from "./controls/ThemeShadowControl";
 import { getCurrentApplicationId } from "selectors/editorSelectors";
 import ThemeBorderRadiusControl from "./controls/ThemeBorderRadiusControl";
@@ -64,7 +63,6 @@ function ThemeEditor() {
   const applicationId = useSelector(getCurrentApplicationId);
   const selectedTheme = useSelector(getSelectedAppTheme);
   const themingStack = useSelector(getAppThemingStack);
-  const [isSaveModalOpen, setSaveModalOpen] = useState(false);
 
   /**
    * customizes the current theme
@@ -78,7 +76,7 @@ function ThemeEditor() {
 
       dispatch(updateSelectedAppThemeAction({ applicationId, theme }));
     },
-    [updateSelectedAppThemeAction],
+    [applicationId, dispatch],
   );
 
   /**
@@ -93,23 +91,7 @@ function ThemeEditor() {
         AppThemingMode.APP_THEME_SELECTION,
       ]),
     );
-  }, [setAppThemingModeStackAction]);
-
-  /**
-   * open the save modal
-   */
-  const onOpenSaveModal = useCallback(() => {
-    AnalyticsUtil.logEvent("APP_THEMING_SAVE_THEME_START");
-
-    setSaveModalOpen(true);
-  }, [setSaveModalOpen]);
-
-  /**
-   * on close save modal
-   */
-  const onCloseSaveModal = useCallback(() => {
-    setSaveModalOpen(false);
-  }, [setSaveModalOpen]);
+  }, [dispatch, themingStack]);
 
   /**
    * resets theme
@@ -136,9 +118,6 @@ function ThemeEditor() {
                 />
               </MenuTrigger>
               <MenuContent align="end" className="t--save-theme-menu">
-                <MenuItem onClick={onOpenSaveModal} startIcon="save">
-                  Save theme
-                </MenuItem>
                 <MenuItem onClick={onResetTheme} startIcon="arrow-go-back">
                   Reset widget styles
                 </MenuItem>
@@ -270,7 +249,6 @@ function ThemeEditor() {
           )}
         </SettingSection>
       </main>
-      <SaveThemeModal isOpen={isSaveModalOpen} onClose={onCloseSaveModal} />
       <PopoverStyles />
     </>
   );

@@ -17,7 +17,8 @@ jobs:
       github.event.pull_request.head.repo.full_name == github.repository ||
       github.event_name == 'push' ||
       github.event_name == 'workflow_dispatch' ||
-      github.event_name == 'repository_dispatch'
+      github.event_name == 'repository_dispatch' ||
+      github.event_name == 'schedule'
     defaults:
       run:
         shell: bash
@@ -37,7 +38,7 @@ jobs:
 
       - name: Download the client build artifact
         if: steps.run_result.outputs.run_result != 'success'
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: client-build
           path: app/client
@@ -50,14 +51,14 @@ jobs:
 
       - name: Download the server build artifact
         if: steps.run_result.outputs.run_result != 'success'
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: server-build
           path: app/server/dist/
 
       - name: Download the rts build artifact
         if: steps.run_result.outputs.run_result != 'success'
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: rts-dist
           path: app/client/packages/rts/dist
@@ -69,10 +70,26 @@ jobs:
           rm app/client/packages/rts/dist/rts-dist.tar
 
       - name: Generate info.json
+        id: info_json
         run: |
-          if [[ -f scripts/generate_info_json.sh ]]; then
-            scripts/generate_info_json.sh
+          scripts/generate_info_json.sh
+
+      - name: Place server artifacts-es
+        env:
+          EDITION: ${{ vars.EDITION }}
+        run: |
+          scripts/prepare_server_artifacts.sh
+
+      - name: Set base image tag
+        id: set_base_tag
+        run: |
+          if [[ "${{ inputs.pr }}" != 0 || "${{ github.ref_name }}" != master ]]; then
+            base_tag=release
+          else
+            base_tag=nightly
           fi
+          echo "base_tag=$base_tag" >> $GITHUB_OUTPUT
+
 
       # We don't use Depot Docker builds because it's faster for local Docker images to be built locally.
       # It's slower and more expensive to build these Docker images on Depot and download it back to the CI node.
@@ -82,23 +99,28 @@ jobs:
         run: |
           set -o xtrace
           declare -a args
-          if [[ "${{ inputs.pr }}" != 0 || "${{ github.ref_name }}" != master ]]; then
+          base_tag=${{ steps.set_base_tag.outputs.base_tag }}
+          if [[ base_tag != 'nightly' ]]; then
             args+=(--build-arg "APPSMITH_CLOUD_SERVICES_BASE_URL=https://release-cs.appsmith.com")
-            base_tag=release
-          else
-            base_tag=nightly
           fi
           args+=(--build-arg "BASE=${{ vars.DOCKER_HUB_ORGANIZATION }}/base-${{ vars.EDITION }}:$base_tag")
+          args+=(--label "org.opencontainers.image.revision=${{ steps.info_json.outputs.commitSha }}")
+          args+=(--label "org.opencontainers.image.source=${{ steps.info_json.outputs.repo }}")
+          args+=(--label "org.opencontainers.image.version=${{ steps.info_json.outputs.version }}")
           docker build -t cicontainer "${args[@]}" .
 
       # Saving the docker image to tar file
       - name: Save Docker image to tar file
         run: |
+          docker image ls --all --no-trunc --format '{{.Repository}},{{.ID}}' \
+            | grep -v cicontainer \
+            | cut -d, -f2 \
+            | xargs -r docker rmi || true
           docker save cicontainer -o cicontainer.tar
           gzip cicontainer.tar
 
       - name: Cache docker image
-        uses: actions/cache/save@v3
+        uses: actions/cache/save@v4
         with:
           path: cicontainer.tar.gz
           key: docker-image-${{github.run_id}}

@@ -15,6 +15,7 @@ import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.util.StringUtils;
 import org.springframework.web.reactive.function.client.ClientRequest;
 import org.springframework.web.reactive.function.client.ExchangeFilterFunction;
+import org.springframework.web.reactive.function.client.ExchangeStrategies;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 import reactor.netty.http.client.HttpClient;
@@ -24,16 +25,19 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
 @Slf4j
 public class WebClientUtils {
 
-    private static final Set<String> DISALLOWED_HOSTS =
-            Set.of("169.254.169.254", "0:0:0:0:0:0:a9fe:a9fe", "fd00:ec2:0:0:0:0:0:254", "metadata.google.internal");
+    private static final Set<String> DISALLOWED_HOSTS = computeDisallowedHosts();
 
     public static final String HOST_NOT_ALLOWED = "Host not allowed.";
+
+    private static final int MAX_IN_MEMORY_SIZE_IN_BYTES = 16 * 1024 * 1024;
 
     private static final InetAddressValidator inetAddressValidator = InetAddressValidator.getInstance();
 
@@ -41,6 +45,18 @@ public class WebClientUtils {
             ExchangeFilterFunction.ofRequestProcessor(WebClientUtils::requestFilterFn);
 
     private WebClientUtils() {}
+
+    private static Set<String> computeDisallowedHosts() {
+        final Set<String> hosts = new HashSet<>(Set.of(
+                "169.254.169.254", "0:0:0:0:0:0:a9fe:a9fe", "fd00:ec2:0:0:0:0:0:254", "metadata.google.internal"));
+
+        if ("1".equals(System.getenv("IN_DOCKER"))) {
+            hosts.add("127.0.0.1");
+            hosts.add("0:0:0:0:0:0:0:1");
+        }
+
+        return Collections.unmodifiableSet(hosts);
+    }
 
     public static WebClient create() {
         return builder().build();
@@ -75,6 +91,9 @@ public class WebClientUtils {
     public static WebClient.Builder builder(HttpClient httpClient) {
         return WebClient.builder()
                 .filter(IP_CHECK_FILTER)
+                .exchangeStrategies(ExchangeStrategies.builder()
+                        .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(MAX_IN_MEMORY_SIZE_IN_BYTES))
+                        .build())
                 .clientConnector(new ReactorClientHttpConnector(makeSafeHttpClient(httpClient)));
     }
 

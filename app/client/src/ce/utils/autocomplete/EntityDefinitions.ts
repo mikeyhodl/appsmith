@@ -1,11 +1,18 @@
 import type { ExtraDef } from "utils/autocomplete/defCreatorUtils";
 import { generateTypeDef } from "utils/autocomplete/defCreatorUtils";
-import type { AppsmithEntity } from "@appsmith/entities/DataTree/types";
+import { ENTITY_TYPE, type AppsmithEntity } from "ee/entities/DataTree/types";
 import _ from "lodash";
 import { EVALUATION_PATH } from "utils/DynamicBindingUtils";
-import type { JSCollectionData } from "@appsmith/reducers/entityReducers/jsActionsReducer";
 import type { Def } from "tern";
-import type { ActionEntity } from "@appsmith/entities/DataTree/types";
+import type {
+  ActionEntity,
+  ActionEntityConfig,
+  DataTreeEntityConfig,
+  WidgetEntityConfig,
+} from "ee/entities/DataTree/types";
+import type { FieldEntityInformation } from "components/editorComponents/CodeEditor/EditorConfig";
+import { AutocompleteDataType } from "utils/autocomplete/AutocompleteDataType";
+import { eeAppsmithAutocompleteDefs } from "ee/utils/autocomplete/helpers";
 
 export const entityDefinitions = {
   APPSMITH: (entity: AppsmithEntity, extraDefsToDefine: ExtraDef) => {
@@ -13,6 +20,7 @@ export const entityDefinitions = {
       _.omit(entity, "ENTITY_TYPE", EVALUATION_PATH),
       extraDefsToDefine,
     );
+
     if (
       typeof generatedTypeDef === "object" &&
       typeof generatedTypeDef.geolocation === "object"
@@ -79,8 +87,10 @@ export const entityDefinitions = {
               "https://docs.appsmith.com/reference/appsmith-framework/context-object#geolocationclearwatch",
           },
         },
+        ...eeAppsmithAutocompleteDefs(generatedTypeDef),
       };
     }
+
     return generatedTypeDef;
   },
   ACTION: (entity: ActionEntity, extraDefsToDefine: ExtraDef) => {
@@ -108,6 +118,7 @@ export const entityDefinitions = {
     } else {
       dataCustomDef = { ...dataCustomDef, ...dataDef };
     }
+
     return {
       "!doc":
         "Object that contains the properties required to run queries and access the query data.",
@@ -267,30 +278,8 @@ export const GLOBAL_FUNCTIONS = {
   },
 };
 
-export const getPropsForJSActionEntity = ({
-  config,
-  data,
-}: JSCollectionData): Record<string, string> => {
-  const properties: Record<string, any> = {};
-  const actions = config.actions;
-  if (actions && actions.length > 0)
-    for (let i = 0; i < config.actions.length; i++) {
-      const action = config.actions[i];
-      properties[action.name + "()"] = "Function";
-      if (data && action.id in data) {
-        properties[action.name + ".data"] = data[action.id];
-      }
-    }
-  const variablesProps = config.variables;
-  if (variablesProps && variablesProps.length > 0) {
-    for (let i = 0; i < variablesProps.length; i++) {
-      const variableProp = variablesProps[i];
-      properties[variableProp.name] = variableProp.value;
-    }
-  }
-  return properties;
-};
-
+// TODO: Fix this the next time the file is edited
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const ternDocsInfo: Record<string, any> = {
   showAlert: {
     exampleArgs: [
@@ -299,10 +288,10 @@ export const ternDocsInfo: Record<string, any> = {
     ],
   },
   showModal: {
-    exampleArgs: ["'Modal1'"],
+    exampleArgs: ["Modal1.name"],
   },
   closeModal: {
-    exampleArgs: ["'Modal1'"],
+    exampleArgs: ["Modal1.name"],
   },
   navigateTo: {
     exampleArgs: [
@@ -343,3 +332,45 @@ export const ternDocsInfo: Record<string, any> = {
 };
 
 export type EntityDefinitionsOptions = keyof typeof entityDefinitions;
+
+export const getEachEntityInformation = {
+  [ENTITY_TYPE.ACTION]: (
+    entity: DataTreeEntityConfig,
+    entityInformation: FieldEntityInformation,
+  ): FieldEntityInformation => {
+    const actionEntity = entity as ActionEntityConfig;
+
+    entityInformation.entityId = actionEntity.actionId;
+
+    return entityInformation;
+  },
+  [ENTITY_TYPE.WIDGET]: (
+    entity: DataTreeEntityConfig,
+    entityInformation: FieldEntityInformation,
+    propertyPath: string,
+  ): FieldEntityInformation => {
+    const widgetEntity = entity as WidgetEntityConfig;
+    const isTriggerPath = widgetEntity.triggerPaths[propertyPath];
+
+    entityInformation.entityId = widgetEntity.widgetId;
+
+    if (isTriggerPath)
+      entityInformation.expectedType = AutocompleteDataType.FUNCTION;
+
+    entityInformation.isTriggerPath = isTriggerPath;
+    entityInformation.widgetType = widgetEntity.type;
+
+    return entityInformation;
+  },
+  [ENTITY_TYPE.JSACTION]: (
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    entity: DataTreeEntityConfig,
+    entityInformation: FieldEntityInformation,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    propertyPath: string,
+  ): FieldEntityInformation => {
+    entityInformation.isTriggerPath = true;
+
+    return entityInformation;
+  },
+};

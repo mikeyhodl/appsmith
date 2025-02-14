@@ -159,6 +159,14 @@ if [[ $backend =~ /$ ]]; then
     exit 1
 fi
 
+if [[ -n $backend ]]; then
+  # Try to get a version from the "backend". If it's a full container, not just backend, then it'll give us a version.
+  APPSMITH_VERSION_ID="$(
+    curl -vsS "${backend/host.docker.internal/localhost}/info" | grep -Eo '"version": ".+?"' | cut -d\" -f4 || true
+  )"
+  export APPSMITH_VERSION_ID
+fi
+
 if [[ -n ${env_file-} && ! -f $env_file ]]; then
     echo "I got --env-file as '$env_file', but I cannot access it." >&2
     exit 1
@@ -204,6 +212,12 @@ nginx_dev_conf="$working_dir/nginx.dev.conf"
 rm -rf "$nginx_dev_conf"
 
 worker_connections=1024
+
+substitutions="$(
+  grep -Eo '{{env "APPSMITH_\w+"}}' public/index.html \
+    | cut -d\" -f2 \
+    | awk '{print "sub_filter '\''{{env \"" $0 "\"}}'\'' '\''" ENVIRON[$0] "'\'';"}'
+)"
 
 echo "
 worker_processes  1;
@@ -275,31 +289,15 @@ $(if [[ $use_https == 1 ]]; then echo "
         sub_filter_once off;
         location / {
             proxy_pass $frontend;
-            sub_filter __APPSMITH_SENTRY_DSN__ '${APPSMITH_SENTRY_DSN-}';
-            sub_filter __APPSMITH_SMART_LOOK_ID__ '${APPSMITH_SMART_LOOK_ID-}';
-            sub_filter __APPSMITH_MARKETPLACE_ENABLED__ '${APPSMITH_MARKETPLACE_ENABLED-}';
-            sub_filter __APPSMITH_SEGMENT_KEY__ '${APPSMITH_SEGMENT_KEY-}';
-            sub_filter __APPSMITH_ALGOLIA_API_ID__ '${APPSMITH_ALGOLIA_API_ID-}';
-            sub_filter __APPSMITH_ALGOLIA_SEARCH_INDEX_NAME__ '${APPSMITH_ALGOLIA_SEARCH_INDEX_NAME-}';
-            sub_filter __APPSMITH_ALGOLIA_API_KEY__ '${APPSMITH_ALGOLIA_API_KEY-}';
-            sub_filter __APPSMITH_CLIENT_LOG_LEVEL__ '${APPSMITH_CLIENT_LOG_LEVEL-}';
-            sub_filter __APPSMITH_TNC_PP__ '${APPSMITH_TNC_PP-}';
-            sub_filter __APPSMITH_SENTRY_RELEASE__ '${APPSMITH_SENTRY_RELEASE-}';
-            sub_filter __APPSMITH_SENTRY_ENVIRONMENT__ '${APPSMITH_SENTRY_ENVIRONMENT-}';
-            sub_filter __APPSMITH_VERSION_ID__ '${APPSMITH_VERSION_ID-}';
-            sub_filter __APPSMITH_VERSION_RELEASE_DATE__ '${APPSMITH_VERSION_RELEASE_DATE-}';
-            sub_filter __APPSMITH_INTERCOM_APP_ID__ '${APPSMITH_INTERCOM_APP_ID-}';
-            sub_filter __APPSMITH_MAIL_ENABLED__ '${APPSMITH_MAIL_ENABLED-}';
-            sub_filter __APPSMITH_CLOUD_SERVICES_BASE_URL__ '${APPSMITH_CLOUD_SERVICES_BASE_URL-}';
-            sub_filter __APPSMITH_RECAPTCHA_SITE_KEY__ '${APPSMITH_RECAPTCHA_SITE_KEY-}';
-            sub_filter __APPSMITH_DISABLE_INTERCOM__ '${APPSMITH_DISABLE_INTERCOM-}';
-            sub_filter __APPSMITH_ZIPY_SDK_KEY__ '${APPSMITH_ZIPY_SDK_KEY-}';
-            sub_filter __APPSMITH_HIDE_WATERMARK__ '${APPSMITH_HIDE_WATERMARK-}';
-            sub_filter __APPSMITH_DISABLE_IFRAME_WIDGET_SANDBOX__ '${APPSMITH_DISABLE_IFRAME_WIDGET_SANDBOX-}';
+            $substitutions
         }
 
         location /api {
             proxy_pass $backend;
+            # Delete the Cache-Control header set in the server block above.
+            add_header Cache-Control '' always;
+            # Proxy pass the Cache-Control header from the upstream.
+            proxy_pass_header Cache-Control;
         }
 
         location /oauth2 {

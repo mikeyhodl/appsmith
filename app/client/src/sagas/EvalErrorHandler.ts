@@ -1,11 +1,16 @@
-import type { Log, ENTITY_TYPE } from "entities/AppsmithConsole";
+import type { Log } from "entities/AppsmithConsole";
+import {
+  getModuleInstanceInvalidErrors,
+  type ENTITY_TYPE,
+} from "ee/entities/AppsmithConsole/utils";
 import { Severity } from "entities/AppsmithConsole";
 import type { ConfigTree, DataTree } from "entities/DataTree/dataTreeTypes";
 import {
   getEntityNameAndPropertyPath,
+  isAction,
   isJSAction,
   isWidget,
-} from "@appsmith/workers/Evaluation/evaluationUtils";
+} from "ee/workers/Evaluation/evaluationUtils";
 import type { EvalError, EvaluationError } from "utils/DynamicBindingUtils";
 import { EvalErrorTypes, getEvalErrorPath } from "utils/DynamicBindingUtils";
 import { get } from "lodash";
@@ -13,18 +18,18 @@ import LOG_TYPE from "entities/AppsmithConsole/logtype";
 import { select } from "redux-saga/effects";
 import AppsmithConsole from "utils/AppsmithConsole";
 import * as Sentry from "@sentry/react";
-import AnalyticsUtil from "utils/AnalyticsUtil";
+import AnalyticsUtil from "ee/utils/AnalyticsUtil";
 import {
   createMessage,
   ERROR_EVAL_ERROR_GENERIC,
   JS_OBJECT_BODY_INVALID,
   VALUE_IS_INVALID,
-} from "@appsmith/constants/messages";
+} from "ee/constants/messages";
 import log from "loglevel";
-import type { AppState } from "@appsmith/reducers";
-import { toast } from "design-system";
-import { isDynamicEntity } from "@appsmith/entities/DataTree/isDynamicEntity";
-import { getEntityPayloadInfo } from "@appsmith/utils/getEntityPayloadInfo";
+import type { AppState } from "ee/reducers";
+import { toast } from "@appsmith/ads";
+import { isDynamicEntity } from "ee/entities/DataTree/isDynamicEntity";
+import { getEntityPayloadInfo } from "ee/utils/getEntityPayloadInfo";
 
 const getDebuggerErrors = (state: AppState) => state.ui.debugger.errors;
 
@@ -46,9 +51,15 @@ function logLatestEvalPropertyErrors(
       getEntityNameAndPropertyPath(evaluatedPath);
     const entity = dataTree[entityName];
     const entityConfig = configTree[entityName];
+
     if (!entity || !entityConfig || !isDynamicEntity(entity)) continue;
+
+    // TODO: Fix this the next time the file is edited
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const logBlackList = (entityConfig as any)?.logBlackList;
+
     if (logBlackList && propertyPath in logBlackList) continue;
+
     const allEvalErrors: EvaluationError[] = get(
       entity,
       getEvalErrorPath(evaluatedPath, {
@@ -64,6 +75,7 @@ function logLatestEvalPropertyErrors(
       if (err.severity === Severity.WARNING) {
         evalWarnings.push(err);
       }
+
       if (err.severity === Severity.ERROR) {
         evalErrors.push(err);
       }
@@ -71,6 +83,19 @@ function logLatestEvalPropertyErrors(
 
     const entityType = entity.ENTITY_TYPE as string;
     const payloadInfo = getEntityPayloadInfo[entityType](entityConfig);
+    const entityNameToDisplay = payloadInfo.entityName || entityName;
+
+    const moduleInstanceErrors = getModuleInstanceInvalidErrors(
+      entity,
+      entityConfig,
+      propertyPath,
+    );
+
+    if (moduleInstanceErrors.length) {
+      moduleInstanceErrors.forEach((instanceError) => {
+        errorsToAdd.push(instanceError);
+      });
+    }
 
     if (!payloadInfo) continue;
 
@@ -86,7 +111,10 @@ function logLatestEvalPropertyErrors(
       },
     ];
 
-    const httpMethod = get(entity.config, "httpMethod");
+    const httpMethod =
+      isAction(entity) && entity.config
+        ? get(entity.config, "httpMethod")
+        : undefined;
 
     for (const { errors, isWarning, key: debuggerKey } of debuggerKeys) {
       // if dataTree has error but debugger does not -> add
@@ -107,7 +135,11 @@ function logLatestEvalPropertyErrors(
               widgetType: entity.type,
             }
           : {};
-        const logPropertyPath = !isJSAction(entity) ? propertyPath : entityName;
+
+        const logPropertyPath = !isJSAction(entity)
+          ? propertyPath
+          : entityNameToDisplay;
+
         // Add or update
         if (
           !isJSAction(entity) ||
@@ -126,7 +158,7 @@ function logLatestEvalPropertyErrors(
               messages: errorMessages,
               source: {
                 id: payloadInfo.id,
-                name: entityName,
+                name: entityNameToDisplay,
                 type: entityType as ENTITY_TYPE,
                 propertyPath: logPropertyPath,
                 pluginType: payloadInfo.pluginType,
@@ -153,6 +185,7 @@ function logLatestEvalPropertyErrors(
     for (const removedPath of removedPaths) {
       const { entityId, fullpath } = removedPath;
       const { propertyPath } = getEntityNameAndPropertyPath(fullpath);
+
       errorsToDelete.push({ id: `${entityId}-${propertyPath}` });
     }
   }
@@ -189,12 +222,14 @@ export function* evalErrorHandler(
         if (error.context) {
           // Add more info about node for the toast
           const { dependencyMap, diffs, entityType, node } = error.context;
+
           toast.show(`${error.message} Node was: ${node}`, {
             kind: "error",
           });
           AppsmithConsole.error({
             text: `${error.message} Node was: ${node}`,
           });
+
           if (error.context.logToSentry) {
             // Send the generic error message to sentry for better grouping
             Sentry.captureException(new Error(error.message), {

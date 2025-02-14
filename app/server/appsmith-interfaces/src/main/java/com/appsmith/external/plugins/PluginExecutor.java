@@ -7,6 +7,7 @@ import com.appsmith.external.helpers.MustacheHelper;
 import com.appsmith.external.models.ActionConfiguration;
 import com.appsmith.external.models.ActionExecutionResult;
 import com.appsmith.external.models.DatasourceConfiguration;
+import com.appsmith.external.models.DatasourceStorage;
 import com.appsmith.external.models.DatasourceStructure;
 import com.appsmith.external.models.DatasourceStructure.Template;
 import com.appsmith.external.models.DatasourceTestResult;
@@ -171,6 +172,20 @@ public interface PluginExecutor<C> extends ExtensionPoint, CrudTemplateService {
     }
 
     /**
+     * This function is being called as a hook before saving a datasource.
+     */
+    default Mono<DatasourceStorage> preSaveHook(DatasourceStorage datasourceStorage) {
+        return Mono.just(datasourceStorage);
+    }
+
+    /**
+     * This function is being called as a hook after deleting a datasource.
+     */
+    default Mono<DatasourceStorage> preDeleteHook(DatasourceStorage datasourceStorage) {
+        return Mono.just(datasourceStorage);
+    }
+
+    /**
      * This function fetches the structure of the tables/collections in the datasource. It's used to make query creation
      * easier for the user.
      *
@@ -189,14 +204,10 @@ public interface PluginExecutor<C> extends ExtensionPoint, CrudTemplateService {
      * @param connection
      * @param datasourceConfiguration
      * @param isMock
-     * @param isMongoSchemaEnabledForMockDB
      * @return
      */
     default Mono<DatasourceStructure> getStructure(
-            C connection,
-            DatasourceConfiguration datasourceConfiguration,
-            Boolean isMock,
-            Boolean isMongoSchemaEnabledForMockDB) {
+            C connection, DatasourceConfiguration datasourceConfiguration, Boolean isMock) {
         return this.getStructure(connection, datasourceConfiguration);
     }
 
@@ -234,6 +245,50 @@ public interface PluginExecutor<C> extends ExtensionPoint, CrudTemplateService {
                 .tag("plugin", this.getClass().getName())
                 .name(ACTION_EXECUTION_PLUGIN_EXECUTION)
                 .tap(Micrometer.observation(observationRegistry));
+    }
+
+    // TODO: Following methods of executeParameterizedWithFlags, executeParameterizedWithMetricsAndFlags,
+    // triggerWithFlags are
+    // added
+    // to support feature flags in the plugin modules. Current implementation of featureFlagService is only available in
+    // server module
+    // and not available in any of the plugin modules due to dependencies on SessionUserService, TenantService etc.
+    // Hence, these methods are added to support feature flags in the plugin modules.
+    // Ideal solution would be to move featureFlagService and its dependencies to the shared interface module
+    // But this is a bigger change and will be done in future. Current change of passing flags was done to resolve
+    // release blocker
+    // https://github.com/appsmithorg/appsmith/issues/37714
+    // Once thorogh testing of shared drive support is done, we can remove this tech debt of passing feature flags like
+    // this.
+    default Mono<ActionExecutionResult> executeParameterizedWithFlags(
+            C connection,
+            ExecuteActionDTO executeActionDTO,
+            DatasourceConfiguration datasourceConfiguration,
+            ActionConfiguration actionConfiguration,
+            Map<String, Boolean> featureFlagMap) {
+        return this.executeParameterized(connection, executeActionDTO, datasourceConfiguration, actionConfiguration);
+    }
+
+    default Mono<ActionExecutionResult> executeParameterizedWithMetricsAndFlags(
+            C connection,
+            ExecuteActionDTO executeActionDTO,
+            DatasourceConfiguration datasourceConfiguration,
+            ActionConfiguration actionConfiguration,
+            ObservationRegistry observationRegistry,
+            Map<String, Boolean> featureFlagMap) {
+        return this.executeParameterizedWithFlags(
+                        connection, executeActionDTO, datasourceConfiguration, actionConfiguration, featureFlagMap)
+                .tag("plugin", this.getClass().getName())
+                .name(ACTION_EXECUTION_PLUGIN_EXECUTION)
+                .tap(Micrometer.observation(observationRegistry));
+    }
+
+    default Mono<TriggerResultDTO> triggerWithFlags(
+            C connection,
+            DatasourceConfiguration datasourceConfiguration,
+            TriggerRequestDTO request,
+            Map<String, Boolean> featureFlagMap) {
+        return this.trigger(connection, datasourceConfiguration, request);
     }
 
     /**

@@ -3,12 +3,11 @@ import EditorNavigation, {
   EntityType,
 } from "../../../../support/Pages/EditorNavigation";
 
-let forkedApplicationDsl;
-let parentApplicationDsl: any;
-
 describe(
   "Fork application across workspaces",
-  { tags: ["@tag.Fork"] },
+  {
+    tags: ["@tag.Fork", "@tag.Datasource", "@tag.Git", "@tag.Table", "@tag.JS"],
+  },
   function () {
     before(() => {
       _.agHelper.AddDsl("basicDsl");
@@ -19,6 +18,7 @@ describe(
         localStorage.getItem("workspaceName") || "randomApp";
       EditorNavigation.SelectEntityByName("Input1", EntityType.Widget);
 
+      let parentApplicationDsl: any;
       cy.intercept("PUT", "/api/v1/layouts/*/pages/*").as("inputUpdate");
       _.propPane.TypeTextIntoField("defaultvalue", "A");
       cy.wait("@inputUpdate").then((response) => {
@@ -43,12 +43,11 @@ describe(
         .its("response.body.responseMeta.status")
         .should("eq", 200);
       // check that forked application has same dsl
-      cy.get("@getPage")
+      cy.get("@getConsolidatedData")
         .its("response.body.data")
         .then((data) => {
-          forkedApplicationDsl = data.layouts[0].dsl;
-          expect(JSON.stringify(forkedApplicationDsl)).to.contain(
-            JSON.stringify(parentApplicationDsl),
+          expect(data.pageWithMigratedDsl.data.layouts[0].dsl).to.deep.eq(
+            parentApplicationDsl,
           );
         });
     });

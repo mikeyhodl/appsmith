@@ -1,7 +1,7 @@
 import _ from "./lodash-wrapper";
 import moment from "moment-timezone";
 import forge from "node-forge";
-import { defaultLibraries } from "./index";
+import { defaultLibraries, JSLibraryAccessor } from "./index";
 import { JSLibraries, libraryReservedIdentifiers } from "./index";
 import { invalidEntityIdentifiers } from "../DependencyMap/utils";
 const defaultLibImplementations = {
@@ -18,8 +18,10 @@ export function resetJSLibraries() {
   const defaultLibraryAccessors = defaultLibraries.map(
     (lib) => lib.accessor[0],
   );
+
   for (const key of Object.keys(libraryReservedIdentifiers)) {
     if (defaultLibraryAccessors.includes(key)) continue;
+
     try {
       // @ts-expect-error: Types are not available
       delete self[key];
@@ -41,4 +43,5 @@ export function resetJSLibraries() {
     // @ts-expect-error: Types are not available
     self[library.accessor] = defaultLibImplementations[library.name];
   });
+  JSLibraryAccessor.regenerateSet();
 }

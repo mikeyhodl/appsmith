@@ -1,17 +1,21 @@
-import React, { useEffect, useState } from "react";
-import styled from "styled-components";
-import { Button, Checkbox, Divider, Icon, Text } from "design-system";
-import { useDispatch } from "react-redux";
-import { importTemplateIntoApplication } from "actions/templateActions";
-import type { Template } from "api/TemplatesApi";
-import type { ApplicationPagePayload } from "@appsmith/api/ApplicationApi";
+import type { ApplicationPagePayload } from "ee/api/ApplicationApi";
 import {
-  createMessage,
   FILTER_SELECTALL,
+  FILTER_SELECT_PAGE,
   FILTER_SELECT_PAGES,
   PAGE,
   PAGES,
-} from "@appsmith/constants/messages";
+  createMessage,
+} from "ee/constants/messages";
+import { getCurrentAppWorkspace } from "ee/selectors/selectedWorkspaceSelectors";
+import { importTemplateIntoApplication } from "actions/templateActions";
+import type { Template } from "api/TemplatesApi";
+import { Button, Checkbox, Divider, Icon, Text } from "@appsmith/ads";
+import React, { useEffect, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { getCurrentApplicationId } from "selectors/editorSelectors";
+import styled from "styled-components";
+import AnalyticsUtil from "ee/utils/AnalyticsUtil";
 
 const Wrapper = styled.div`
   width: 280px;
@@ -60,6 +64,7 @@ const StyledButton = styled(Button)`
 `;
 
 interface PageSelectionProps {
+  isStartWithTemplateFlow: boolean;
   pages: ApplicationPagePayload[];
   template: Template;
   onPageSelection: (pageId: string) => void;
@@ -74,6 +79,8 @@ function PageSelection(props: PageSelectionProps) {
     props.pages.length > 1 || props.pages.length === 0
       ? createMessage(PAGES)
       : createMessage(PAGE);
+  const applicationId = useSelector(getCurrentApplicationId);
+  const currentWorkSpace = useSelector(getCurrentAppWorkspace);
 
   useEffect(() => {
     setSelectedPages(props.pages.map((page) => page.name));
@@ -107,6 +114,18 @@ function PageSelection(props: PageSelectionProps) {
         selectedPages,
       ),
     );
+
+    if (props.isStartWithTemplateFlow) {
+      AnalyticsUtil.logEvent("fork_APPLICATIONTEMPLATE", {
+        applicationId: applicationId,
+        workspaceId: currentWorkSpace.id,
+        source: "canvas",
+        eventData: {
+          templateAppName: props.template.title,
+          selectedPages,
+        },
+      });
+    }
   };
 
   return (
@@ -153,7 +172,9 @@ function PageSelection(props: PageSelectionProps) {
           onClick={importPagesToApp}
           size="md"
         >
-          {createMessage(FILTER_SELECT_PAGES)}
+          {createMessage(
+            props.pages.length === 1 ? FILTER_SELECT_PAGE : FILTER_SELECT_PAGES,
+          )}
         </StyledButton>
       </Card>
     </Wrapper>

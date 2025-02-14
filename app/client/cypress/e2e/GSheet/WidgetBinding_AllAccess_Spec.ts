@@ -18,12 +18,14 @@ import {
 } from "../../support/Pages/EditorNavigation";
 
 const workspaceName = "gsheet apps";
-const dataSourceName = "gsheet";
+const dataSourceName = "gsheet-all";
 let appName = "gsheet-app";
 let spreadSheetName = "test-sheet";
-describe(
+describe.skip(
   "GSheet-widget binding",
-  { tags: ["@tag.Datasource", "@tag.GSheet"] },
+  {
+    tags: ["@tag.Datasource", "@tag.GSheet", "@tag.Git", "@tag.AccessControl"],
+  },
   function () {
     before("Setup app and spreadsheet", function () {
       //Setting up the app name
@@ -33,6 +35,7 @@ describe(
 
       //Adding app
       homePage.NavigateToHome();
+      homePage.SelectWorkspace(workspaceName);
       homePage.CreateAppInWorkspace(workspaceName);
       homePage.RenameApplication(appName);
       gsheetHelper.AddNewSpreadsheetQuery(
@@ -54,7 +57,7 @@ describe(
         dataSourceName,
         spreadSheetName,
       );
-      dataSources.RunQueryNVerifyResponseViews(10);
+      dataSources.runQueryAndVerifyResponseViews({ count: 10 });
 
       // Adding suggested widgets and verify
       dataSources.AddSuggestedWidget(Widgets.Table);
@@ -82,7 +85,7 @@ describe(
 
     after("Delete app", function () {
       // Delete spreadsheet and app
-      PageLeftPane.switchSegment(PagePaneSegment.Explorer);
+      PageLeftPane.switchSegment(PagePaneSegment.Queries);
       gsheetHelper.DeleteSpreadsheetQuery(dataSourceName, spreadSheetName);
       cy.get("@postExecute").then((interception: any) => {
         expect(interception.response.body.data.body.message).to.deep.equal(

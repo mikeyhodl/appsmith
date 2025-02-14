@@ -5,9 +5,9 @@ import type {
 import type {
   WidgetEntity,
   WidgetEntityConfig,
-} from "@appsmith/entities/DataTree/types";
+} from "ee/entities/DataTree/types";
 import type { ConfigTree, DataTree } from "entities/DataTree/dataTreeTypes";
-import { ENTITY_TYPE } from "entities/DataTree/dataTreeFactory";
+import { ENTITY_TYPE } from "ee/entities/DataTree/types";
 import { pick } from "lodash";
 import {
   WIDGET_DSL_STRUCTURE_PROPS,
@@ -47,17 +47,19 @@ export const createCanvasWidget = (
     ...evaluatedStaticProps,
     ...evaluatedWidgetConfig,
     ...widgetStaticProps,
+    // TODO: Fix this the next time the file is edited
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } as any;
-  widgetProps.errors = widgetErrorsFromStaticProps(evaluatedStaticProps);
+
   return widgetProps;
 };
 
-function widgetErrorsFromStaticProps(props: Record<string, unknown>) {
+export function widgetErrorsFromStaticProps(props: Record<string, unknown>) {
   /**
    * Evaluation Error Map
    * {
-     widgetPropertyName : DataTreeError[]
-    }
+   widgetPropertyName : DataTreeError[]
+   }
    */
 
   const evaluationErrorMap = get(props, EVAL_ERROR_PATH, {}) as Record<
@@ -85,7 +87,8 @@ function widgetErrorsFromStaticProps(props: Record<string, unknown>) {
   return widgetErrors;
 }
 
-const WidgetTypes = WidgetFactory.widgetTypes;
+const WidgetTypes = WidgetFactory?.widgetTypes;
+
 export const createLoadingWidget = (
   canvasWidget: FlattenedWidgetProps,
 ): WidgetEntity => {
@@ -93,6 +96,7 @@ export const createLoadingWidget = (
     canvasWidget,
     Object.keys(WIDGET_STATIC_PROPS),
   ) as WidgetProps;
+
   return {
     ...widgetStaticProps,
     type:

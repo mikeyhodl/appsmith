@@ -1,39 +1,34 @@
 import { createReducer } from "utils/ReducerUtils";
-import type {
-  ReduxAction,
-  ApplicationPayload,
-} from "@appsmith/constants/ReduxActionConstants";
+import type { ReduxAction } from "actions/ReduxActionTypes";
 import {
   ReduxActionTypes,
   ReduxActionErrorTypes,
-} from "@appsmith/constants/ReduxActionConstants";
-import type {
-  Workspaces,
-  WorkspaceUser,
-} from "@appsmith/constants/workspaceConstants";
+} from "ee/constants/ReduxActionConstants";
 import {
   createMessage,
   ERROR_MESSAGE_CREATE_APPLICATION,
-} from "@appsmith/constants/messages";
+} from "ee/constants/messages";
 import type {
   AppEmbedSetting,
   PageDefaultMeta,
   UpdateApplicationRequest,
-} from "@appsmith/api/ApplicationApi";
+} from "ee/api/ApplicationApi";
 import type { CreateApplicationFormValues } from "pages/Applications/helpers";
 import type { AppLayoutConfig } from "reducers/entityReducers/pageListReducer";
 import type { ConnectToGitResponse } from "actions/gitSyncActions";
-import type { IconNames } from "design-system";
+import type { IconNames } from "@appsmith/ads";
 import type { NavigationSetting, ThemeSetting } from "constants/AppConstants";
 import {
   defaultNavigationSetting,
   defaultThemeSetting,
 } from "constants/AppConstants";
-import produce from "immer";
-import { groupBy, isEmpty } from "lodash";
+import { create } from "mutative";
+import { isEmpty } from "lodash";
+import type { ApplicationPayload } from "entities/Application";
+import { gitConnectSuccess, type GitConnectSuccessPayload } from "git";
+import type { PayloadAction } from "@reduxjs/toolkit";
 
 export const initialState: ApplicationsReduxState = {
-  isFetchingApplications: false,
   isSavingAppName: false,
   isErrorSavingAppName: false,
   isFetchingApplication: false,
@@ -42,8 +37,6 @@ export const initialState: ApplicationsReduxState = {
   creatingApplication: {},
   deletingApplication: false,
   forkingApplication: false,
-  userWorkspaces: [],
-  isSavingWorkspaceInfo: false,
   importingApplication: false,
   importedApplication: null,
   isImportAppModalOpen: false,
@@ -54,14 +47,15 @@ export const initialState: ApplicationsReduxState = {
   isErrorSavingNavigationSetting: false,
   isUploadingNavigationLogo: false,
   isDeletingNavigationLogo: false,
-  deletingMultipleApps: {},
   loadingStates: {
     isFetchingAllRoles: false,
     isFetchingAllUsers: false,
   },
   partialImportExport: {
+    isExportModalOpen: false,
     isExporting: false,
     isExportDone: false,
+    isImportModalOpen: false,
     isImporting: false,
     isImportDone: false,
   },
@@ -75,30 +69,11 @@ export const handlers = {
   },
   [ReduxActionTypes.DELETE_APPLICATION_SUCCESS]: (
     state: ApplicationsReduxState,
+    // eslint-disable-next-line
     action: ReduxAction<ApplicationPayload>,
   ) => {
-    const _workspaces = state.userWorkspaces.map((workspace: Workspaces) => {
-      if (workspace.workspace.id === action.payload.workspaceId) {
-        let applications = workspace.applications;
-
-        applications = applications.filter(
-          (application: ApplicationPayload) => {
-            return application.id !== action.payload.id;
-          },
-        );
-
-        return {
-          ...workspace,
-          applications,
-        };
-      }
-
-      return workspace;
-    });
-
     return {
       ...state,
-      userWorkspaces: _workspaces,
       deletingApplication: false,
     };
   },
@@ -106,96 +81,6 @@ export const handlers = {
     state: ApplicationsReduxState,
   ) => {
     return { ...state, deletingApplication: false };
-  },
-  [ReduxActionTypes.DELETE_MULTIPLE_APPS_TOGGLE]: (
-    state: ApplicationsReduxState,
-    action: ReduxAction<{ id: string }>,
-  ) => {
-    let deleteMultipleAppsList = state.deletingMultipleApps.list || [];
-    if (deleteMultipleAppsList.includes(action.payload.id)) {
-      deleteMultipleAppsList = deleteMultipleAppsList.filter(
-        (i) => i !== action.payload.id,
-      );
-    } else {
-      deleteMultipleAppsList = [...deleteMultipleAppsList, action.payload.id];
-    }
-    return {
-      ...state,
-      deletingMultipleApps: {
-        list: deleteMultipleAppsList,
-      },
-    };
-  },
-  [ReduxActionTypes.DELETE_MULTIPLE_APPS_INIT]: (
-    state: ApplicationsReduxState,
-  ) => {
-    return {
-      ...state,
-      deletingMultipleApps: {
-        list: state.deletingMultipleApps.list,
-        isDeleting: true,
-      },
-    };
-  },
-  [ReduxActionTypes.DELETE_MULTIPLE_APPLICATION_SUCCESS]: (
-    state: ApplicationsReduxState,
-    action: ReduxAction<ApplicationPayload[]>,
-  ) => {
-    const workspacesWithDeletedApps = groupBy(
-      action.payload,
-      (e) => e.workspaceId,
-    );
-    const _workspaces = state.userWorkspaces.map((workspace: Workspaces) => {
-      if (workspacesWithDeletedApps[workspace.workspace.id]) {
-        const deletedApplicationIds = workspacesWithDeletedApps[
-          workspace.workspace.id
-        ].map((e) => e.id);
-
-        let applications = workspace.applications;
-        applications = applications.filter(
-          (application: ApplicationPayload) => {
-            return !deletedApplicationIds.includes(application.id);
-          },
-        );
-
-        return {
-          ...workspace,
-          applications,
-        };
-      }
-
-      return workspace;
-    });
-
-    return {
-      ...state,
-      userWorkspaces: _workspaces,
-      deletingMultipleApps: {
-        list: [],
-        isDeleting: false,
-      },
-    };
-  },
-  [ReduxActionTypes.DELETE_MULTIPLE_APPLICATION_CANCEL]: (
-    state: ApplicationsReduxState,
-  ) => {
-    return {
-      ...state,
-      deletingMultipleApps: {
-        list: [],
-        isDeleting: false,
-      },
-    };
-  },
-  [ReduxActionErrorTypes.DELETE_MULTIPLE_APPLICATION_ERROR]: (
-    state: ApplicationsReduxState,
-  ) => {
-    return {
-      ...state,
-      deletingMultipleApps: {
-        isDeleting: false,
-      },
-    };
   },
   [ReduxActionTypes.CHANGE_APPVIEW_ACCESS_INIT]: (
     state: ApplicationsReduxState,
@@ -211,30 +96,6 @@ export const handlers = {
         ...state.currentApplication,
         isPublic: action.payload.isPublic,
       },
-    };
-  },
-  [ReduxActionTypes.GET_ALL_APPLICATION_INIT]: (
-    state: ApplicationsReduxState,
-  ) => ({ ...state, isFetchingApplications: true }),
-  [ReduxActionTypes.FETCH_USER_APPLICATIONS_WORKSPACES_SUCCESS]: (
-    state: ApplicationsReduxState,
-    action: ReduxAction<{ applicationList: any }>,
-  ) => {
-    return {
-      ...state,
-      isFetchingApplications: false,
-      userWorkspaces: action.payload,
-    };
-  },
-  [ReduxActionTypes.DELETE_WORKSPACE_SUCCESS]: (
-    state: ApplicationsReduxState,
-    action: ReduxAction<string>,
-  ) => {
-    return {
-      ...state,
-      userWorkspaces: state.userWorkspaces.filter(
-        (workspace: Workspaces) => workspace.workspace.id !== action.payload,
-      ),
     };
   },
   [ReduxActionTypes.FETCH_APPLICATION_INIT]: (
@@ -260,8 +121,10 @@ export const handlers = {
       !newState.currentApplication.applicationDetail.navigationSetting ||
       isEmpty(newState.currentApplication.applicationDetail.navigationSetting)
     ) {
-      newState.currentApplication.applicationDetail.navigationSetting =
-        defaultNavigationSetting;
+      newState.currentApplication.applicationDetail = {
+        ...newState.currentApplication.applicationDetail,
+        navigationSetting: defaultNavigationSetting,
+      };
     }
 
     return newState;
@@ -302,6 +165,7 @@ export const handlers = {
     action: ReduxAction<CreateApplicationFormValues>,
   ) => {
     const updatedCreatingApplication = { ...state.creatingApplication };
+
     updatedCreatingApplication[action.payload.workspaceId] = true;
 
     return {
@@ -316,46 +180,14 @@ export const handlers = {
       application: ApplicationPayload;
     }>,
   ) => {
-    const _workspaces = state.userWorkspaces.map((workspace: Workspaces) => {
-      if (workspace.workspace.id === action.payload.workspaceId) {
-        const applications = workspace.applications;
-        applications.push(action.payload.application);
-        workspace.applications = [...applications];
-        return {
-          ...workspace,
-        };
-      }
-      return workspace;
-    });
-
     const updatedCreatingApplication = { ...state.creatingApplication };
+
     updatedCreatingApplication[action.payload.workspaceId] = false;
 
     return {
       ...state,
       creatingApplication: updatedCreatingApplication,
       applicationList: [...state.applicationList, action.payload.application],
-      userWorkspaces: _workspaces,
-    };
-  },
-  [ReduxActionTypes.INVITED_USERS_TO_WORKSPACE]: (
-    state: ApplicationsReduxState,
-    action: ReduxAction<{ workspaceId: string; users: WorkspaceUser[] }>,
-  ) => {
-    const _workspaces = state.userWorkspaces.map((workspace: Workspaces) => {
-      if (workspace.workspace.id === action.payload.workspaceId) {
-        const users = workspace.users;
-        workspace.users = [...users, ...action.payload.users];
-        return {
-          ...workspace,
-        };
-      }
-      return workspace;
-    });
-
-    return {
-      ...state,
-      userWorkspaces: _workspaces,
     };
   },
   [ReduxActionErrorTypes.CREATE_APPLICATION_ERROR]: (
@@ -363,6 +195,7 @@ export const handlers = {
     action: ReduxAction<{ workspaceId: string }>,
   ) => {
     const updatedCreatingApplication = { ...state.creatingApplication };
+
     updatedCreatingApplication[action.payload.workspaceId] = false;
 
     return {
@@ -381,22 +214,10 @@ export const handlers = {
       application: ApplicationPayload;
     }>,
   ) => {
-    const _workspaces = state.userWorkspaces.map((workspace: Workspaces) => {
-      if (workspace.workspace.id === action.payload.workspaceId) {
-        const applications = workspace.applications;
-        workspace.applications = [...applications, action.payload.application];
-        return {
-          ...workspace,
-        };
-      }
-      return workspace;
-    });
-
     return {
       ...state,
       forkingApplication: false,
       applicationList: [...state.applicationList, action.payload.application],
-      userWorkspaces: _workspaces,
     };
   },
   [ReduxActionErrorTypes.FORK_APPLICATION_ERROR]: (
@@ -415,9 +236,12 @@ export const handlers = {
   }),
   [ReduxActionTypes.IMPORT_APPLICATION_SUCCESS]: (
     state: ApplicationsReduxState,
+    // TODO: Fix this the next time the file is edited
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     action: ReduxAction<{ importedApplication: any }>,
   ) => {
     const importedApplication = action.payload;
+
     return {
       ...state,
       importingApplication: false,
@@ -430,6 +254,12 @@ export const handlers = {
     return {
       ...state,
       importingApplication: false,
+    };
+  },
+  [ReduxActionTypes.RESET_IMPORT_DATA]: (state: ApplicationsReduxState) => {
+    return {
+      ...state,
+      importedApplication: null,
     };
   },
   [ReduxActionTypes.PARTIAL_IMPORT_INIT]: (state: ApplicationsReduxState) => ({
@@ -446,6 +276,7 @@ export const handlers = {
     ...state,
     partialImportExport: {
       ...state.partialImportExport,
+      isImportModalOpen: false,
       isImporting: false,
       isImportDone: true,
     },
@@ -456,51 +287,11 @@ export const handlers = {
     ...state,
     partialImportExport: {
       ...state.partialImportExport,
+      isImportModalOpen: false,
       isImporting: false,
       isImportDone: true,
     },
   }),
-  [ReduxActionTypes.SAVING_WORKSPACE_INFO]: (state: ApplicationsReduxState) => {
-    return {
-      ...state,
-      isSavingWorkspaceInfo: true,
-    };
-  },
-  [ReduxActionTypes.SAVE_WORKSPACE_SUCCESS]: (
-    state: ApplicationsReduxState,
-    action: ReduxAction<{
-      id: string;
-      name?: string;
-      website?: string;
-      email?: string;
-      logoUrl?: string;
-    }>,
-  ) => {
-    const _workspaces = state.userWorkspaces.map((workspace: Workspaces) => {
-      if (workspace.workspace.id === action.payload.id) {
-        workspace.workspace = { ...workspace.workspace, ...action.payload };
-
-        return {
-          ...workspace,
-        };
-      }
-      return workspace;
-    });
-
-    return {
-      ...state,
-      userWorkspaces: _workspaces,
-      isSavingWorkspaceInfo: false,
-    };
-  },
-  [ReduxActionErrorTypes.SAVE_WORKSPACE_ERROR]: (
-    state: ApplicationsReduxState,
-  ) => {
-    return {
-      ...state,
-      isSavingWorkspaceInfo: false,
-    };
-  },
   [ReduxActionTypes.SEARCH_APPLICATIONS]: (
     state: ApplicationsReduxState,
     action: ReduxAction<{ keyword?: string }>,
@@ -543,26 +334,13 @@ export const handlers = {
   },
   [ReduxActionTypes.UPDATE_APPLICATION_SUCCESS]: (
     state: ApplicationsReduxState,
+    // eslint-disable-next-line
     action: ReduxAction<UpdateApplicationRequest>,
   ) => {
     // userWorkspaces data has to be saved to localStorage only if the action is successful
     // It introduces bug if we prematurely save it during init action.
-    const { id, ...rest } = action.payload;
-    const _workspaces = state.userWorkspaces.map((workspace: Workspaces) => {
-      const appIndex = workspace.applications.findIndex((app) => app.id === id);
-
-      if (appIndex !== -1) {
-        workspace.applications[appIndex] = {
-          ...workspace.applications[appIndex],
-          ...rest,
-        };
-      }
-
-      return workspace;
-    });
     return {
       ...state,
-      userWorkspaces: _workspaces,
       isSavingAppName: false,
       isErrorSavingAppName: false,
       isSavingNavigationSetting: false,
@@ -613,9 +391,14 @@ export const handlers = {
   }), // updating default branch when git sync on branch list
   [ReduxActionTypes.FETCH_BRANCHES_SUCCESS]: (
     state: ApplicationsReduxState,
+    // TODO: Fix this the next time the file is edited
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     action: ReduxAction<any[]>,
   ) => {
+    // TODO: Fix this the next time the file is edited
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const defaultBranch = action.payload.find((branch: any) => branch.default);
+
     if (defaultBranch) {
       return {
         ...state,
@@ -628,6 +411,7 @@ export const handlers = {
         },
       };
     }
+
     return state;
   },
   [ReduxActionTypes.INIT_DATASOURCE_CONNECTION_DURING_IMPORT_SUCCESS]: (
@@ -644,11 +428,11 @@ export const handlers = {
   }),
   [ReduxActionTypes.SET_WORKSPACE_ID_FOR_IMPORT]: (
     state: ApplicationsReduxState,
-    action: ReduxAction<string>,
+    action: ReduxAction<{ workspaceId: string }>,
   ) => {
     return {
       ...state,
-      workspaceIdForImport: action.payload,
+      workspaceIdForImport: action.payload.workspaceId,
     };
   },
   [ReduxActionTypes.SET_PAGE_ID_FOR_IMPORT]: (
@@ -746,7 +530,7 @@ export const handlers = {
     state: ApplicationsReduxState,
     action: ReduxAction<NavigationSetting["logoAssetId"]>,
   ) => {
-    return produce(state, (draftState: ApplicationsReduxState) => {
+    return create(state, (draftState: ApplicationsReduxState) => {
       draftState.isUploadingNavigationLogo = false;
 
       if (
@@ -889,6 +673,26 @@ export const handlers = {
       currentApplicationIdForCreateNewApp: undefined,
     };
   },
+  [ReduxActionTypes.PARTIAL_IMPORT_MODAL_OPEN]: (
+    state: ApplicationsReduxState,
+    action: ReduxAction<boolean>,
+  ) => ({
+    ...state,
+    partialImportExport: {
+      ...state.partialImportExport,
+      isImportModalOpen: action.payload,
+    },
+  }),
+  [ReduxActionTypes.PARTIAL_EXPORT_MODAL_OPEN]: (
+    state: ApplicationsReduxState,
+    action: ReduxAction<boolean>,
+  ) => ({
+    ...state,
+    partialImportExport: {
+      ...state.partialImportExport,
+      isExportModalOpen: action.payload,
+    },
+  }),
   [ReduxActionTypes.PARTIAL_EXPORT_INIT]: (state: ApplicationsReduxState) => ({
     ...state,
     partialImportExport: {
@@ -903,6 +707,7 @@ export const handlers = {
     ...state,
     partialImportExport: {
       ...state.partialImportExport,
+      isExportModalOpen: false,
       isExporting: false,
       isExportDone: true,
     },
@@ -913,6 +718,7 @@ export const handlers = {
     ...state,
     partialImportExport: {
       ...state.partialImportExport,
+      isExportModalOpen: false,
       isExporting: false,
       isExportDone: true,
     },
@@ -934,21 +740,35 @@ export const handlers = {
       currentPluginIdForCreateNewApp: undefined,
     };
   },
+  [ReduxActionTypes.RESET_EDITOR_REQUEST]: (state: ApplicationsReduxState) => {
+    return {
+      ...state,
+      isSavingNavigationSetting: false,
+    };
+  },
+  // git
+  [gitConnectSuccess.type]: (
+    state: ApplicationsReduxState,
+    action: PayloadAction<GitConnectSuccessPayload>,
+  ) => {
+    return {
+      ...state,
+      currentApplication: {
+        ...state.currentApplication,
+        gitApplicationMetadata:
+          action.payload.responseData.gitApplicationMetadata,
+      },
+    };
+  },
 };
 
 const applicationsReducer = createReducer(initialState, handlers);
 
 export type creatingApplicationMap = Record<string, boolean>;
 
-export interface DeletingMultipleApps {
-  list?: string[];
-  isDeleting?: boolean;
-}
-
 export interface ApplicationsReduxState {
   applicationList: ApplicationPayload[];
   searchKeyword?: string;
-  isFetchingApplications: boolean;
   isSavingAppName: boolean;
   isErrorSavingAppName: boolean;
   isFetchingApplication: boolean;
@@ -958,11 +778,11 @@ export interface ApplicationsReduxState {
   deletingApplication: boolean;
   forkingApplication: boolean;
   currentApplication?: ApplicationPayload;
-  userWorkspaces: Workspaces[];
-  isSavingWorkspaceInfo: boolean;
   importingApplication: boolean;
   importedApplication: unknown;
   isImportAppModalOpen: boolean;
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   workspaceIdForImport: any;
   pageIdForImport: string;
   isDatasourceConfigForImportFetched?: boolean;
@@ -971,15 +791,16 @@ export interface ApplicationsReduxState {
   isErrorSavingNavigationSetting: boolean;
   isUploadingNavigationLogo: boolean;
   isDeletingNavigationLogo: boolean;
-  deletingMultipleApps: DeletingMultipleApps;
   loadingStates: {
     isFetchingAllRoles: boolean;
     isFetchingAllUsers: boolean;
   };
   currentApplicationIdForCreateNewApp?: string;
   partialImportExport: {
+    isExportModalOpen: boolean;
     isExporting: boolean;
     isExportDone: boolean;
+    isImportModalOpen: boolean;
     isImporting: boolean;
     isImportDone: boolean;
   };
@@ -988,6 +809,7 @@ export interface ApplicationsReduxState {
 
 export interface Application {
   id: string;
+  baseId: string;
   name: string;
   workspaceId: string;
   isPublic: boolean;

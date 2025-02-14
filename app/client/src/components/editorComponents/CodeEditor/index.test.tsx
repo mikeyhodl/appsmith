@@ -19,6 +19,8 @@ describe("<CodeEditor /> - Keyboard navigation", () => {
   // To avoid warning "Error: Not implemented: window.focus"
   window.focus = jest.fn();
 
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const getTestComponent = (handleOnSelect: any = undefined) => (
     <Provider store={store}>
       <ThemeProvider theme={lightTheme}>
@@ -38,9 +40,9 @@ describe("<CodeEditor /> - Keyboard navigation", () => {
     </Provider>
   );
 
-  it("Pressing tab should focus the component", () => {
+  it("Pressing tab should focus the component", async () => {
     render(getTestComponent());
-    userEvent.tab();
+    await userEvent.tab();
     expect(screen.getByTestId("code-editor-target")).toHaveFocus();
   });
 });

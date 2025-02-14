@@ -19,10 +19,18 @@ const StyledCode = styled.div<{ skin: Skin }>`
   ${(props) => (props.skin === Skin.DARK ? themes.DARK : themes.LIGHT)};
   padding: 0 0px;
 
+  code.language-appsmith-binding {
+    color: ${(props) => props.theme.colors.bindingText};
+  }
+  .token.punctuation {
+    color: hsl(222, 70%, 77%);
+  }
+  .token.property {
+    color: hsl(30, 77%, 40%);
   }
 `;
 
-/* When adding an entry please make sure to include it in the craco.common.config.js as well */
+/* When adding an entry please make sure to include it in the webpack.config.js as well */
 export enum SYNTAX_HIGHLIGHTING_SUPPORTED_LANGUAGES {
   JAVASCRIPT = "language-javascript",
   APPSMITH = "language-appsmith-binding", // Please note that we're using the CSS class name required by prismjs.

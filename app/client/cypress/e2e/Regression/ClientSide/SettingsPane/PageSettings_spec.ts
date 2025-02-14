@@ -1,7 +1,7 @@
 import * as _ from "../../../../support/Objects/ObjectsCore";
 import PageList from "../../../../support/Pages/PageList";
 
-describe("Page Settings", () => {
+describe("Page Settings", { tags: ["@tag.Settings", "@tag.Sanity"] }, () => {
   it("1. Page name change updates URL", () => {
     _.appSettings.OpenAppSettings();
     _.appSettings.GoToPageSettings("Page1");
@@ -59,10 +59,10 @@ describe("Page Settings", () => {
     });
     _.appSettings.ClosePane();
 
-    //Page name doesn't allow special character
+    // Page name doesn't allow slashes and colons
     _.appSettings.OpenAppSettings();
     _.appSettings.GoToPageSettings("Page3");
-    _.pageSettings.UpdatePageNameAndVerifyTextValue("Page3!@#", "Page3 ");
+    _.pageSettings.UpdatePageNameAndVerifyTextValue("Page3/\\:", "Page3");
     _.appSettings.ClosePane();
 
     // Page name doesn't allow empty

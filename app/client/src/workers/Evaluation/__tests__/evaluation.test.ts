@@ -3,31 +3,47 @@ import type {
   WidgetEntityConfig,
   ActionEntityConfig,
   ActionEntity,
-} from "@appsmith/entities/DataTree/types";
+} from "ee/entities/DataTree/types";
 import type { UnEvalTree, ConfigTree } from "entities/DataTree/dataTreeTypes";
 import {
   ENTITY_TYPE,
   EvaluationSubstitutionType,
-} from "entities/DataTree/dataTreeFactory";
+} from "ee/entities/DataTree/types";
 import type { WidgetTypeConfigMap } from "WidgetProvider/factory";
 import { RenderModes } from "constants/WidgetConstants";
-import { PluginType } from "entities/Action";
+import { PluginType } from "entities/Plugin";
 import DataTreeEvaluator from "workers/common/DataTreeEvaluator";
 import { ValidationTypes } from "constants/WidgetValidation";
 import WidgetFactory from "WidgetProvider/factory";
 import { generateDataTreeWidget } from "entities/DataTree/dataTreeWidget";
 import { sortObjectWithArray } from "../../../utils/treeUtils";
 import klona from "klona";
+import { APP_MODE } from "entities/App";
 
 const klonaFullSpy = jest.fn();
+
 jest.mock("klona/full", () => ({
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   klona: (arg: any) => {
     klonaFullSpy(arg);
+
+    return klona.klona(arg);
+  },
+}));
+const klonaJsonSpy = jest.fn();
+
+jest.mock("klona/json", () => ({
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  klona: (arg: any) => {
+    klonaJsonSpy(arg);
+
     return klona.klona(arg);
   },
 }));
 
-const WIDGET_CONFIG_MAP: WidgetTypeConfigMap = {
+export const WIDGET_CONFIG_MAP: WidgetTypeConfigMap = {
   CONTAINER_WIDGET: {
     defaultProperties: {},
     derivedProperties: {},
@@ -231,7 +247,7 @@ const WIDGET_CONFIG_MAP: WidgetTypeConfigMap = {
   },
 };
 
-const BASE_WIDGET = {
+export const BASE_WIDGET = {
   widgetId: "randomID",
   widgetName: "randomWidgetName",
   bottomRow: 0,
@@ -249,7 +265,7 @@ const BASE_WIDGET = {
   meta: {},
 } as unknown as WidgetEntity;
 
-const BASE_WIDGET_CONFIG = {
+export const BASE_WIDGET_CONFIG = {
   logBlackList: {},
   widgetId: "randomID",
   type: "SKELETON_WIDGET",
@@ -561,16 +577,29 @@ describe("DataTreeEvaluator", () => {
 
   const evaluator = new DataTreeEvaluator(WIDGET_CONFIG_MAP);
 
-  it("Checks the number of clone operations in first tree flow", () => {
-    evaluator.setupFirstTree(unEvalTree, configTree);
+  it("Checks the number of clone operations in first tree flow", async () => {
+    await evaluator.setupFirstTree(
+      unEvalTree,
+      configTree,
+      {},
+      {
+        appId: "appId",
+        pageId: "pageId",
+        timestamp: "timestamp",
+        appMode: APP_MODE.PUBLISHED,
+        instanceId: "instanceId",
+      },
+    );
     evaluator.evalAndValidateFirstTree();
     // Hard check to not regress on the number of clone operations. Try to improve this number.
-    expect(klonaFullSpy).toBeCalledTimes(41);
+    expect(klonaFullSpy).toBeCalledTimes(15);
+    expect(klonaJsonSpy).toBeCalledTimes(28);
   });
 
   it("Evaluates a binding in first run", () => {
     const evaluation = evaluator.evalTree;
     const dependencies = evaluator.dependencies;
+
     expect(evaluation).toHaveProperty("Text1.text", "Label");
     expect(evaluation).toHaveProperty("Text2.text", "Label");
     expect(evaluation).toHaveProperty("Text3.text", "Label");
@@ -597,6 +626,7 @@ describe("DataTreeEvaluator", () => {
       updatedUnEvalTree,
       updatedConfigTree,
     );
+
     evaluator.evalAndValidateSubTree(
       evalOrder,
       updatedConfigTree,
@@ -634,6 +664,7 @@ describe("DataTreeEvaluator", () => {
       updatedUnEvalTree,
       updatedConfigTree,
     );
+
     evaluator.evalAndValidateSubTree(
       evalOrder,
       updatedConfigTree,
@@ -679,12 +710,14 @@ describe("DataTreeEvaluator", () => {
       updatedUnEvalTree,
       updatedConfigTree,
     );
+
     evaluator.evalAndValidateSubTree(
       evalOrder,
       updatedConfigTree,
       unEvalUpdates,
     );
     const dataTree = evaluator.evalTree;
+
     expect(dataTree).toHaveProperty("Input1.text", "Default value");
     expect(sortObjectWithArray(evaluator.dependencies)).toStrictEqual(
       expectedDependencies,
@@ -748,6 +781,7 @@ describe("DataTreeEvaluator", () => {
     );
     const dataTree = evaluator.evalTree;
     const updatedDependencies = evaluator.dependencies;
+
     expect(dataTree).toHaveProperty("Dropdown2.options.0.label", "newValue");
     expect(sortObjectWithArray(updatedDependencies)).toStrictEqual(
       expectedDependencies,
@@ -782,6 +816,7 @@ describe("DataTreeEvaluator", () => {
       updatedUnEvalTree,
       updatedConfigTree,
     );
+
     evaluator.evalAndValidateSubTree(
       evalOrder,
       updatedConfigTree,
@@ -789,6 +824,7 @@ describe("DataTreeEvaluator", () => {
     );
     const dataTree = evaluator.evalTree;
     const updatedDependencies = evaluator.dependencies;
+
     expect(dataTree).toHaveProperty("Table1.tableData", [
       {
         test: "Hey",
@@ -853,6 +889,7 @@ describe("DataTreeEvaluator", () => {
     );
     const dataTree = evaluator.evalTree;
     const updatedDependencies = evaluator.dependencies;
+
     expect(dataTree).toHaveProperty("Table1.tableData", [
       {
         test: "Hey",
@@ -916,6 +953,7 @@ describe("DataTreeEvaluator", () => {
       updatedTree1,
       updatedConfigTree1,
     );
+
     evaluator.evalAndValidateSubTree(
       evalOrder,
       updatedConfigTree1,
@@ -949,12 +987,14 @@ describe("DataTreeEvaluator", () => {
 
     const { evalOrder: newEvalOrder, unEvalUpdates: unEvalUpdates2 } =
       evaluator.setupUpdateTree(updatedTree2, updatedConfigTree2);
+
     evaluator.evalAndValidateSubTree(
       newEvalOrder,
       updatedConfigTree2,
       unEvalUpdates2,
     );
     const dataTree = evaluator.evalTree;
+
     expect(evaluator.dependencies["Api2.config.body"]).toStrictEqual([
       "Api2.config.pluginSpecifiedTemplates[0].value",
       "Text1.text",
@@ -988,12 +1028,14 @@ describe("DataTreeEvaluator", () => {
 
     const { evalOrder: newEvalOrder2, unEvalUpdates: unEvalUpdates3 } =
       evaluator.setupUpdateTree(updatedTree3, updatedConfigTree3);
+
     evaluator.evalAndValidateSubTree(
       newEvalOrder2,
       updatedConfigTree3,
       unEvalUpdates3,
     );
     const dataTree3 = evaluator.evalTree;
+
     expect(evaluator.dependencies["Api2.config.body"]).toStrictEqual([
       "Api2.config.pluginSpecifiedTemplates[0].value",
       "Text1.text",
@@ -1026,6 +1068,7 @@ describe("DataTreeEvaluator", () => {
       updatedUnEvalTree,
       updatedConfigTree,
     );
+
     expect(evalOrder).toContain("TextX.text");
     evaluator.evalAndValidateSubTree(
       evalOrder,
@@ -1033,6 +1076,7 @@ describe("DataTreeEvaluator", () => {
       unEvalUpdates,
     );
     const dataTree = evaluator.evalTree;
+
     expect(dataTree).toHaveProperty("TextX.text", 123);
     expect(dataTree).toHaveProperty("Text1.text", "Label");
   });
@@ -1061,6 +1105,7 @@ describe("DataTreeEvaluator", () => {
       updatedUnEvalTree,
       updatedConfigTree,
     );
+
     expect(evalOrder).toContain("TextY.text");
     expect(evalOrder.length).toBe(2);
     evaluator.evalAndValidateSubTree(
@@ -1069,6 +1114,7 @@ describe("DataTreeEvaluator", () => {
       unEvalUpdates,
     );
     // Hard check to not regress on the number of clone operations. Try to improve this number.
-    expect(klonaFullSpy).toBeCalledTimes(7);
+    expect(klonaFullSpy).toBeCalledTimes(4);
+    expect(klonaJsonSpy).toBeCalledTimes(4);
   });
 });

@@ -7,8 +7,7 @@ import type { ControlProps } from "components/formControls/BaseControl";
 import type { Datasource } from "entities/Datasource";
 import { isHidden, isKVArray } from "components/formControls/utils";
 import log from "loglevel";
-import CloseEditor from "components/editorComponents/CloseEditor";
-import type { FeatureFlags } from "@appsmith/entities/FeatureFlag";
+import type { FeatureFlags } from "ee/entities/FeatureFlag";
 
 export const FormContainer = styled.div`
   display: flex;
@@ -35,6 +34,8 @@ export const FormContainerBody = styled.div`
 export interface JSONtoFormProps {
   formData: Datasource;
   formName: string;
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   formConfig: any[];
   datasourceId: string;
   featureFlags?: FeatureFlags;
@@ -46,23 +47,16 @@ export interface JSONtoFormProps {
 export class JSONtoForm<
   P = unknown,
   S = unknown,
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   SS = any,
 > extends React.Component<JSONtoFormProps & P, S, SS> {
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   renderForm = (formContent: any) => {
-    const { featureFlags } = this.props;
-    const isSidebarEnabled =
-      featureFlags?.release_app_sidebar_enabled === true ||
-      featureFlags?.rollout_app_sidebar_enabled === true;
-    const isPagePaneSegmentsEnabled =
-      featureFlags?.release_show_new_sidebar_pages_pane_enabled;
     return (
       // <MainContainer>
-      <FormContainer className="t--json-to-form-wrapper">
-        {isSidebarEnabled ||
-        isPagePaneSegmentsEnabled ||
-        !!this.props.isOnboardingFlow ? null : (
-          <CloseEditor />
-        )}
+      <FormContainer className="t--json-to-form-wrapper select-text">
         <FormContainerBody className="t--json-to-form-body">
           {formContent}
         </FormContainerBody>
@@ -71,6 +65,8 @@ export class JSONtoForm<
     );
   };
 
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   renderMainSection = (section: any, index: number) => {
     if (
       !this.props.formData ||
@@ -96,6 +92,7 @@ export class JSONtoForm<
       )
     )
       return null;
+
     return (
       <Collapsible
         key={section.sectionName}
@@ -118,8 +115,10 @@ export class JSONtoForm<
         `datasourceStorages.${this.props.currentEnvironment}.` +
         config.configProperty,
     };
+
     try {
       this.props.setupConfig(customConfig);
+
       return (
         <div key={customConfig.configProperty} style={{ marginTop: "16px" }}>
           <FormControl
@@ -138,6 +137,7 @@ export class JSONtoForm<
     try {
       // setup config for each child
       children.forEach((c) => this.props.setupConfig(c));
+
       // We pass last child for legacy reasons, to keep the logic here exactly same as before.
       return this.renderSingleConfig(children[children.length - 1], children);
     } catch (e) {
@@ -145,9 +145,14 @@ export class JSONtoForm<
     }
   };
 
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   renderEachConfig = (section: any) => {
     return (
-      <div key={section.sectionName}>
+      <div
+        key={section.sectionName}
+        style={{ ...(section.sectionStyles || {}) }}
+      >
         {_.map(section.children, (propertyControlOrSection: ControlProps) => {
           // If the section is hidden, skip rendering
           // hides features/configs that are hidden behind feature flag
@@ -164,11 +169,16 @@ export class JSONtoForm<
             )
           )
             return null;
+
           if ("children" in propertyControlOrSection) {
+            // TODO: Fix this the next time the file is edited
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const { children } = propertyControlOrSection as any;
+
             if (isKVArray(children)) {
               return this.renderKVArray(children);
             }
+
             return this.renderEachConfig(propertyControlOrSection);
           } else {
             return this.renderSingleConfig(propertyControlOrSection);

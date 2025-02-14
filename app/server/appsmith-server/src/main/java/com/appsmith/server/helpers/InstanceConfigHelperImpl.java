@@ -1,5 +1,6 @@
 package com.appsmith.server.helpers;
 
+import com.appsmith.external.services.RTSCaller;
 import com.appsmith.server.configurations.CloudServicesConfig;
 import com.appsmith.server.configurations.CommonConfig;
 import com.appsmith.server.helpers.ce.InstanceConfigHelperCEImpl;
@@ -22,7 +23,8 @@ public class InstanceConfigHelperImpl extends InstanceConfigHelperCEImpl impleme
             FeatureFlagService featureFlagService,
             AnalyticsService analyticsService,
             NetworkUtils networkUtils,
-            ReleaseNotesService releaseNotesService) {
+            ReleaseNotesService releaseNotesService,
+            RTSCaller rtsCaller) {
         super(
                 configService,
                 cloudServicesConfig,
@@ -32,6 +34,7 @@ public class InstanceConfigHelperImpl extends InstanceConfigHelperCEImpl impleme
                 featureFlagService,
                 analyticsService,
                 networkUtils,
-                releaseNotesService);
+                releaseNotesService,
+                rtsCaller);
     }
 }

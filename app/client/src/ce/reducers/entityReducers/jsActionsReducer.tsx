@@ -1,12 +1,13 @@
 import { createReducer } from "utils/ReducerUtils";
 import type { JSAction, JSCollection } from "entities/JSCollection";
-import type { ReduxAction } from "@appsmith/constants/ReduxActionConstants";
+import type { ReduxAction } from "actions/ReduxActionTypes";
 import {
   ReduxActionTypes,
   ReduxActionErrorTypes,
-} from "@appsmith/constants/ReduxActionConstants";
+} from "ee/constants/ReduxActionConstants";
 import { set, keyBy, findIndex, unset } from "lodash";
-import produce from "immer";
+import { create } from "mutative";
+import { klona } from "klona";
 
 export const initialState: JSCollectionDataState = [];
 
@@ -19,7 +20,9 @@ export interface JSCollectionData {
   // Existence of parse errors for each action (updates after execution)
   isDirty?: Record<string, boolean>;
 }
+
 export type JSCollectionDataState = JSCollectionData[];
+
 export interface PartialActionData {
   isLoading: boolean;
   config: { id: string };
@@ -52,6 +55,7 @@ export const handlers = {
       const foundAction = state.find((currentAction) => {
         return currentAction.config.id === action.id;
       });
+
       return {
         isLoading: false,
         config: action,
@@ -90,7 +94,16 @@ export const handlers = {
         return {
           ...jsCollection,
           isLoading: false,
-          config: action.payload.data,
+          config: action.payload.data.isPublic
+            ? {
+                ...action.payload.data,
+                isMainJSCollection: true,
+                displayName: "Main",
+              }
+            : {
+                ...action.payload.data,
+                isMainJSCollection: jsCollection.config.isMainJSCollection,
+              },
           activeJSActionId:
             findIndex(jsCollection.config.actions, {
               id: jsCollection.activeJSActionId,
@@ -99,6 +112,7 @@ export const handlers = {
               : jsCollection.activeJSActionId,
         };
       }
+
       return jsCollection;
     }),
   [ReduxActionTypes.UPDATE_JS_ACTION_BODY_SUCCESS]: (
@@ -110,8 +124,18 @@ export const handlers = {
         return {
           ...a,
           isLoading: false,
-          config: action.payload.data,
+          config: action.payload.data.isPublic
+            ? {
+                ...action.payload.data,
+                isMainJSCollection: true,
+                displayName: "Main",
+              }
+            : {
+                ...action.payload.data,
+                isMainJSCollection: a.config.isMainJSCollection,
+              },
         };
+
       return a;
     }),
   [ReduxActionTypes.UPDATE_JS_ACTION_BODY_INIT]: (
@@ -124,6 +148,7 @@ export const handlers = {
           ...a,
           config: { ...a.config, body: action.payload.body },
         };
+
       return a;
     }),
   [ReduxActionErrorTypes.UPDATE_JS_ACTION_ERROR]: (
@@ -132,86 +157,29 @@ export const handlers = {
   ): JSCollectionDataState =>
     state.map((a) => {
       if (a.config.id === action.payload.data.id)
-        return { isLoading: false, config: action.payload.data };
+        return {
+          isLoading: false,
+          config: action.payload.data.isPublic
+            ? {
+                ...action.payload.data,
+                isMainJSCollection: true,
+                displayName: "Main",
+              }
+            : action.payload.data,
+        };
+
       return a;
     }),
-  [ReduxActionTypes.COPY_JS_ACTION_INIT]: (
-    state: JSCollectionDataState,
-    action: ReduxAction<{
-      id: string;
-      destinationPageId: string;
-      name: string;
-    }>,
-  ): JSCollectionDataState =>
-    state.concat(
-      state
-        .filter((a) => a.config.id === action.payload.id)
-        .map((a) => ({
-          ...a,
-          data: undefined,
-          config: {
-            ...a.config,
-            id: "TEMP_COPY_ID",
-            name: action.payload.name,
-            pageId: action.payload.destinationPageId,
-          },
-        })),
-    ),
   [ReduxActionTypes.COPY_JS_ACTION_SUCCESS]: (
     state: JSCollectionDataState,
     action: ReduxAction<JSCollection>,
   ): JSCollectionDataState =>
-    state.map((a) => {
-      if (
-        a.config.pageId === action.payload.pageId &&
-        a.config.name === action.payload.name
-      ) {
-        return {
-          ...a,
-          config: action.payload,
-        };
-      }
-
-      return a;
-    }),
-  [ReduxActionErrorTypes.COPY_JS_ACTION_ERROR]: (
-    state: JSCollectionDataState,
-    action: ReduxAction<{
-      id: string;
-      destinationPageId: string;
-      name: string;
-    }>,
-  ): JSCollectionDataState =>
-    state.filter((a) => {
-      if (a.config.pageId === action.payload.destinationPageId) {
-        if (a.config.id === action.payload.id) {
-          return a.config.name !== action.payload.name;
-        }
-        return true;
-      }
-
-      return true;
-    }),
-  [ReduxActionTypes.MOVE_JS_ACTION_INIT]: (
-    state: JSCollectionDataState,
-    action: ReduxAction<{
-      id: string;
-      destinationPageId: string;
-    }>,
-  ): JSCollectionDataState =>
-    state.map((a) => {
-      if (a.config.id === action.payload.id) {
-        return {
-          ...a,
-          config: {
-            ...a.config,
-            pageId: action.payload.destinationPageId,
-          },
-        };
-      }
-
-      return a;
-    }),
+    state.concat([
+      {
+        config: { ...action.payload },
+        isLoading: false,
+      },
+    ]),
   [ReduxActionTypes.FETCH_JS_ACTIONS_VIEW_MODE_SUCCESS]: (
     state: JSCollectionDataState,
     action: ReduxAction<JSCollection[]>,
@@ -231,6 +199,7 @@ export const handlers = {
 
       action.payload.forEach((actionPayload: JSCollection) => {
         const stateAction = stateActionMap[actionPayload.id];
+
         if (stateAction) {
           result.push({
             data: stateAction.data,
@@ -253,6 +222,7 @@ export const handlers = {
 
       return result;
     }
+
     return state;
   },
   [ReduxActionTypes.MOVE_JS_ACTION_SUCCESS]: (
@@ -262,23 +232,6 @@ export const handlers = {
     state.map((a) => {
       if (a.config.id === action.payload.id) {
         return { ...a, config: action.payload };
-      }
-
-      return a;
-    }),
-  [ReduxActionErrorTypes.MOVE_JS_ACTION_ERROR]: (
-    state: JSCollectionDataState,
-    action: ReduxAction<{ id: string; originalPageId: string }>,
-  ): JSCollectionDataState =>
-    state.map((a) => {
-      if (a.config.id === action.payload.id) {
-        return {
-          ...a,
-          config: {
-            ...a.config,
-            pageId: action.payload.originalPageId,
-          },
-        };
       }
 
       return a;
@@ -299,8 +252,10 @@ export const handlers = {
       if (a.config.id === action.payload.collection.id) {
         const newData = { ...a.data };
         const newIsDirty = { ...a.isDirty };
+
         unset(newData, action.payload.action.id);
         unset(newIsDirty, action.payload.action.id);
+
         return {
           ...a,
           isExecuting: {
@@ -315,6 +270,7 @@ export const handlers = {
           },
         };
       }
+
       return a;
     }),
   [ReduxActionTypes.EXECUTE_JS_FUNCTION_SUCCESS]: (
@@ -339,6 +295,7 @@ export const handlers = {
           },
         };
       }
+
       return a;
     }),
   [ReduxActionTypes.SET_JS_FUNCTION_EXECUTION_DATA]: (
@@ -347,18 +304,22 @@ export const handlers = {
   ): JSCollectionDataState =>
     state.map((jsCollectionData) => {
       const collectionId = jsCollectionData.config.id;
+
       if (action.payload.hasOwnProperty(collectionId)) {
         let data = {
           ...jsCollectionData.data,
         };
+
         action.payload[collectionId].forEach((item) => {
           data = { ...data, [item.actionId]: item.data };
         });
+
         return {
           ...jsCollectionData,
           data,
         };
       }
+
       return jsCollectionData;
     }),
   [ReduxActionTypes.SET_JS_FUNCTION_EXECUTION_ERRORS]: (
@@ -367,18 +328,22 @@ export const handlers = {
   ): JSCollectionDataState =>
     state.map((jsCollectionData) => {
       const collectionId = jsCollectionData.config.id;
+
       if (action.payload.hasOwnProperty(collectionId)) {
         let isDirty = {
           ...jsCollectionData.isDirty,
         };
+
         action.payload[collectionId].forEach(({ actionId }) => {
           isDirty = { ...isDirty, [actionId]: true };
         });
+
         return {
           ...jsCollectionData,
           isDirty,
         };
       }
+
       return jsCollectionData;
     }),
   [ReduxActionTypes.UPDATE_JS_FUNCTION_PROPERTY_SUCCESS]: (
@@ -392,6 +357,7 @@ export const handlers = {
           data: action.payload,
         };
       }
+
       return a;
     }),
   [ReduxActionTypes.TOGGLE_FUNCTION_EXECUTE_ON_LOAD_SUCCESS]: (
@@ -408,8 +374,10 @@ export const handlers = {
           if (jsAction.id === action.payload.actionId) {
             set(jsAction, `executeOnLoad`, action.payload.executeOnLoad);
           }
+
           return jsAction;
         });
+
         return {
           ...a,
           config: {
@@ -418,6 +386,7 @@ export const handlers = {
           },
         };
       }
+
       return a;
     }),
   [ReduxActionTypes.SET_JS_ACTION_TO_EXECUTE_ON_PAGELOAD]: (
@@ -431,12 +400,14 @@ export const handlers = {
       }>
     >,
   ) => {
-    return produce(state, (draft) => {
+    return create(state, (draft) => {
       const CollectionUpdateSearch = keyBy(action.payload, "collectionId");
       const actionUpdateSearch = keyBy(action.payload, "id");
+
       draft.forEach((action, index) => {
         if (action.config.id in CollectionUpdateSearch) {
           const allActions = draft[index].config.actions;
+
           allActions.forEach((js) => {
             if (js.id in actionUpdateSearch) {
               js.executeOnLoad = actionUpdateSearch[js.id].executeOnLoad;
@@ -460,7 +431,55 @@ export const handlers = {
           activeJSActionId: action.payload.jsActionId,
         };
       }
+
       return jsCollection;
+    }),
+  [ReduxActionTypes.RESET_EDITOR_REQUEST]: () => {
+    return klona(initialState);
+  },
+  [ReduxActionTypes.UPDATE_TEST_PAYLOAD_FOR_COLLECTION]: (
+    state: JSCollectionDataState,
+    action: ReduxAction<{
+      collectionId: string;
+      testPayload: Record<string, unknown>;
+    }>,
+  ): JSCollectionDataState =>
+    state.map((jsCollectionData) => {
+      if (jsCollectionData.config.id === action.payload.collectionId) {
+        return {
+          ...jsCollectionData,
+          data: {
+            ...jsCollectionData.data,
+            testPayload: action.payload.testPayload,
+          },
+        };
+      }
+
+      return jsCollectionData;
+    }),
+  [ReduxActionTypes.UPDATE_TEST_PAYLOAD_FOR_JS_ACTION]: (
+    state: JSCollectionDataState,
+    action: ReduxAction<{
+      collectionId: string;
+      actionId: string;
+      testPayload: Record<string, unknown>;
+    }>,
+  ): JSCollectionDataState =>
+    state.map((jsCollectionData) => {
+      if (jsCollectionData.config.id === action.payload.collectionId) {
+        return {
+          ...jsCollectionData,
+          data: {
+            ...jsCollectionData.data,
+            testPayload: {
+              ...(jsCollectionData.data?.testPayload || {}),
+              [action.payload.actionId]: action.payload.testPayload,
+            },
+          },
+        };
+      }
+
+      return jsCollectionData;
     }),
 };
 

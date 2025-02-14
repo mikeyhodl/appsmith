@@ -11,6 +11,8 @@ import {
 } from "../../../../support/Objects/ObjectsCore";
 import EditorNavigation, {
   EntityType,
+  PageLeftPane,
+  PagePaneSegment,
 } from "../../../../support/Pages/EditorNavigation";
 import PageList from "../../../../support/Pages/PageList";
 
@@ -27,7 +29,7 @@ const jsObjectBody = `export default {
 	}
 }`;
 
-describe("Autocomplete tests", { tags: ["@tag.JS"] }, () => {
+describe("Autocomplete tests", { tags: ["@tag.JS", "@tag.Binding"] }, () => {
   it("1. Bug #13613 Verify widgets autocomplete: ButtonGroup & Document viewer widget", () => {
     entityExplorer.DragDropWidgetNVerify(
       draggableWidgets.BUTTON_GROUP,
@@ -238,8 +240,8 @@ describe("Autocomplete tests", { tags: ["@tag.JS"] }, () => {
     agHelper.TypeText(locators._codeMirrorTextArea, "userCollection[0].");
     agHelper.GetNAssertElementText(locators._hints, "users");
     agHelper.TypeText(locators._codeMirrorTextArea, "users[0].");
-    agHelper.GetNAssertElementText(locators._hints, "label");
-    agHelper.GetNAssertElementText(locators._hints, "value", "have.text", 1);
+    agHelper.GetNAssertElementText(locators._hints, "value");
+    agHelper.GetNAssertElementText(locators._hints, "label", "have.text", 1);
 
     cy.get("@jsObjName").then((jsObjName) => {
       jsName = jsObjName;
@@ -253,6 +255,7 @@ describe("Autocomplete tests", { tags: ["@tag.JS"] }, () => {
         entityType: entityItems.JSObject,
       });
     });
+    PageLeftPane.switchSegment(PagePaneSegment.Queries);
     entityExplorer.ActionContextMenuByEntityName({
       entityNameinLeftSidebar: "Api1",
       action: "Delete",
@@ -265,7 +268,7 @@ describe("Autocomplete tests", { tags: ["@tag.JS"] }, () => {
     dataSources.CreateQueryAfterDSSaved();
 
     dataSources.ValidateNSelectDropdown(
-      "Commands",
+      "Command",
       "Find document(s)",
       "Insert document(s)",
     );
@@ -295,7 +298,7 @@ describe("Autocomplete tests", { tags: ["@tag.JS"] }, () => {
           )
           .type(".");
 
-        agHelper.GetNAssertElementText(locators._hints, "geolocation");
+        agHelper.GetNAssertElementText(locators._hints, "appName");
       });
   });
 
@@ -310,6 +313,6 @@ describe("Autocomplete tests", { tags: ["@tag.JS"] }, () => {
       .type("{downArrow}{leftArrow}{leftArrow}");
 
     agHelper.TypeText(locators._codeMirrorTextArea, ".");
-    agHelper.GetNAssertElementText(locators._hints, "geolocation");
+    agHelper.GetNAssertElementText(locators._hints, "appName");
   });
 });

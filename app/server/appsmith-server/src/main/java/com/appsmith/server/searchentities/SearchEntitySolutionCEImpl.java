@@ -1,12 +1,10 @@
 package com.appsmith.server.searchentities;
 
 import com.appsmith.server.applications.base.ApplicationService;
-import com.appsmith.server.constants.FieldName;
 import com.appsmith.server.domains.Application;
 import com.appsmith.server.domains.Workspace;
 import com.appsmith.server.dtos.SearchEntityDTO;
 import com.appsmith.server.helpers.GitUtils;
-import com.appsmith.server.helpers.ResponseUtils;
 import com.appsmith.server.services.WorkspaceService;
 import com.appsmith.server.solutions.ApplicationPermission;
 import com.appsmith.server.solutions.WorkspacePermission;
@@ -19,6 +17,8 @@ import reactor.core.publisher.Mono;
 import java.util.ArrayList;
 import java.util.List;
 
+import static com.appsmith.server.searchentities.helpers.SearchEntityHelper.getPageable;
+import static com.appsmith.server.searchentities.helpers.SearchEntityHelper.getSort;
 import static com.appsmith.server.searchentities.helpers.SearchEntityHelper.shouldSearchEntity;
 
 @RequiredArgsConstructor
@@ -31,8 +31,6 @@ public class SearchEntitySolutionCEImpl implements SearchEntitySolutionCE {
     private final WorkspacePermission workspacePermission;
 
     private final ApplicationPermission applicationPermission;
-
-    private final ResponseUtils responseUtils;
 
     /**
      * This method searches for workspaces and applications based on the searchString provided.
@@ -55,15 +53,15 @@ public class SearchEntitySolutionCEImpl implements SearchEntitySolutionCE {
         if (size == 0) {
             return Mono.just(new SearchEntityDTO());
         }
-        Pageable pageable = Pageable.ofSize(size).withPage(page);
-        Sort sort = Sort.by(Sort.Direction.DESC, FieldName.UPDATED_AT);
+        Pageable pageable = getPageable(page, size);
+        Sort sort = getSort();
         searchString = StringUtils.hasLength(searchString) ? searchString.trim() : "";
         // If no entities are specified, search for all entities.
         Mono<List<Workspace>> workspacesMono = Mono.just(new ArrayList<>());
         if (shouldSearchEntity(Workspace.class, entities)) {
             workspacesMono = workspaceService
-                    .filterByEntityFields(
-                            List.of(FieldName.NAME),
+                    .filterByEntityFieldsWithoutPublicAccess(
+                            List.of(Workspace.Fields.name),
                             searchString,
                             pageable,
                             sort,
@@ -74,8 +72,8 @@ public class SearchEntitySolutionCEImpl implements SearchEntitySolutionCE {
         Mono<List<Application>> applicationsMono = Mono.just(new ArrayList<>());
         if (shouldSearchEntity(Application.class, entities)) {
             applicationsMono = applicationService
-                    .filterByEntityFields(
-                            List.of(FieldName.NAME),
+                    .filterByEntityFieldsWithoutPublicAccess(
+                            List.of(Application.Fields.name),
                             searchString,
                             pageable,
                             sort,
@@ -91,10 +89,9 @@ public class SearchEntitySolutionCEImpl implements SearchEntitySolutionCE {
                          * OR
                          * - Applications that, when connected, revert with default branch only.
                          */
-                        return !GitUtils.isApplicationConnectedToGit(application)
-                                || GitUtils.isDefaultBranchedApplication(application);
+                        return !GitUtils.isArtifactConnectedToGit(application.getGitArtifactMetadata())
+                                || GitUtils.isDefaultBranchedArtifact(application.getGitArtifactMetadata());
                     })
-                    .map(responseUtils::updateApplicationWithDefaultResources)
                     .collectList();
         }
 

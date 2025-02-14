@@ -2,6 +2,8 @@
  * TODO: (Balaji) Move all the types to different file
  */
 import { IconNames } from "@blueprintjs/icons";
+import type { SpacingDimension } from "@appsmith/wds";
+import type { Responsive, SizingDimension } from "@appsmith/wds";
 import type { Theme } from "constants/DefaultTheme";
 import type { PropertyPaneConfig } from "constants/PropertyControlConstants";
 import type { WidgetTags } from "constants/WidgetConstants";
@@ -9,11 +11,10 @@ import { WIDGET_STATIC_PROPS } from "constants/WidgetConstants";
 import type { Stylesheet } from "entities/AppTheming";
 import { omit } from "lodash";
 import moment from "moment";
-import type { DerivedPropertiesMap } from "WidgetProvider/factory";
+import type { SVGProps } from "react";
 import type { WidgetFeatures } from "utils/WidgetFeatures";
 import type { WidgetProps } from "../widgets/BaseWidget";
-import type { ExtraDef } from "utils/autocomplete/defCreatorUtils";
-import type { WidgetEntityConfig } from "@appsmith/entities/DataTree/types";
+import type { WidgetEntityConfig } from "ee/entities/DataTree/types";
 import type {
   WidgetQueryConfig,
   WidgetQueryGenerationConfig,
@@ -24,9 +25,13 @@ import type {
   Positioning,
   ResponsiveBehavior,
 } from "layoutSystems/common/utils/constants";
+import type { DerivedPropertiesMap } from "./factory/types";
+import type { ExtraDef } from "utils/autocomplete/types";
 
 export interface WidgetSizeConfig {
   viewportMinWidth: number;
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   configuration: (props: any) => Record<string, string | number>;
 }
 
@@ -34,13 +39,16 @@ interface ResizableValues {
   vertical?: boolean;
   horizontal?: boolean;
 }
+// TODO: Fix this the next time the file is edited
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type ResizableOptions = ResizableValues | ((props: any) => ResizableValues);
 export interface AutoDimensionValues {
   width?: boolean;
   height?: boolean;
 }
 export type AutoDimensionOptions =
-  | AutoDimensionValues
+  | AutoDimensionValues // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   | ((props: any) => AutoDimensionValues);
 
 export interface AutoLayoutConfig {
@@ -56,21 +64,28 @@ export interface AutoLayoutConfig {
   disabledPropsDefaults?: Partial<WidgetProps>;
 }
 export interface SizeConfig {
-  maxHeight?: Record<string, string>;
-  maxWidth?: Record<string, string>;
-  minHeight: Record<string, string>;
-  minWidth: Record<string, string>;
+  maxHeight?: Responsive<SizingDimension>;
+  maxWidth?: Responsive<SizingDimension>;
+  minHeight?: Responsive<SizingDimension>;
+  minWidth?: Responsive<SizingDimension>;
+  paddingTop?: Responsive<SpacingDimension>;
+  paddingBottom?: Responsive<SpacingDimension>;
 }
 
 export interface AnvilConfig {
   isLargeWidget: boolean;
   // min/max sizes for the widget
-  widgetSize?: SizeConfig | ((props: any) => SizeConfig);
+  widgetSize?:
+    | SizeConfig // TODO: Fix this the next time the file is edited
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    | ((props: any, isPreviewMode: boolean) => SizeConfig);
 }
 
 export interface WidgetBaseConfiguration {
   name: string;
+  displayOrder?: number;
   iconSVG?: string;
+  thumbnailSVG?: string;
   hideCard?: boolean;
   eagerRender?: boolean;
   isDeprecated?: boolean;
@@ -80,6 +95,21 @@ export interface WidgetBaseConfiguration {
   searchTags?: string[];
   tags?: WidgetTags[];
   needsHeightForContent?: boolean;
+
+  // Flag to tell platform to disaplay this widget when search key
+  // is not matching any widget.
+  isSearchWildcard?: boolean;
+
+  // Flag to tell withWidgetProps HOC to inject evaluation errors into the widget
+  needsErrorInfo?: boolean;
+
+  onCanvasUI?: {
+    selectionBGCSSVar: string;
+    focusBGCSSVar: string;
+    selectionColorCSSVar: string;
+    focusColorCSSVar: string;
+    disableParentSelection: boolean;
+  };
 }
 
 export type WidgetDefaultProps = Partial<WidgetProps> & WidgetConfigProps;
@@ -93,11 +123,15 @@ export interface WidgetConfiguration extends WidgetBaseConfiguration {
     contentConfig?: PropertyPaneConfig[];
     styleConfig?: PropertyPaneConfig[];
     default: Record<string, string>;
+    // TODO: Fix this the next time the file is edited
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     meta: Record<string, any>;
     derived: DerivedPropertiesMap;
     loadingProperties?: Array<RegExp>;
     stylesheetConfig?: Stylesheet;
     autocompleteDefinitions?: AutocompletionDefinitions;
+    // TODO: Fix this the next time the file is edited
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     setterConfig?: Record<string, any>;
   };
   methods?: Record<string, WidgetMethods>;
@@ -117,13 +151,15 @@ export interface WidgetMethods {
   getCanvasHeightOffset?: GetCanvasHeightOffset;
   getEditorCallouts?: GetEditorCallouts;
   getOneClickBindingConnectableWidgetConfig?: GetOneClickBindingConnectableWidgetConfig;
+  IconCmp?: (props: SVGProps<SVGSVGElement>) => JSX.Element;
+  ThumbnailCmp?: (props: SVGProps<SVGSVGElement>) => JSX.Element;
 }
 
 type GetEditorCallouts = (props: WidgetProps) => WidgetCallout[];
 
 export interface WidgetCallout {
   message: string;
-  links: [
+  links?: [
     {
       text: string;
       url: string;
@@ -173,6 +209,10 @@ export enum BlueprintOperationTypes {
   UPDATE_CREATE_PARAMS_BEFORE_ADD = "UPDATE_CREATE_PARAMS_BEFORE_ADD",
 }
 
+export enum BlueprintOperationActionTypes {
+  CREATE_OR_UPDATE_DATASOURCE_WITH_ACTION = "CREATE_OR_UPDATE_DATASOURCE_WITH_ACTION",
+}
+
 export type FlattenedWidgetProps = WidgetProps & {
   children?: string[];
 };
@@ -193,11 +233,14 @@ export type AutocompleteDefinitionFunction = (
   widgetProps: WidgetProps,
   extraDefsToDefine?: ExtraDef,
   configTree?: WidgetEntityConfig,
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ) => Record<string, any>;
 
 export type AutocompletionDefinitions =
-  | Record<string, any>
-  | AutocompleteDefinitionFunction;
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  Record<string, any> | AutocompleteDefinitionFunction;
 
 const staticProps = omit(
   WIDGET_STATIC_PROPS,
@@ -205,6 +248,7 @@ const staticProps = omit(
   "topRowBeforeCollapse",
   "bottomRowBeforeCollapse",
 );
+
 export type CanvasWidgetStructure = Pick<
   WidgetProps,
   keyof typeof staticProps
@@ -447,8 +491,12 @@ export interface WidgetBlueprint {
     type: string;
     size?: { rows: number; cols: number };
     position: { top?: number; left?: number };
+    // TODO: Fix this the next time the file is edited
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     props: Record<string, any>;
   }>;
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   operations?: any;
 }
 

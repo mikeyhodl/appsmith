@@ -11,7 +11,9 @@ import {
   agHelper,
   propPane,
   deployMode,
+  table,
 } from "../../../../support/Objects/ObjectsCore";
+import PageList from "../../../../support/Pages/PageList";
 
 describe(
   "Table Widget V2 and Navigate to functionality validation",
@@ -34,7 +36,7 @@ describe(
       agHelper.AddDsl("displayWidgetDsl");
       // eslint-disable-next-line cypress/no-unnecessary-waiting
       cy.wait(500);
-      PageLeftPane.expandCollapseItem("Pages");
+      PageList.ShowList();
       PageLeftPane.assertPresence(pageid);
       //Table Widget V2 Functionality with multiple page
       EditorNavigation.SelectEntityByName("Page1", EntityType.Page);
@@ -53,14 +55,14 @@ describe(
       cy.get(commonlocators.singleSelectMenuItem)
         .contains(pageid)
         .click({ force: true });
-      cy.assertPageSave();
+      agHelper.AssertAutoSave();
     });
 
     it("2. Validate NavigateTo Page functionality ", function () {
       cy.wait(2000);
       deployMode.DeployApp();
       cy.get(widgetsPage.chartWidget).should("not.exist");
-      cy.isSelectRow(1);
+      table.SelectTableRow(1, 0, true, "v2");
       cy.get(widgetsPage.chartWidget).should("be.visible");
     });
   },

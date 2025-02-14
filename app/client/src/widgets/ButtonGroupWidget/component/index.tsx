@@ -1,6 +1,7 @@
 import type { RefObject } from "react";
 import React, { createRef } from "react";
 import { sortBy } from "lodash";
+import { objectKeys } from "@appsmith/utils";
 import {
   Alignment,
   Icon,
@@ -40,11 +41,12 @@ interface ButtonData {
   label?: string;
   iconName?: string;
 }
+
 // Extract props influencing to width change
 const getButtonData = (
   groupButtons: Record<string, GroupButtonProps>,
 ): ButtonData[] => {
-  const buttonData = Object.keys(groupButtons).reduce(
+  const buttonData = objectKeys(groupButtons).reduce(
     (acc: ButtonData[], id) => {
       return [
         ...acc,
@@ -202,8 +204,8 @@ const StyledButton = styled.button<ThemeProp & ButtonStyleProps>`
         getCustomBackgroundColor(buttonVariant, buttonColor) !== "none"
           ? getCustomBackgroundColor(buttonVariant, buttonColor)
           : buttonVariant === ButtonVariantTypes.PRIMARY
-          ? theme.colors.button.primary.primary.bgColor
-          : "none"
+            ? theme.colors.button.primary.primary.bgColor
+            : "none"
       } !important;
       flex-direction : ${iconAlign === "right" ? "row-reverse" : "row"};
       .bp3-icon {
@@ -221,8 +223,8 @@ const StyledButton = styled.button<ThemeProp & ButtonStyleProps>`
       getCustomBorderColor(buttonVariant, buttonColor) !== "none"
         ? `1px solid ${getCustomBorderColor(buttonVariant, buttonColor)}`
         : buttonVariant === ButtonVariantTypes.SECONDARY
-        ? `1px solid ${theme.colors.button.primary.secondary.borderColor}`
-        : "none"
+          ? `1px solid ${theme.colors.button.primary.secondary.borderColor}`
+          : "none"
     } ${buttonVariant === ButtonVariantTypes.PRIMARY ? "" : "!important"};
 
     & span {
@@ -343,9 +345,10 @@ interface PopoverContentProps {
 function PopoverContent(props: PopoverContentProps) {
   const { buttonId, menuItems, onItemClicked } = props;
 
-  let items = Object.keys(menuItems)
+  let items = objectKeys(menuItems)
     .map((itemKey) => menuItems[itemKey])
     .filter((item) => item.isVisible === true);
+
   // sort btns by index
   items = sortBy(items, ["index"]);
 
@@ -432,6 +435,7 @@ class ButtonGroupComponent extends React.Component<
       if (this.timer) {
         clearTimeout(this.timer);
       }
+
       this.timer = setTimeout(() => {
         this.setState(() => {
           return {
@@ -487,25 +491,27 @@ class ButtonGroupComponent extends React.Component<
 
   // Get widths of menu buttons
   getMenuButtonWidths = () =>
-    Object.keys(this.props.groupButtons).reduce((acc, id) => {
+    objectKeys(this.props.groupButtons).reduce((acc, id) => {
       if (this.props.groupButtons[id].buttonType === "MENU") {
         return {
           ...acc,
           [id]: this.state.itemRefs[id].current?.getBoundingClientRect().width,
         };
       }
+
       return acc;
     }, {});
 
   // Create refs of menu buttons
   createMenuButtonRefs = () =>
-    Object.keys(this.props.groupButtons).reduce((acc, id) => {
+    objectKeys(this.props.groupButtons).reduce((acc, id) => {
       if (this.props.groupButtons[id].buttonType === "MENU") {
         return {
           ...acc,
           [id]: createRef(),
         };
       }
+
       return acc;
     }, {});
 
@@ -535,6 +541,7 @@ class ButtonGroupComponent extends React.Component<
       buttonVariant,
       groupButtons,
       isDisabled,
+      isFormValid,
       minPopoverWidth,
       orientation,
       widgetId,
@@ -542,9 +549,10 @@ class ButtonGroupComponent extends React.Component<
     const { loadedBtnId } = this.state;
     const isHorizontal = orientation === "horizontal";
 
-    let items = Object.keys(groupButtons)
+    let items = objectKeys(groupButtons)
       .map((itemKey) => groupButtons[itemKey])
       .filter((item) => item.isVisible === true);
+
     // sort btns by index
     items = sortBy(items, ["index"]);
     const popoverId = `button-group-${widgetId}`;
@@ -568,7 +576,12 @@ class ButtonGroupComponent extends React.Component<
         {items.map((button) => {
           const isLoading = button.id === loadedBtnId;
           const isButtonDisabled =
-            button.isDisabled || isDisabled || !!loadedBtnId || isLoading;
+            button.isDisabled ||
+            isDisabled ||
+            !!loadedBtnId ||
+            isLoading ||
+            (button.disabledWhenInvalid && isFormValid === false);
+
           if (button.buttonType === "MENU" && !isButtonDisabled) {
             const { menuItems } = button;
 
@@ -640,6 +653,7 @@ class ButtonGroupComponent extends React.Component<
               </MenuButtonWrapper>
             );
           }
+
           return (
             <DragContainer
               buttonColor={button.buttonColor}
@@ -695,6 +709,7 @@ interface GroupButtonProps {
   index: number;
   isVisible?: boolean;
   isDisabled?: boolean;
+  disabledWhenInvalid?: boolean;
   label?: string;
   buttonType?: string;
   buttonColor?: string;
@@ -710,6 +725,7 @@ interface GroupButtonProps {
       index: number;
       isVisible?: boolean;
       isDisabled?: boolean;
+      disabledWhenInvalid?: boolean;
       label?: string;
       backgroundColor?: string;
       textColor?: string;
@@ -738,6 +754,7 @@ export interface ButtonGroupComponentProps {
   widgetId: string;
   buttonMinWidth?: number;
   minHeight?: number;
+  isFormValid?: boolean;
 }
 
 export interface ButtonGroupComponentState {

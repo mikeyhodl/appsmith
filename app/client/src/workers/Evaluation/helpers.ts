@@ -1,22 +1,36 @@
-import { serialiseToBigInt } from "@appsmith/workers/Evaluation/evaluationUtils";
+import { serialiseToBigInt } from "ee/workers/Evaluation/evaluationUtils";
+import type { WidgetEntity } from "ee//entities/DataTree/types";
 import type { Diff } from "deep-diff";
 import { diff } from "deep-diff";
 import type { DataTree } from "entities/DataTree/dataTreeTypes";
 import equal from "fast-deep-equal";
-import { get, isNumber, isObject, set } from "lodash";
+import { get, isObject, set } from "lodash";
 import { isMoment } from "moment";
 import { EvalErrorTypes } from "utils/DynamicBindingUtils";
 
 export const fn_keys: string = "__fn_keys__";
 
-export interface DiffReferenceState {
-  kind: "referenceState";
-  path: any[];
-  referencePath: string;
+export const uniqueOrderUpdatePaths = (updatePaths: string[]) =>
+  Array.from(new Set(updatePaths)).sort((a, b) => b.length - a.length);
+
+export const getNewDataTreeUpdates = (paths: string[], dataTree: object) =>
+  paths.map((path) => {
+    const segmentedPath = path.split(".");
+
+    return {
+      kind: "N",
+      path: segmentedPath,
+      rhs: get(dataTree, segmentedPath),
+    };
+  });
+
+export interface DiffNewTreeState {
+  kind: "newTree";
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  rhs: any;
 }
-export type DiffWithReferenceState =
-  | Diff<DataTree, DataTree>
-  | DiffReferenceState;
+export type DiffWithNewTreeState = Diff<DataTree, DataTree> | DiffNewTreeState;
 // Finds the first index which is a duplicate value
 // Returns -1 if there are no duplicates
 // Returns the index of the first duplicate entry it finds
@@ -26,12 +40,15 @@ export type DiffWithReferenceState =
 export const findDuplicateIndex = (arr: Array<unknown>) => {
   const _uniqSet = new Set();
   let currSetSize = 0;
+
   for (let i = 0; i < arr.length; i++) {
     // JSON.stringify because value can be objects
     _uniqSet.add(JSON.stringify(arr[i]));
+
     if (_uniqSet.size > currSetSize) currSetSize = _uniqSet.size;
     else return i;
   }
+
   return -1;
 };
 
@@ -49,6 +66,7 @@ export const countOccurrences = (
 ): number => {
   string += "";
   subString += "";
+
   if (subString.length <= 0) return string.length + 1;
 
   let n = 0, // count of occurrences
@@ -57,44 +75,25 @@ export const countOccurrences = (
 
   while (true) {
     pos = string.indexOf(subString, pos);
+
     if (pos >= 0) {
       ++n;
+
       /**
        * If you are only interested in knowing
        * whether occurances count exceeds maxLimit,
        * then break the loop.
        */
       if (maxLimit && n > maxLimit) break;
+
       pos += step;
     } else break;
   }
+
   return n;
 };
 
 const LARGE_COLLECTION_SIZE = 100;
-// for object paths which have a "." in the object key like "a.['b.c']"
-const REGEX_NESTED_OBJECT_PATH = /(.+)\.\[\'(.*)\'\]/;
-
-const generateWithKey = (basePath: any, key: any) => {
-  const segmentedPath = [...basePath, key];
-
-  if (isNumber(key)) {
-    return {
-      path: basePath.join(".") + ".[" + key + "]",
-      segmentedPath,
-    };
-  }
-  if (key.includes(".")) {
-    return {
-      path: basePath.join(".") + ".['" + key + "']",
-      segmentedPath,
-    };
-  }
-  return {
-    path: basePath.join(".") + "." + key,
-    segmentedPath,
-  };
-};
 
 export const stringifyFnsInObject = (
   userObject: Record<string, unknown>,
@@ -103,16 +102,21 @@ export const stringifyFnsInObject = (
   const fnStrings: string[] = [];
 
   for (const path of paths) {
+    // TODO: Fix this the next time the file is edited
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const fnValue: any = get(userObject, path);
+
     fnStrings.push(fnValue.toString());
   }
 
   const output = JSON.parse(JSON.stringify(userObject));
+
   for (const [index, parsedFnString] of fnStrings.entries()) {
     set(output, paths[index], parsedFnString);
   }
 
   output[fn_keys] = paths;
+
   return output;
 };
 
@@ -132,6 +136,7 @@ const parseFunctionsInObject = (
   if (Array.isArray(userObject)) {
     for (let i = 0; i < userObject.length; i++) {
       const arrayValue = userObject[i];
+
       if (typeof arrayValue == "function") {
         paths.push(constructPath(path, `[${i}]`));
       } else if (typeof arrayValue == "object") {
@@ -144,8 +149,10 @@ const parseFunctionsInObject = (
     }
   } else {
     const keys = Object.keys(userObject);
+
     for (const key of keys) {
       const value = userObject[key];
+
       if (typeof value == "function") {
         paths.push(constructPath(path, key));
       } else if (typeof value == "object") {
@@ -161,8 +168,11 @@ const parseFunctionsInObject = (
   return paths;
 };
 
+// TODO: Fix this the next time the file is edited
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const isLargeCollection = (val: any) => {
   if (!Array.isArray(val)) return false;
+
   const rowSize = !isObject(val[0]) ? 1 : Object.keys(val[0]).length;
 
   const size = val.length * rowSize;
@@ -170,104 +180,50 @@ const isLargeCollection = (val: any) => {
   return size > LARGE_COLLECTION_SIZE;
 };
 
-const normaliseEvalPath = (identicalEvalPathsPatches: any) =>
-  Object.keys(identicalEvalPathsPatches || {}).reduce(
-    (acc: any, evalPath: string) => {
-      //for object paths which have a "." in the object key like "a.['b.c']", we need to extract these
-      // paths and break them to appropriate patch paths
+const getReducedDataTree = (
+  dataTree: DataTree,
+  constrainedDiffPaths: string[],
+): DataTree => {
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const withErrors = Object.keys(dataTree).reduce((acc: any, key: string) => {
+    const widgetValue = dataTree[key] as WidgetEntity;
 
-      const matches = evalPath.match(REGEX_NESTED_OBJECT_PATH);
-      if (!matches || !matches.length) {
-        //regular paths like "a.b.c"
-        acc[evalPath] = identicalEvalPathsPatches[evalPath];
-        return acc;
-      }
+    acc[key] = {
+      __evaluation__: {
+        errors: widgetValue.__evaluation__?.errors,
+      },
+    };
 
-      const [, firstSeg, nestedPathSeg] = matches;
-      // normalise non nested paths like "a.['b']"
-      if (!nestedPathSeg.includes(".")) {
-        const key = [firstSeg, nestedPathSeg].join(".");
-        acc[key] = identicalEvalPathsPatches[evalPath];
-        return acc;
-      }
-      // object paths which have a "." like "a.['b.c']"
-      const key = [firstSeg, `['${nestedPathSeg}']`].join(".");
-      acc[key] = identicalEvalPathsPatches[evalPath];
-      return acc;
-    },
-    {},
-  );
-//completely new updates which the diff will not traverse through needs to be attached
-const generateMissingSetPathsUpdates = (
-  ignoreLargeKeys: any,
-  ignoreLargeKeysHasBeenAttached: any,
-  dataTree: any,
-): DiffWithReferenceState[] =>
-  Object.keys(ignoreLargeKeys)
-    .filter((evalPath) => !ignoreLargeKeysHasBeenAttached.has(evalPath))
-    .map((evalPath) => {
-      const statePath = ignoreLargeKeys[evalPath];
-      //for object paths which have a "." in the object key like "a.['b.c']", we need to extract these
-      // paths and break them to appropriate patch paths
+    return acc;
+  }, {});
 
-      //get the matching value from the widget properies in the data tree
-      const val = get(dataTree, statePath);
+  return constrainedDiffPaths.reduce((acc: DataTree, key: string) => {
+    set(acc, key, get(dataTree, key));
 
-      const matches = evalPath.match(REGEX_NESTED_OBJECT_PATH);
-      if (!matches || !matches.length) {
-        //regular paths like "a.b.c"
-
-        return {
-          kind: "N",
-          path: evalPath.split("."),
-          rhs: val,
-        };
-      }
-      // object paths which have a "." like "a.['b.c']"
-      const [, firstSeg, nestedPathSeg] = matches;
-      const segmentedPath = [...firstSeg.split("."), nestedPathSeg];
-
-      return {
-        kind: "N",
-        path: segmentedPath,
-        rhs: val,
-      };
-    });
-
+    return acc;
+  }, withErrors);
+};
 const generateDiffUpdates = (
-  oldDataTree: any,
-  dataTree: any,
-  ignoreLargeKeys: any,
-): DiffWithReferenceState[] => {
-  const attachDirectly: DiffWithReferenceState[] = [];
-  const ignoreLargeKeysHasBeenAttached = new Set();
-  const attachLater: DiffWithReferenceState[] = [];
+  oldDataTree: DataTree,
+  dataTree: DataTree,
+  constrainedDiffPaths: string[],
+): Diff<DataTree, DataTree>[] => {
+  const attachDirectly: Diff<DataTree, DataTree>[] = [];
+  const attachLater: Diff<DataTree, DataTree>[] = [];
+
+  // we are reducing the data tree to only the paths that are being diffed
+  const oldData = getReducedDataTree(oldDataTree, constrainedDiffPaths);
+  const newData = getReducedDataTree(dataTree, constrainedDiffPaths);
   const updates =
-    diff(oldDataTree, dataTree, (path, key) => {
+    diff(oldData, newData, (path, key) => {
       if (!path.length || key === "__evaluation__") return false;
 
-      const { path: setPath, segmentedPath } = generateWithKey(path, key);
+      const segmentedPath = [...path, key];
 
-      // if ignore path is present...this segment of code generates the data compression patches
-      if (!!ignoreLargeKeys[setPath]) {
-        const originalStateVal = get(oldDataTree, segmentedPath);
-        const correspondingStatePath = ignoreLargeKeys[setPath];
-        const statePathValue = get(dataTree, correspondingStatePath);
-        if (!equal(originalStateVal, statePathValue)) {
-          //reference state patches are a patch that does not have a patch value but it provides a path which contains the same value
-          //this is helpful in making the payload sent to the main thread small
-          attachLater.push({
-            kind: "referenceState",
-            path: segmentedPath,
-            referencePath: correspondingStatePath,
-          });
-        }
-        ignoreLargeKeysHasBeenAttached.add(setPath);
-        return true;
-      }
-      const rhs = get(dataTree, segmentedPath);
+      const rhs = get(dataTree, segmentedPath) as DataTree;
 
-      const lhs = get(oldDataTree, segmentedPath);
+      const lhs = get(oldDataTree, segmentedPath) as DataTree;
 
       //when a moment value changes we do not want the inner moment object updates, we just want the ISO result of it
       // which we get during the serialisation process we perform at latter steps
@@ -275,23 +231,28 @@ const generateDiffUpdates = (
         attachDirectly.push({
           kind: "E",
           lhs,
+          // TODO: Fix this the next time the file is edited
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           rhs: rhs as any,
           path: segmentedPath,
         });
+
         // ignore trying to diff moment objects
         return true;
       }
+
       if (rhs === undefined) {
         //if an undefined value is being set it should be a delete
         if (lhs !== undefined) {
           attachDirectly.push({ kind: "D", lhs, path: segmentedPath });
         }
-        // if the lhs is also undefined ignore diff on this node
+
         return true;
       }
 
       const isLhsLarge = isLargeCollection(lhs);
       const isRhsLarge = isLargeCollection(rhs);
+
       if (!isLhsLarge && !isRhsLarge) {
         //perform diff on this node
         return false;
@@ -301,6 +262,7 @@ const generateDiffUpdates = (
 
       if ((!isLhsLarge && isRhsLarge) || (isLhsLarge && !isRhsLarge)) {
         attachDirectly.push({ kind: "N", path: segmentedPath, rhs });
+
         return true;
       }
 
@@ -312,34 +274,129 @@ const generateDiffUpdates = (
       return true;
     }) || [];
 
-  const missingSetPaths = generateMissingSetPathsUpdates(
-    ignoreLargeKeys,
-    ignoreLargeKeysHasBeenAttached,
-    dataTree,
-  );
+  const largeDataSetUpdates = [...attachDirectly, ...attachLater];
 
-  const largeDataSetUpdates = [
-    ...attachDirectly,
-    ...missingSetPaths,
-    ...attachLater,
-  ];
   return [...updates, ...largeDataSetUpdates];
 };
 
+const correctUndefinedUpdatesToDeletesOrNew = (
+  updates: Diff<DataTree, DataTree>[],
+) =>
+  updates.reduce(
+    (acc, update) => {
+      // TODO: Fix this the next time the file is edited
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { kind, lhs, path, rhs } = update as any;
+
+      if (kind === "E") {
+        if (lhs === undefined && rhs !== undefined) {
+          acc.push({ kind: "N", path, rhs });
+        }
+
+        if (lhs !== undefined && rhs === undefined) {
+          acc.push({ path, lhs, kind: "D" });
+        }
+
+        if (lhs !== undefined && rhs !== undefined) {
+          acc.push(update);
+        }
+
+        return acc;
+      }
+
+      acc.push(update);
+
+      return acc;
+    },
+    [] as Diff<DataTree, DataTree>[],
+  );
+
+// whenever an element in a collection is set to undefined, we need to send the entire collection as an update
+const generateRootWidgetUpdates = (
+  updates: Diff<DataTree, DataTree>[],
+  newDataTree: DataTree,
+  oldDataTree: DataTree,
+): Diff<DataTree, DataTree>[] =>
+  updates
+    .filter(
+      (v) =>
+        v.kind === "D" &&
+        v.path &&
+        typeof v.path[v.path.length - 1] === "number",
+    )
+    .map(
+      // TODO: Fix this the next time the file is edited
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ({ path }: any) => {
+        const pathCopy = [...path];
+
+        pathCopy.pop();
+
+        return {
+          kind: "E",
+          path: pathCopy,
+          lhs: get(oldDataTree, pathCopy) as DataTree,
+          rhs: get(newDataTree, pathCopy) as DataTree,
+        }; //push the parent path
+      },
+      [] as Diff<DataTree, DataTree>[],
+    );
+
+// when a root collection is updated, we need to scrub out updates that are inside the root collection
+const getScrubbedOutUpdatesWhenRootCollectionIsUpdated = (
+  updates: Diff<DataTree, DataTree>[],
+  rootCollectionUpdates: Diff<DataTree, DataTree>[],
+) => {
+  const rootCollectionPaths = rootCollectionUpdates
+    .filter((update) => update?.path?.length)
+    .map((update) => (update.path as string[]).join("."));
+
+  return (
+    updates // TODO: Fix this the next time the file is edited
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .map((update: any) => ({ update, condensedPath: update.path.join(".") }))
+      .filter(
+        ({ condensedPath }) =>
+          !rootCollectionPaths.some((p) => condensedPath.startsWith(p)),
+      )
+      // remove the condensedPath from the update
+      .map(({ update }) => update)
+  );
+};
+
 export const generateOptimisedUpdates = (
-  oldDataTree: any,
-  dataTree: any,
-  identicalEvalPathsPatches?: Record<string, string>,
-): DiffWithReferenceState[] => {
-  const ignoreLargeKeys = normaliseEvalPath(identicalEvalPathsPatches);
-  const updates = generateDiffUpdates(oldDataTree, dataTree, ignoreLargeKeys);
-  return updates;
+  oldDataTree: DataTree,
+  dataTree: DataTree,
+  // these are the paths that the diff is limited to, this is a performance optimisation and through this we don't have to diff the entire data tree
+  constrainedDiffPaths: string[],
+): Diff<DataTree, DataTree>[] => {
+  const updates = generateDiffUpdates(
+    oldDataTree,
+    dataTree,
+    constrainedDiffPaths,
+  );
+  const correctedUpdates = correctUndefinedUpdatesToDeletesOrNew(updates);
+
+  const rootCollectionUpdates = generateRootWidgetUpdates(
+    correctedUpdates,
+    dataTree,
+    oldDataTree,
+  );
+  const scrubedOutUpdates = getScrubbedOutUpdatesWhenRootCollectionIsUpdated(
+    correctedUpdates,
+    rootCollectionUpdates,
+  );
+
+  return [...scrubedOutUpdates, ...rootCollectionUpdates];
 };
 
 export const generateSerialisedUpdates = (
-  prevState: any,
-  currentState: any,
-  identicalEvalPathsPatches: any,
+  prevState: DataTree,
+  currentState: DataTree,
+  constrainedDiffPaths: string[],
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  mergeAdditionalUpdates?: any,
 ): {
   serialisedUpdates: string;
   error?: { type: string; message: string };
@@ -347,13 +404,15 @@ export const generateSerialisedUpdates = (
   const updates = generateOptimisedUpdates(
     prevState,
     currentState,
-    identicalEvalPathsPatches,
+    constrainedDiffPaths,
   );
 
   //remove lhs from diff to reduce the size of diff upload,
   //it is not necessary to send lhs and we can make the payload to transfer to the main thread smaller for quicker transfer
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const removedLhs = updates.map(({ lhs, ...rest }: any) => rest);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars, @typescript-eslint/no-explicit-any
+  let removedLhs = updates.map(({ lhs, ...rest }: any) => rest);
+
+  removedLhs = [...removedLhs, ...(mergeAdditionalUpdates || [])];
 
   try {
     // serialise bigInt values and convert the updates to a string over here to minismise the cost of transfer
@@ -371,21 +430,27 @@ export const generateSerialisedUpdates = (
 };
 
 export const generateOptimisedUpdatesAndSetPrevState = (
-  dataTree: any,
+  dataTree: DataTree,
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   dataTreeEvaluator: any,
+  constrainedDiffPaths: string[],
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  mergeAdditionalUpdates?: any,
 ) => {
-  const identicalEvalPathsPatches =
-    dataTreeEvaluator?.getEvalPathsIdenticalToState();
-
   const { error, serialisedUpdates } = generateSerialisedUpdates(
-    dataTreeEvaluator.getPrevState(),
+    dataTreeEvaluator?.getPrevState() || {},
     dataTree,
-    identicalEvalPathsPatches,
+    constrainedDiffPaths,
+    mergeAdditionalUpdates,
   );
 
-  if (error) {
+  if (error && dataTreeEvaluator?.errors) {
     dataTreeEvaluator.errors.push(error);
   }
+
   dataTreeEvaluator?.setPrevState(dataTree);
+
   return serialisedUpdates;
 };

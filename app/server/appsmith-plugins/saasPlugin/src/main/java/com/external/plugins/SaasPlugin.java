@@ -3,6 +3,7 @@ package com.external.plugins;
 import com.appsmith.external.dtos.ExecutePluginDTO;
 import com.appsmith.external.exceptions.pluginExceptions.AppsmithPluginError;
 import com.appsmith.external.exceptions.pluginExceptions.AppsmithPluginException;
+import com.appsmith.external.helpers.Stopwatch;
 import com.appsmith.external.models.ActionConfiguration;
 import com.appsmith.external.models.ActionExecutionRequest;
 import com.appsmith.external.models.ActionExecutionResult;
@@ -12,6 +13,7 @@ import com.appsmith.external.plugins.BasePlugin;
 import com.appsmith.external.plugins.PluginExecutor;
 import com.appsmith.external.plugins.SmartSubstitutionInterface;
 import com.appsmith.external.services.SharedConfig;
+import com.appsmith.util.SerializationUtils;
 import com.appsmith.util.WebClientUtils;
 import com.external.helpers.RequestCaptureFilter;
 import com.external.plugins.exceptions.SaaSErrorMessages;
@@ -21,6 +23,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.extern.slf4j.Slf4j;
 import org.pf4j.Extension;
 import org.pf4j.PluginWrapper;
 import org.springframework.http.HttpMethod;
@@ -46,6 +49,7 @@ import java.util.Set;
 import static org.springframework.http.HttpHeaders.CONTENT_TYPE;
 import static org.springframework.http.MediaType.APPLICATION_JSON_VALUE;
 
+@Slf4j
 public class SaasPlugin extends BasePlugin {
     private static final int MAX_REDIRECTS = 5;
 
@@ -60,7 +64,7 @@ public class SaasPlugin extends BasePlugin {
         // Setting max content length. This would've been coming from `spring.codec.max-in-memory-size` property if the
         // `WebClient` instance was loaded as an auto-wired bean.
         private final ExchangeStrategies EXCHANGE_STRATEGIES;
-        private final ObjectMapper saasObjectMapper = new ObjectMapper();
+        private final ObjectMapper saasObjectMapper = SerializationUtils.getObjectMapperWithSourceInLocationEnabled();
 
         public SaasPluginExecutor(SharedConfig sharedConfig) {
             this.sharedConfig = sharedConfig;
@@ -83,6 +87,7 @@ public class SaasPlugin extends BasePlugin {
                 ExecutePluginDTO connection,
                 DatasourceConfiguration datasourceConfiguration,
                 ActionConfiguration actionConfiguration) {
+            log.debug(Thread.currentThread().getName() + ": execute() called for Saas plugin.");
             // Initializing object for error condition
             ActionExecutionResult errorResult = new ActionExecutionResult();
 
@@ -131,7 +136,11 @@ public class SaasPlugin extends BasePlugin {
 
             String valueAsString = "";
             try {
+                log.debug(Thread.currentThread().getName() + ": objectMapper writing value as string for Saas plugin.");
+                Stopwatch processStopwatch =
+                        new Stopwatch("SaaS Plugin objectMapper writing value as string for connection");
                 valueAsString = saasObjectMapper.writeValueAsString(connection);
+                processStopwatch.stopAndLogTimeInMillis();
             } catch (JsonProcessingException e) {
                 e.printStackTrace();
             }
@@ -144,7 +153,14 @@ public class SaasPlugin extends BasePlugin {
                         byte[] body = stringResponseEntity.getBody();
                         if (statusCode.is2xxSuccessful()) {
                             try {
-                                return saasObjectMapper.readValue(body, ActionExecutionResult.class);
+                                log.debug(Thread.currentThread().getName()
+                                        + ": objectMapper reading value as string for Saas plugin.");
+                                Stopwatch processStopwatch =
+                                        new Stopwatch("SaaS Plugin objectMapper reading value as string for body");
+                                ActionExecutionResult result =
+                                        saasObjectMapper.readValue(body, ActionExecutionResult.class);
+                                processStopwatch.stopAndLogTimeInMillis();
+                                return result;
                             } catch (IOException e) {
                                 throw Exceptions.propagate(new AppsmithPluginException(
                                         AppsmithPluginError.PLUGIN_JSON_PARSE_ERROR, body, e.getMessage()));

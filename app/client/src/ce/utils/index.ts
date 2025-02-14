@@ -1,15 +1,4 @@
-import type { MenuItemProps } from "design-system-old";
 import _ from "lodash";
-
-export const addItemsInContextMenu = (
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  args: boolean[],
-  history: any,
-  workspaceId: string,
-  moreActionItems: MenuItemProps[],
-) => {
-  return moreActionItems;
-};
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export const getHtmlPageTitle = (instanceName: string) => {
@@ -37,6 +26,7 @@ export const to = (url: string) => {
       .replace(/([a-z])?:\/\//, "$1")
       .split("/"),
   ).join("/");
+
   return `/${path}`;
 };
 

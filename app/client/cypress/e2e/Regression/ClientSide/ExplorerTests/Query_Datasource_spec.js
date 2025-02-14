@@ -17,7 +17,7 @@ let datasourceName;
 
 describe(
   "Entity explorer tests related to query and datasource",
-  { tags: ["@tag.IDE"] },
+  { tags: ["@tag.IDE", "@tag.PropertyPane"] },
   function () {
     before(() => {
       cy.generateUUID().then((uid) => {
@@ -26,7 +26,7 @@ describe(
     });
 
     beforeEach(() => {
-      cy.startRoutesForDatasource();
+      dataSources.StartDataSourceRoutes();
     });
 
     it("1. Create a page/moveQuery/rename/delete in explorer", function () {
@@ -43,7 +43,10 @@ describe(
         .clear()
         .type("download", { force: true })
         .blur();
-      cy.get(".Toastify").should("contain", "Invalid name");
+      cy.get(".Toastify").should(
+        "contain",
+        Cypress.env("MESSAGES").INVALID_NAME_ERROR(),
+      );
 
       // checking a valid name
       cy.get(".t--edit-datasource-name").click();
@@ -60,11 +63,11 @@ describe(
         datasourceName,
         EntityType.Datasource,
       );
-      agHelper.RenameWithInPane(`${datasourceName}new`, false);
+      agHelper.RenameDatasource(`${datasourceName}new`);
       cy.contains(dataSources._datasourceCard, `${datasourceName}new`);
 
       // reverting the name
-      agHelper.RenameWithInPane(datasourceName, false);
+      agHelper.RenameDatasource(datasourceName);
 
       // going  to the query create page
       EditorNavigation.SelectEntityByName("Query1", EntityType.Query);
@@ -78,7 +81,7 @@ describe(
       dataSources.EnterQuery("select * from users");
 
       cy.EvaluateCurrentValue("select * from users");
-      cy.get(".t--action-name-edit-field").click({ force: true });
+
       entityExplorer.ActionContextMenuByEntityName({
         entityNameinLeftSidebar: "Query1",
         action: "Show bindings",
@@ -94,7 +97,7 @@ describe(
       cy.get(".t--entity-property-close").click(); //closing Bindings overlay
       entityExplorer.ActionContextMenuByEntityName({
         entityNameinLeftSidebar: "Query1",
-        action: "Edit name",
+        action: "Rename",
       });
       cy.EditApiNameFromExplorer("MyQuery");
       entityExplorer.ActionContextMenuByEntityName({

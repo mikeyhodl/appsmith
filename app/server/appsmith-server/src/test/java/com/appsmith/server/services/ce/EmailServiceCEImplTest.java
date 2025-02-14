@@ -7,12 +7,10 @@ import com.appsmith.server.domains.Workspace;
 import com.appsmith.server.notifications.EmailSender;
 import com.appsmith.server.services.TenantService;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.SpyBean;
-import org.springframework.test.context.junit.jupiter.SpringExtension;
 import reactor.core.publisher.Mono;
 
 import java.util.HashMap;
@@ -30,6 +28,7 @@ import static com.appsmith.server.constants.ce.EmailConstantsCE.INVITE_TO_WORKSP
 import static com.appsmith.server.constants.ce.EmailConstantsCE.PRIMARY_LINK_TEXT;
 import static com.appsmith.server.constants.ce.EmailConstantsCE.PRIMARY_LINK_URL;
 import static com.appsmith.server.constants.ce.EmailConstantsCE.RESET_URL;
+import static com.appsmith.server.constants.ce.EmailConstantsCE.WORKSPACE_URL;
 import static graphql.Assert.assertTrue;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -38,7 +37,6 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
 
 @SpringBootTest
-@ExtendWith(SpringExtension.class)
 class EmailServiceCEImplTest {
 
     @Autowired
@@ -178,5 +176,13 @@ class EmailServiceCEImplTest {
         emailService
                 .sendInstanceAdminInviteEmail(invitedUser, invitingUser, originHeader, true)
                 .block();
+    }
+
+    @Test
+    void testInviteWorkspaceUrl() {
+        String inviteUrl = "https://example.com";
+        String workspaceId = "testWorkspaceId";
+        assertThat(String.format(WORKSPACE_URL, inviteUrl, workspaceId))
+                .isEqualTo("https://example.com/applications?workspaceId=testWorkspaceId");
     }
 }

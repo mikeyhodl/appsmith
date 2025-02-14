@@ -27,7 +27,8 @@ type columnTypeValues =
   | "Button"
   | "Menu button"
   | "Icon button"
-  | "Select";
+  | "Select"
+  | "HTML";
 
 export class Table {
   private agHelper = ObjectsRegistry.AggregateHelper;
@@ -37,9 +38,7 @@ export class Table {
   private assertHelper = ObjectsRegistry.AssertHelper;
 
   private _tableWrap = "//div[contains(@class,'tableWrap')]";
-  private _tableHeader =
-    this._tableWrap +
-    "//div[contains(@class,'thead')]//div[contains(@class,'tr')][1]";
+  private _tableHeader = ".thead div[role=columnheader]";
   private _columnHeader = (columnName: string) =>
     this._tableWrap +
     "//div[contains(@class,'thead')]//div[contains(@class,'tr')][1]//div[@role='columnheader']//div[contains(text(),'" +
@@ -61,6 +60,15 @@ export class Table {
   _tableRow = (rowNum: number, colNum: number, version: "v1" | "v2") =>
     this._tableWidgetVersion(version) +
     ` .tbody .td[data-rowindex=${rowNum}][data-colindex=${colNum}]`;
+  _tableColumnDataWithText = (
+    colNum: number,
+    columnText: string,
+    version: "v1" | "v2",
+  ) =>
+    this._tableWidgetVersion(version) +
+    ` .tbody .td[data-colindex=${colNum}]` +
+    this._tableRowColumnDataVersion(version) +
+    ` div:contains("${columnText}")`;
   _editCellIconDiv = ".t--editable-cell-icon";
   _editCellEditor = ".t--inlined-cell-editor";
   _editCellEditorInput = this._editCellEditor + " input";
@@ -258,7 +266,7 @@ export class Table {
   }
 
   public AssertTableHeaderOrder(expectedOrder: string) {
-    cy.xpath(this._tableHeader)
+    cy.get(this._tableHeader)
       .invoke("text")
       .then((x) => {
         expect(x).to.eq(expectedOrder);
@@ -561,7 +569,7 @@ export class Table {
     col: number,
     expectedURL: string,
     tableVersion: "v1" | "v2" = "v1",
-    networkCall = "viewPage",
+    networkCall = "getConsolidatedData",
   ) {
     this.deployMode.StubWindowNAssert(
       this._tableRowColumnData(row, col, tableVersion),
@@ -585,6 +593,20 @@ export class Table {
       force: true,
     });
     cy.get(this._defaultColName).type(colId, { force: true });
+  }
+
+  public toggleColumnEditableViaColSettingsPane(
+    columnName: string,
+    tableVersion: "v1" | "v2" = "v2",
+    editable = true,
+    goBackToPropertyPane = true,
+  ) {
+    this.EditColumn(columnName, tableVersion);
+    this.propPane.TogglePropertyState(
+      "Editable",
+      editable === true ? "On" : "Off",
+    );
+    goBackToPropertyPane && this.propPane.NavigateBackToPropertyPane();
   }
 
   public EditColumn(columnName: string, tableVersion: "v1" | "v2") {
@@ -617,18 +639,24 @@ export class Table {
     this.agHelper.GetNClick(colSettings);
   }
 
-  public ClickOnEditIcon(rowIndex: number, colIndex: number) {
+  public ClickOnEditIcon(
+    rowIndex: number,
+    colIndex: number,
+    isSelectColumn: boolean = false,
+  ) {
     this.agHelper.HoverElement(this._tableRow(rowIndex, colIndex, "v2"));
     this.agHelper.GetNClick(
       this._tableRow(rowIndex, colIndex, "v2") + " " + this._editCellIconDiv,
       0,
       true,
     );
-    this.agHelper.AssertElementVisibility(
-      this._tableRow(rowIndex, colIndex, "v2") +
-        " " +
-        this._editCellEditorInput,
-    );
+    if (!isSelectColumn) {
+      this.agHelper.AssertElementVisibility(
+        this._tableRow(rowIndex, colIndex, "v2") +
+          " " +
+          this._editCellEditorInput,
+      );
+    }
   }
 
   public EditTableCell(
@@ -654,12 +682,11 @@ export class Table {
     toSaveNewValue = false,
     force = false,
   ) {
-    this.agHelper.UpdateInputValue(
+    this.agHelper.ClearNType(
       this._tableRow(rowIndex, colIndex, "v2") +
         " " +
         this._editCellEditorInput,
       newValue.toString(),
-      force,
     );
     toSaveNewValue &&
       this.agHelper.TypeText(this._editCellEditorInput, "{enter}", {
@@ -815,5 +842,21 @@ export class Table {
     this.agHelper
       .GetText(this._listActivePage(version), "text")
       .then(($newPageNo) => expect(Number($newPageNo)).to.eq(pageNumber));
+  }
+
+  public DiscardEditRow(row: number, col: number, verify = true) {
+    /*
+     * Why not get it with text `Discard`?
+     * We've tried using selector: `[data-colindex="${col}"][data-rowindex="${row}"] button span:contains('Discard')` and this dosn't work, making this spec fail.
+     */
+    const selector = `${this._tableRow(row, col, "v2")} button`;
+
+    cy.get(selector).eq(1).should("be.enabled");
+    this.agHelper.GetHoverNClick(selector, 1, true);
+    verify && cy.get(selector).eq(1).should("be.disabled");
+  }
+
+  public GetTableDataSelector(rowNum: number, colNum: number): string {
+    return `.t--widget-tablewidgetv2 .tbody .td[data-rowindex=${rowNum}][data-colindex=${colNum}]`;
   }
 }

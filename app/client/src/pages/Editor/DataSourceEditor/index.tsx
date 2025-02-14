@@ -7,14 +7,14 @@ import {
   isDirty,
   reset,
 } from "redux-form";
-import type { AppState } from "@appsmith/reducers";
+import type { AppState } from "ee/reducers";
 import { get, isEmpty, isEqual, isNil, memoize, merge } from "lodash";
 import {
   getPluginImages,
   getDatasource,
   getPlugin,
   getDatasourceFormButtonConfig,
-} from "@appsmith/selectors/entitiesSelector";
+} from "ee/selectors/entitiesSelector";
 import {
   switchDatasource,
   setDatasourceViewMode,
@@ -31,20 +31,19 @@ import {
 import {
   DATASOURCE_DB_FORM,
   DATASOURCE_REST_API_FORM,
-} from "@appsmith/constants/forms";
+} from "ee/constants/forms";
 import DataSourceEditorForm from "./DBForm";
 import RestAPIDatasourceForm from "./RestAPIDatasourceForm";
 import type { Datasource, DatasourceStorage } from "entities/Datasource";
 import { ToastMessageType } from "entities/Datasource";
 import type { RouteComponentProps } from "react-router";
 import EntityNotFoundPane from "pages/Editor/EntityNotFoundPane";
-import { DatasourceComponentTypes } from "api/PluginApi";
 import DatasourceSaasForm from "../SaaSEditor/DatasourceForm";
 import {
   getCurrentApplicationId,
   selectURLSlugs,
 } from "selectors/editorSelectors";
-import { saasEditorDatasourceIdURL } from "@appsmith/RouteBuilder";
+import { saasEditorDatasourceIdURL } from "ee/RouteBuilder";
 import {
   createMessage,
   REST_API_AUTHORIZATION_APPSMITH_ERROR,
@@ -53,16 +52,18 @@ import {
   SAVE_BUTTON_TEXT,
   TEST_DATASOURCE_ERROR,
   TEST_DATASOURCE_SUCCESS,
-} from "@appsmith/constants/messages";
+} from "ee/constants/messages";
 import { isDatasourceInViewMode } from "selectors/ui";
 import { getQueryParams } from "utils/URLUtils";
 import { TEMP_DATASOURCE_ID } from "constants/Datasource";
 import SaveOrDiscardDatasourceModal from "./SaveOrDiscardDatasourceModal";
 
-import { toast, Callout } from "design-system";
+import { toast, Callout } from "@appsmith/ads";
 import styled from "styled-components";
-import CloseEditor from "components/editorComponents/CloseEditor";
-import { isDatasourceAuthorizedForQueryCreation } from "utils/editorContextUtils";
+import {
+  isDatasourceAuthorizedForQueryCreation,
+  isEnabledForPreviewData,
+} from "utils/editorContextUtils";
 import Debugger, {
   ResizerContentContainer,
   ResizerMainContainer,
@@ -79,33 +80,29 @@ import {
 } from "components/formControls/utils";
 import type { ControlProps } from "components/formControls/BaseControl";
 import type { ApiDatasourceForm } from "entities/Datasource/RestAPIForm";
-import { formValuesToDatasource } from "transformers/RestAPIDatasourceFormTransformer";
+import { formValuesToDatasource } from "PluginActionEditor/transformers/RestAPIDatasourceFormTransformer";
 import { DSFormHeader } from "./DSFormHeader";
-import type { PluginType } from "entities/Action";
-import { PluginName, PluginPackageName } from "entities/Action";
-import DSDataFilter from "@appsmith/components/DSDataFilter";
-import { DEFAULT_ENV_ID } from "@appsmith/api/ApiUtils";
-import { isStorageEnvironmentCreated } from "@appsmith/utils/Environments";
-import type { CalloutKind } from "design-system";
-import type { FeatureFlags } from "@appsmith/entities/FeatureFlag";
-import { FEATURE_FLAG } from "@appsmith/entities/FeatureFlag";
+import type { PluginType } from "entities/Plugin";
+import { DatasourceComponentTypes, PluginPackageName } from "entities/Plugin";
+import DSDataFilter from "ee/components/DSDataFilter";
+import { DEFAULT_ENV_ID } from "ee/api/ApiUtils";
+import { isStorageEnvironmentCreated } from "ee/utils/Environments";
+import type { CalloutKind } from "@appsmith/ads";
+import type { FeatureFlags } from "ee/entities/FeatureFlag";
 
-import {
-  selectFeatureFlagCheck,
-  selectFeatureFlags,
-} from "@appsmith/selectors/featureFlagsSelectors";
-import AnalyticsUtil from "utils/AnalyticsUtil";
-import { DATASOURCES_ALLOWED_FOR_PREVIEW_MODE } from "constants/QueryEditorConstants";
-import { setCurrentEditingEnvironmentID } from "@appsmith/actions/environmentAction";
-import { getCurrentEnvironmentDetails } from "@appsmith/selectors/environmentSelectors";
-import { isGACEnabled } from "@appsmith/utils/planHelpers";
+import { selectFeatureFlags } from "ee/selectors/featureFlagsSelectors";
+import AnalyticsUtil from "ee/utils/AnalyticsUtil";
+import { setCurrentEditingEnvironmentID } from "ee/actions/environmentAction";
+import { getCurrentEnvironmentDetails } from "ee/selectors/environmentSelectors";
+import { isGACEnabled } from "ee/utils/planHelpers";
 import {
   getHasDeleteDatasourcePermission,
   getHasManageDatasourcePermission,
-} from "@appsmith/utils/BusinessFeatures/permissionPageHelpers";
+} from "ee/utils/BusinessFeatures/permissionPageHelpers";
 import DatasourceTabs from "../DatasourceInfo/DatasorceTabs";
 import DatasourceInformation, { ViewModeWrapper } from "./DatasourceSection";
-import { getIsAppSidebarEnabled } from "../../../selectors/ideSelectors";
+import { convertToPageIdSelector } from "selectors/pageListSelectors";
+import { getApplicationByIdFromWorkspaces } from "ee/selectors/applicationSelectors";
 
 interface ReduxStateProps {
   canDeleteDatasource: boolean;
@@ -116,10 +113,13 @@ interface ReduxStateProps {
   formName: string;
   isSaving: boolean;
   isTesting: boolean;
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   formConfig: any[];
   isDeleting: boolean;
   isNewDatasource: boolean;
   isPluginAuthorized: boolean;
+  basePageId: string;
   pageId: string;
   pluginImage: string;
   pluginId: string;
@@ -141,10 +141,7 @@ interface ReduxStateProps {
   initialValue: Datasource | ApiDatasourceForm | undefined;
   showDebugger: boolean;
   featureFlags?: FeatureFlags;
-  isEnabledForDSViewModeSchema: boolean;
   isPluginAllowedToPreviewData: boolean;
-  isAppSidebarEnabled: boolean;
-  isPagePaneSegmentsEnabled: boolean;
   isOnboardingFlow?: boolean;
 }
 
@@ -160,7 +157,7 @@ type Props = ReduxStateProps &
   DatasourcePaneFunctions &
   RouteComponentProps<{
     datasourceId: string;
-    pageId: string;
+    basePageId: string;
   }>;
 
 export const DSEditorWrapper = styled.div`
@@ -223,7 +220,11 @@ export interface DatasourcePaneFunctions {
   deleteTempDSFromDraft: () => void;
   toggleSaveActionFlag: (flag: boolean) => void;
   toggleSaveActionFromPopupFlag: (flag: boolean) => void;
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   reinitializeForm: (formName: string, value: any) => void;
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   createTempDatasource: (data: any) => void;
   resetDefaultKeyValPairFlag: () => void;
   resetForm: (formName: string) => void;
@@ -283,6 +284,7 @@ class DatasourceEditorRouter extends React.Component<Props, State> {
     if (this.props.isDatasourceBeingSaved) {
       this.closeDialogAndUnblockRoutes();
     }
+
     this.setViewModeFromQueryParams();
 
     if (
@@ -313,12 +315,14 @@ class DatasourceEditorRouter extends React.Component<Props, State> {
         (this.props.datasource as Datasource).datasourceStorages,
       )[0];
     }
+
     return this.state.filterParams.id;
   };
 
   componentDidMount() {
     const urlObject = new URL(window.location.href);
     const pluginId = urlObject?.searchParams.get("pluginId");
+
     // Create Temp Datasource on component mount,
     // if user hasnt saved datasource for the first time and refreshed the page
     if (
@@ -329,6 +333,7 @@ class DatasourceEditorRouter extends React.Component<Props, State> {
         pluginId,
       });
     }
+
     if (!this.props.viewMode && !!this.props.pluginId) {
       this.blockRoutes();
     }
@@ -359,14 +364,17 @@ class DatasourceEditorRouter extends React.Component<Props, State> {
       const search = new URLSearchParams(this.props.location.search);
       const responseStatus = search.get("response_status");
       const responseMessage = search.get("display_message");
+
       if (responseStatus) {
         // Set default error message
         let message = REST_API_AUTHORIZATION_FAILED;
+
         if (responseStatus === "success") {
           message = REST_API_AUTHORIZATION_SUCCESSFUL;
         } else if (responseStatus === "appsmith_error") {
           message = REST_API_AUTHORIZATION_APPSMITH_ERROR;
         }
+
         toast.show(responseMessage || createMessage(message));
       }
     }
@@ -376,6 +384,7 @@ class DatasourceEditorRouter extends React.Component<Props, State> {
   // from outside the datasource route
   setViewModeFromQueryParams() {
     const params = getQueryParams();
+
     if (this.props.viewMode) {
       if (
         (params.viewMode === "false" && !this.state.readUrlParams) ||
@@ -400,9 +409,12 @@ class DatasourceEditorRouter extends React.Component<Props, State> {
     const { configProperty, controlType, isRequired } = config;
     const configDetails = this.state.configDetails;
     const requiredFields = this.state.requiredFields;
+
     if (!configProperty || !configProperty.includes(this.getEnvironmentId()))
       return;
+
     configDetails[configProperty] = controlType;
+
     if (isRequired) requiredFields[configProperty] = config;
 
     // if the required fields being rendered has been hidden, then remove them.
@@ -494,11 +506,14 @@ class DatasourceEditorRouter extends React.Component<Props, State> {
 
   blockRoutes() {
     this.setState({
+      // TODO: Fix this the next time the file is edited
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       unblock: this.props?.history?.block((tx: any) => {
         const nextPath = tx.pathname + tx.search;
         const prevPath =
           this.props.history.location.pathname +
           this.props.history.location.search;
+
         // On reload, it goes from same path to same path, we do not need to show popup in that case
         if (nextPath !== prevPath && this.props.isFormDirty) {
           this.setState(
@@ -511,6 +526,7 @@ class DatasourceEditorRouter extends React.Component<Props, State> {
             },
             this.routesBlockFormChangeCallback.bind(this),
           );
+
           return false;
         }
       }),
@@ -540,6 +556,7 @@ class DatasourceEditorRouter extends React.Component<Props, State> {
   onDiscard() {
     this.props.resetForm(this.props.formName);
     this.closeDialogAndUnblockRoutes();
+
     if (this.state.switchFilterBlocked) {
       //unblock switch filter
       this.setState({ switchFilterBlocked: false });
@@ -548,6 +565,7 @@ class DatasourceEditorRouter extends React.Component<Props, State> {
       this.props.deleteTempDSFromDraft();
       this.props.datasourceDiscardAction(this.props?.pluginId);
     }
+
     this.state.navigation();
     this.props.datasourceDiscardAction(this.props?.pluginId);
 
@@ -569,6 +587,7 @@ class DatasourceEditorRouter extends React.Component<Props, State> {
     this.props.toggleSaveActionFlag(false);
     this.props.toggleSaveActionFromPopupFlag(false);
     this.setState({ routesBlocked: false });
+
     if (isNavigateBack) {
       this.state.navigation();
     }
@@ -592,6 +611,7 @@ class DatasourceEditorRouter extends React.Component<Props, State> {
       if (!this.props.viewMode) {
         this.props.setCurrentEditingEnvironmentID(id);
       }
+
       if (this.state.filterParams.id !== id) {
         if (
           !isEmpty(this.props.formData) &&
@@ -605,10 +625,12 @@ class DatasourceEditorRouter extends React.Component<Props, State> {
               this.updateFilterSuccess(id, name, userPermissions);
             },
           });
+
           return false;
         } else {
           this.props.resetForm(this.props.formName);
         }
+
         return this.updateFilterSuccess(id, name, userPermissions);
       } else if (
         !isStorageEnvironmentCreated(this.props.formData as Datasource, id)
@@ -616,6 +638,7 @@ class DatasourceEditorRouter extends React.Component<Props, State> {
         return this.updateFilterSuccess(id, name, userPermissions);
       }
     }
+
     return true;
   };
 
@@ -634,6 +657,7 @@ class DatasourceEditorRouter extends React.Component<Props, State> {
         ) {
           acc[envId] = datasourceStorages[envId];
         }
+
         return acc;
       },
       {},
@@ -641,6 +665,7 @@ class DatasourceEditorRouter extends React.Component<Props, State> {
     const initialValues = merge(getConfigInitialValues(this.props.formConfig), {
       properties: [],
     });
+
     if (!datasourceStoragesWithId.hasOwnProperty(id)) {
       // Create the new datasource storage object
       const newDsStorageObject: DatasourceStorage = {
@@ -674,6 +699,7 @@ class DatasourceEditorRouter extends React.Component<Props, State> {
         },
       });
     }
+
     AnalyticsUtil.logEvent("SWITCH_ENVIRONMENT", {
       fromEnvId: this.state.filterParams.id,
       toEnvId: id,
@@ -692,6 +718,7 @@ class DatasourceEditorRouter extends React.Component<Props, State> {
       requiredFields: {},
     });
     this.blockRoutes();
+
     return true;
   };
 
@@ -742,6 +769,7 @@ class DatasourceEditorRouter extends React.Component<Props, State> {
       (datasource as Datasource).name,
       this.state.filterParams.name,
     );
+
     if (toastMessage.message)
       return (
         <CalloutContainer viewMode={viewMode}>
@@ -759,6 +787,7 @@ class DatasourceEditorRouter extends React.Component<Props, State> {
           </Callout>
         </CalloutContainer>
       );
+
     return null;
   }
 
@@ -767,6 +796,7 @@ class DatasourceEditorRouter extends React.Component<Props, State> {
       this.props;
 
     const shouldViewMode = viewMode && !isInsideReconnectModal;
+
     // Check for specific form types first
     return (
       pluginDatasourceForm === DatasourceComponentTypes.RestAPIDatasourceForm &&
@@ -778,6 +808,7 @@ class DatasourceEditorRouter extends React.Component<Props, State> {
     const {
       datasource,
       datasourceId,
+      featureFlags,
       formConfig,
       formData,
       formName,
@@ -824,11 +855,11 @@ class DatasourceEditorRouter extends React.Component<Props, State> {
           applicationId={this.props.applicationId}
           currentEnvironment={this.getEnvironmentId()}
           datasourceId={datasourceId}
+          featureFlags={featureFlags}
           formConfig={formConfig}
           formData={formData}
           formName={DATASOURCE_DB_FORM}
           hiddenHeader={isInsideReconnectModal}
-          isEnabledForDSViewModeSchema={this.props.isEnabledForDSViewModeSchema}
           isPluginAllowedToPreviewData={this.props.isPluginAllowedToPreviewData}
           isSaving={isSaving}
           pageId={pageId}
@@ -864,6 +895,7 @@ class DatasourceEditorRouter extends React.Component<Props, State> {
 
   renderViewConfigChild = () => {
     const { datasource, formConfig, viewMode } = this.props;
+
     return (
       <ViewModeWrapper data-testid="t--ds-review-section">
         {!isNil(formConfig) && !isNil(datasource) ? (
@@ -878,13 +910,14 @@ class DatasourceEditorRouter extends React.Component<Props, State> {
   };
 
   shouldShowTabs = () => {
-    const { isEnabledForDSViewModeSchema, isPluginAllowedToPreviewData } =
-      this.props;
-    return isEnabledForDSViewModeSchema && isPluginAllowedToPreviewData;
+    const { isPluginAllowedToPreviewData } = this.props;
+
+    return isPluginAllowedToPreviewData;
   };
 
   renderTabsForViewMode = () => {
     const { datasource } = this.props;
+
     return this.shouldShowTabs() ? (
       <DatasourceTabs
         configChild={this.renderViewConfigChild()}
@@ -897,6 +930,7 @@ class DatasourceEditorRouter extends React.Component<Props, State> {
 
   render() {
     const {
+      basePageId,
       canDeleteDatasource,
       canManageDatasource,
       datasource,
@@ -904,12 +938,10 @@ class DatasourceEditorRouter extends React.Component<Props, State> {
       datasourceId,
       formData,
       history,
-      isAppSidebarEnabled,
       isDeleting,
       isInsideReconnectModal,
       isNewDatasource,
       isOnboardingFlow,
-      isPagePaneSegmentsEnabled,
       isPluginAuthorized,
       isSaving,
       isTesting,
@@ -943,13 +975,15 @@ class DatasourceEditorRouter extends React.Component<Props, State> {
           />
         );
       }
+
       history.push(
         saasEditorDatasourceIdURL({
-          pageId,
+          basePageId,
           pluginPackageName,
           datasourceId,
         }),
       );
+
       return null;
     }
 
@@ -963,11 +997,6 @@ class DatasourceEditorRouter extends React.Component<Props, State> {
           e.preventDefault();
         }}
       >
-        {isAppSidebarEnabled ||
-        isPagePaneSegmentsEnabled ||
-        !!isOnboardingFlow ? null : (
-          <CloseEditor />
-        )}
         {!isInsideReconnectModal && (
           <DSFormHeader
             canDeleteDatasource={canDeleteDatasource}
@@ -1027,7 +1056,7 @@ class DatasourceEditorRouter extends React.Component<Props, State> {
                         isSaving={isSaving}
                         isTesting={isTesting}
                         onCancel={() => this.onCancel()}
-                        pageId={pageId}
+                        parentEntityId={pageId}
                         pluginName={pluginName}
                         pluginPackageName={pluginPackageName}
                         pluginType={pluginType as PluginType}
@@ -1053,16 +1082,20 @@ class DatasourceEditorRouter extends React.Component<Props, State> {
       formData,
       pluginDatasourceForm,
     } = this.props;
+
     if (
       pluginDatasourceForm === DatasourceComponentTypes.RestAPIDatasourceForm
     ) {
       const createMode = datasourceId === TEMP_DATASOURCE_ID;
+
       if (!formData) return true;
+
       return (
         !(formData as ApiDatasourceForm).url ||
         (!createMode && !canManageDatasource)
       );
     }
+
     return validate(
       this.state.requiredFields,
       formData,
@@ -1071,7 +1104,18 @@ class DatasourceEditorRouter extends React.Component<Props, State> {
   }
 }
 
+// TODO: Fix this the next time the file is edited
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const mapStateToProps = (state: AppState, props: any): ReduxStateProps => {
+  const applicationId = props.applicationId ?? getCurrentApplicationId(state);
+  const application = getApplicationByIdFromWorkspaces(state, applicationId);
+
+  const basePageIdFromUrl = props?.match?.params?.basePageId;
+  const pageIdFromUrl = convertToPageIdSelector(state, basePageIdFromUrl);
+  const pageId = props.pageId || pageIdFromUrl;
+  const basePageId =
+    application?.pages?.find((page) => page.id === pageId)?.baseId ?? "";
+
   const datasourceId = props.datasourceId ?? props.match?.params?.datasourceId;
   const { datasourcePane } = state.ui;
   const { datasources, plugins } = state.entities;
@@ -1103,6 +1147,8 @@ const mapStateToProps = (state: AppState, props: any): ReduxStateProps => {
     | Datasource
     | ApiDatasourceForm;
   const defaultKeyValueArrayConfig =
+    // TODO: Fix this the next time the file is edited
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     datasourcePane?.defaultKeyValueArrayConfig as any;
 
   const datasourcePermissions = datasource?.userPermissions || [];
@@ -1138,30 +1184,9 @@ const mapStateToProps = (state: AppState, props: any): ReduxStateProps => {
     pluginId,
   );
 
-  //   A/B feature flag for datasource view mode preview data.
-  let isEnabledForDSViewModeSchema = selectFeatureFlagCheck(
-    state,
-    FEATURE_FLAG.ab_gsheet_schema_enabled,
-  );
-
-  // for mongoDB, the feature flag should be based on ab_mock_mongo_schema_enabled.
-  if (plugin?.name === PluginName.MONGO) {
-    isEnabledForDSViewModeSchema = selectFeatureFlagCheck(
-      state,
-      FEATURE_FLAG.ab_mock_mongo_schema_enabled,
-    );
-  }
-
   // should plugin be able to preview data
   const isPluginAllowedToPreviewData =
-    DATASOURCES_ALLOWED_FOR_PREVIEW_MODE.includes(plugin?.name || "") ||
-    (plugin?.name === PluginName.MONGO && !!(datasource as Datasource)?.isMock);
-
-  const isAppSidebarEnabled = getIsAppSidebarEnabled(state);
-  const isPagePaneSegmentsEnabled = selectFeatureFlagCheck(
-    state,
-    FEATURE_FLAG.release_show_new_sidebar_pages_pane_enabled,
-  );
+    !!plugin && isEnabledForPreviewData(datasource as Datasource, plugin);
 
   return {
     canDeleteDatasource,
@@ -1180,15 +1205,15 @@ const mapStateToProps = (state: AppState, props: any): ReduxStateProps => {
     isTesting: datasources.isTesting,
     formConfig: formConfigs[pluginId] || [],
     isNewDatasource,
-    isEnabledForDSViewModeSchema,
     isPluginAllowedToPreviewData,
-    pageId: props.pageId ?? props.match?.params?.pageId,
+    pageId,
+    basePageId,
     viewMode,
     pluginType: plugin?.type ?? "",
     pluginName: plugin?.name ?? "",
     pluginDatasourceForm,
     pluginPackageName,
-    applicationId: props.applicationId ?? getCurrentApplicationId(state),
+    applicationId,
     applicationSlug,
     pageSlug,
     isDatasourceBeingSaved: datasources.isDatasourceBeingSaved,
@@ -1198,18 +1223,22 @@ const mapStateToProps = (state: AppState, props: any): ReduxStateProps => {
     defaultKeyValueArrayConfig,
     initialValue,
     showDebugger,
-    isAppSidebarEnabled,
-    isPagePaneSegmentsEnabled,
   };
 };
 
 const mapDispatchToProps = (
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   dispatch: any,
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ownProps: any,
 ): DatasourcePaneFunctions => ({
   switchDatasource: (id: string) => {
     // on reconnect data modal, it shouldn't be redirected to datasource edit page
     dispatch(switchDatasource(id, ownProps.isInsideReconnectModal));
+    // Set view mode to true after switching datasource
+    dispatch(setDatasourceViewModeFlag(true));
   },
   setDatasourceViewMode: (payload: {
     datasourceId: string;
@@ -1222,8 +1251,12 @@ const mapDispatchToProps = (
   toggleSaveActionFlag: (flag) => dispatch(toggleSaveActionFlag(flag)),
   toggleSaveActionFromPopupFlag: (flag) =>
     dispatch(toggleSaveActionFromPopupFlag(flag)),
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   reinitializeForm: (formName: string, value: any) =>
     dispatch(initialize(formName, value, false)),
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   createTempDatasource: (data: any) =>
     dispatch(createTempDatasourceFromForm(data)),
   resetForm: (formName: string) => dispatch(reset(formName)),

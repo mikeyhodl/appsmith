@@ -1,32 +1,27 @@
 import clsx from "clsx";
-import {
-  Button as HeadlessButton,
-  Icon as HeadlessIcon,
-} from "@design-system/headless";
+import type { SIZES } from "@appsmith/wds";
+import type { ForwardedRef } from "react";
 import React, { forwardRef } from "react";
+import { Text, Spinner, Icon } from "@appsmith/wds";
 import { useVisuallyHidden } from "@react-aria/visually-hidden";
-import { getTypographyClassName } from "@design-system/theming";
-import type { ButtonRef as HeadlessButtonRef } from "@design-system/headless";
+import { Button as HeadlessButton } from "react-aria-components";
 
-import { Text } from "../../Text";
-import { Spinner } from "../../Spinner";
 import styles from "./styles.module.css";
 import type { ButtonProps } from "./types";
 
-const _Button = (props: ButtonProps, ref: HeadlessButtonRef) => {
+const _Button = (props: ButtonProps, ref: ForwardedRef<HTMLButtonElement>) => {
   props = useVisuallyDisabled(props);
   const {
     children,
+    className,
     color = "accent",
-    icon: Icon,
+    icon,
     iconPosition = "start",
     isDisabled = false,
     isLoading = false,
     loadingText = "Loading...",
-    // eslint-disable-next-line -- TODO add onKeyUp when the bug is fixed https://github.com/adobe/react-spectrum/issues/4350
-    onKeyUp,
+    size = "medium",
     variant = "filled",
-    visuallyDisabled = false,
     ...rest
   } = props;
   const { visuallyHiddenProps } = useVisuallyHidden();
@@ -35,21 +30,34 @@ const _Button = (props: ButtonProps, ref: HeadlessButtonRef) => {
     return (
       <>
         <span aria-hidden={isLoading ? true : undefined} data-content="">
-          {Icon && (
-            <HeadlessIcon>
-              <Icon />
-            </HeadlessIcon>
-          )}
+          {icon && <Icon name={icon} size={size as keyof typeof SIZES} />}
           {Boolean(children) && (
-            <Text fontWeight={600} lineClamp={1} textAlign="center">
+            <Text
+              data-text=""
+              fontWeight={500}
+              lineClamp={1}
+              size={size === "xSmall" ? "footnote" : "body"}
+            >
               {children}
+            </Text>
+          )}
+          {/*
+            To align buttons in the case when we don't have text content, we create an empty block with the appropriate size.
+            See the styles for data-empty-text attribute.
+           */}
+          {!Boolean(children) && (
+            <Text
+              data-empty-text=""
+              size={size === "xSmall" ? "footnote" : "body"}
+            >
+              &#8203;
             </Text>
           )}
         </span>
 
         {isLoading && (
           <span aria-hidden={!isLoading ? true : undefined} data-loader="">
-            <Spinner />
+            <Spinner size={size} />
             <span {...visuallyHiddenProps}>{loadingText}</span>
           </span>
         )}
@@ -59,23 +67,18 @@ const _Button = (props: ButtonProps, ref: HeadlessButtonRef) => {
 
   return (
     <HeadlessButton
-      aria-busy={isLoading ? true : undefined}
-      aria-disabled={
-        visuallyDisabled || isLoading || isDisabled ? true : undefined
-      }
-      className={clsx(styles.button, getTypographyClassName("body"))}
+      className={clsx(className, styles.button)}
       data-button=""
       data-color={color}
       data-icon-position={iconPosition === "start" ? "start" : "end"}
       data-loading={isLoading ? "" : undefined}
+      data-size={Boolean(size) ? size : undefined}
       data-variant={variant}
-      draggable
       isDisabled={isDisabled}
       ref={ref}
       {...rest}
     >
       {renderChildren()}
-      <span aria-hidden="true" className={styles.dragContainer} />
     </HeadlessButton>
   );
 };
@@ -87,14 +90,13 @@ export const Button = forwardRef(_Button);
  * when the button is visually disabled
  */
 const useVisuallyDisabled = (props: ButtonProps) => {
-  const { isLoading = false, visuallyDisabled = false } = props;
+  const { isLoading = false } = props;
   let computedProps = props;
 
-  if (visuallyDisabled || isLoading) {
+  if (isLoading) {
     computedProps = {
       ...props,
       isDisabled: false,
-      // disabling click/press events
       onPress: undefined,
       onPressStart: undefined,
       onPressEnd: undefined,

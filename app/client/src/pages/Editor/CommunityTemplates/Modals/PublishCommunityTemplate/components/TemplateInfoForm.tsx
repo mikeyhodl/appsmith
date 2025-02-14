@@ -4,11 +4,8 @@ import {
   TemplateInfoFormFieldWrapper,
   TemplateInfoFormWrapper,
 } from "../StyledComponents";
-import { Input, Select, Option } from "design-system";
-import {
-  COMMUNITY_TEMPLATES,
-  createMessage,
-} from "@appsmith/constants/messages";
+import { Input, Select, Option } from "@appsmith/ads";
+import { COMMUNITY_TEMPLATES, createMessage } from "ee/constants/messages";
 import { useSelector } from "react-redux";
 import { allTemplatesFiltersSelector } from "selectors/templatesSelectors";
 
@@ -82,6 +79,7 @@ const TemplateInfoForm = ({
       </TemplateInfoFormFieldWrapper>
       <TemplateInfoFormFieldWrapper>
         <Input
+          data-testid="t--community-template-description-input"
           label={createMessage(
             COMMUNITY_TEMPLATES.publishFormPage.templateForm
               .descriptionInputLabel,
@@ -125,12 +123,13 @@ const UseCasesSelect = ({
 }: UseCaseProps) => {
   const filters = useSelector(allTemplatesFiltersSelector);
   const useCases = filters.useCases;
+
   return (
     <Select
       data-testid="t--community-template-usecases-input"
       getPopupContainer={(triggerNode) => triggerNode.parentNode.parentNode}
       isMultiSelect
-      maxTagCount="responsive"
+      maxTagCount={6}
       maxTagTextLength={20}
       onChange={setTemplateUseCases}
       showSearch

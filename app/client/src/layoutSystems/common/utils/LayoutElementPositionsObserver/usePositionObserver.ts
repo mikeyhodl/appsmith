@@ -3,10 +3,37 @@ import { useEffect } from "react";
 import { positionObserver } from ".";
 import { APP_MODE } from "entities/App";
 import { useSelector } from "react-redux";
-import { combinedPreviewModeSelector } from "selectors/editorSelectors";
-import { getAppMode } from "@appsmith/selectors/entitiesSelector";
+import { selectCombinedPreviewMode } from "selectors/gitModSelectors";
+import { getAppMode } from "ee/selectors/entitiesSelector";
 import { getAnvilLayoutDOMId, getAnvilWidgetDOMId } from "./utils";
+import { LayoutComponentTypes } from "layoutSystems/anvil/utils/anvilTypes";
 export type ObservableElementType = "widget" | "layout";
+
+export function useObserveDetachedWidget(widgetId: string) {
+  // We don't need the observer in preview mode or the published app
+  // This is because the positions need to be observed only to enable
+  // editor features
+  const isPreviewMode = useSelector(selectCombinedPreviewMode);
+  const appMode = useSelector(getAppMode);
+
+  if (isPreviewMode || appMode === APP_MODE.PUBLISHED) {
+    return;
+  }
+
+  const className = getAnvilWidgetDOMId(widgetId);
+  const ref = {
+    current: document.querySelector(`.${className}`) as HTMLDivElement,
+  };
+
+  positionObserver.observeWidget(widgetId, "", ref, true);
+
+  return () => {
+    const element = document.querySelector(`.${className}`) as HTMLDivElement;
+    const domID = element.getAttribute("id");
+
+    if (domID) positionObserver.unObserveWidget(domID);
+  };
+}
 
 /**
  * A hook to register a widget or a layout with the position observer
@@ -23,10 +50,11 @@ export function usePositionObserver(
     canvasId?: string;
     parentDropTarget?: string;
     isDropTarget?: boolean;
+    layoutType?: LayoutComponentTypes;
   },
   ref: RefObject<HTMLDivElement>,
 ) {
-  const isPreviewMode = useSelector(combinedPreviewModeSelector);
+  const isPreviewMode = useSelector(selectCombinedPreviewMode);
   const appMode = useSelector(getAppMode);
 
   useEffect(() => {
@@ -44,18 +72,22 @@ export function usePositionObserver(
         case "widget":
           if (ids.widgetId === undefined)
             throw Error("Failed to observe widget: widgetId is undefined");
+
           positionObserver.observeWidget(ids.widgetId, ids.layoutId || "", ref);
           break;
         case "layout":
           if (ids.layoutId === undefined)
             throw Error("Failed to observe layout: layoutId is undefined");
+
           if (ids.canvasId === undefined)
             throw Error("Failed to observe layout: canvasId is undefined");
+
           positionObserver.observeLayout(
             ids.layoutId,
             ids.canvasId,
             ids.parentDropTarget || "",
             !!ids.isDropTarget,
+            ids.layoutType || LayoutComponentTypes.WIDGET_ROW,
             ref,
           );
           break;
@@ -72,13 +104,16 @@ export function usePositionObserver(
         case "widget":
           if (ids.widgetId === undefined)
             throw Error("Failed to unobserve widget: widgetId is undefined");
+
           positionObserver.unObserveWidget(getAnvilWidgetDOMId(ids.widgetId));
           break;
         case "layout":
           if (ids.layoutId === undefined)
             throw Error("Failed to unobserve layout: layoutId is undefined");
+
           if (ids.canvasId === undefined)
             throw Error("Failed to unobserve layout: canvasId is undefined");
+
           positionObserver.unObserveLayout(
             getAnvilLayoutDOMId(ids.canvasId, ids.layoutId),
           );

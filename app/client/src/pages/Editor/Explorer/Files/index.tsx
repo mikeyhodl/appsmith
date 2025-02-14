@@ -5,7 +5,7 @@ import React, {
   useMemo,
   useState,
 } from "react";
-import { useActiveAction } from "@appsmith/pages/Editor/Explorer/hooks";
+import { useActiveActionBaseId } from "ee/pages/Editor/Explorer/hooks";
 import { Entity, EntityClassNames } from "../Entity/index";
 import {
   createMessage,
@@ -13,24 +13,24 @@ import {
   EMPTY_QUERY_JS_BUTTON_TEXT,
   EMPTY_QUERY_JS_MAIN_TEXT,
   ADD_QUERY_JS_TOOLTIP,
-} from "@appsmith/constants/messages";
+} from "ee/constants/messages";
 import { useDispatch, useSelector } from "react-redux";
 import { ExplorerActionEntity } from "../Actions/ActionEntity";
 import ExplorerJSCollectionEntity from "../JSActions/JSActionEntity";
-import { selectFilesForExplorer } from "@appsmith/selectors/entitiesSelector";
 import {
   getExplorerStatus,
   saveExplorerStatus,
-} from "@appsmith/pages/Editor/Explorer/helpers";
+} from "ee/pages/Editor/Explorer/helpers";
 import { AddEntity, EmptyComponent } from "../common";
 import ExplorerSubMenu from "./Submenu";
-import { Icon, Text } from "design-system";
+import { Icon, Text } from "@appsmith/ads";
 import styled from "styled-components";
 import { useFilteredFileOperations } from "components/editorComponents/GlobalSearch/GlobalSearchHooks";
 import { SEARCH_ITEM_TYPES } from "components/editorComponents/GlobalSearch/utils";
 import { DatasourceCreateEntryPoints } from "constants/Datasource";
-import { ExplorerModuleInstanceEntity } from "@appsmith/pages/Editor/Explorer/ModuleInstanceEntity";
+import { ExplorerModuleInstanceEntity } from "ee/pages/Editor/Explorer/ModuleInstanceEntity";
 import { FilesContext } from "./FilesContextProvider";
+import { selectFilesForExplorer as default_selectFilesForExplorer } from "ee/selectors/entitiesSelector";
 
 const StyledText = styled(Text)`
   color: var(--ads-v2-color-fg-emphasis);
@@ -38,11 +38,19 @@ const StyledText = styled(Text)`
   padding-top: 8px;
   padding-bottom: 4px;
 `;
+
 function Files() {
   // Import the context
   const context = useContext(FilesContext);
-  const { canCreateActions, editorId, parentEntityId, parentEntityType } =
-    context;
+  const {
+    canCreateActions,
+    editorId,
+    parentEntityId,
+    parentEntityType,
+    selectFilesForExplorer = default_selectFilesForExplorer,
+    showModules = true,
+    showWorkflows = true,
+  } = context;
 
   const files = useSelector(selectFilesForExplorer);
   const dispatch = useDispatch();
@@ -51,21 +59,27 @@ function Files() {
   const [isMenuOpen, openMenu] = useState(false);
   const [query, setQuery] = useState("");
 
-  const fileOperations = useFilteredFileOperations({ query, canCreateActions });
+  const fileOperations = useFilteredFileOperations({
+    query,
+    canCreateActions,
+    showModules,
+    showWorkflows,
+  });
 
   const onCreate = useCallback(() => {
     openMenu(true);
-  }, [dispatch, openMenu]);
+  }, [openMenu]);
 
-  const activeActionId = useActiveAction();
+  const activeActionBaseId = useActiveActionBaseId();
 
   useEffect(() => {
-    if (!activeActionId) return;
-    document.getElementById(`entity-${activeActionId}`)?.scrollIntoView({
+    if (!activeActionBaseId) return;
+
+    document.getElementById(`entity-${activeActionBaseId}`)?.scrollIntoView({
       block: "nearest",
       inline: "nearest",
     });
-  }, [activeActionId]);
+  }, [activeActionBaseId]);
 
   const onFilesToggle = useCallback(
     (isOpen: boolean) => {
@@ -78,6 +92,8 @@ function Files() {
 
   const fileEntities = useMemo(
     () =>
+      // TODO: Fix this the next time the file is edited
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       files.map(({ entity, type }: any) => {
         if (type === "group") {
           return (
@@ -93,30 +109,28 @@ function Files() {
           return (
             <ExplorerModuleInstanceEntity
               id={entity.id}
-              isActive={entity.id === activeActionId}
+              isActive={entity.id === activeActionBaseId}
               key={entity.id}
               searchKeyword={""}
               step={2}
-              type={type}
             />
           );
         } else if (type === "JS") {
           return (
             <ExplorerJSCollectionEntity
-              id={entity.id}
-              isActive={entity.id === activeActionId}
+              baseCollectionId={entity.id}
+              isActive={entity.id === activeActionBaseId}
               key={entity.id}
               parentEntityId={parentEntityId}
               searchKeyword={""}
               step={2}
-              type={type}
             />
           );
         } else {
           return (
             <ExplorerActionEntity
-              id={entity.id}
-              isActive={entity.id === activeActionId}
+              baseId={entity.id}
+              isActive={entity.id === activeActionBaseId}
               key={entity.id}
               parentEntityId={parentEntityId}
               searchKeyword={""}
@@ -126,12 +140,15 @@ function Files() {
           );
         }
       }),
-    [files, activeActionId, parentEntityId],
+    [files, activeActionBaseId, parentEntityId],
   );
 
   const handleClick = useCallback(
+    // TODO: Fix this the next time the file is edited
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (item: any) => {
       if (item.kind === SEARCH_ITEM_TYPES.sectionTitle) return;
+
       if (item.action) {
         dispatch(
           item.action(
@@ -144,7 +161,7 @@ function Files() {
         item.redirect(parentEntityId, DatasourceCreateEntryPoints.SUBMENU);
       }
     },
-    [parentEntityId, dispatch],
+    [dispatch, parentEntityId, parentEntityType],
   );
 
   return (

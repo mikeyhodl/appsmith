@@ -5,16 +5,20 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
+import lombok.experimental.FieldNameConstants;
 import org.checkerframework.common.aliasing.qual.Unique;
 import org.springframework.data.annotation.Transient;
 import org.springframework.data.mongodb.core.mapping.Document;
+
+import java.io.Serializable;
 
 @Getter
 @Setter
 @ToString
 @NoArgsConstructor
 @Document
-public class Tenant extends BaseDomain {
+@FieldNameConstants
+public class Tenant extends BaseDomain implements Serializable {
 
     @Unique String slug;
 
@@ -22,6 +26,9 @@ public class Tenant extends BaseDomain {
 
     @Transient
     String instanceId;
+
+    @Transient
+    String adminEmailDomainHash;
 
     PricingPlan pricingPlan;
 

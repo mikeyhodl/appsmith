@@ -10,7 +10,12 @@ const widgetsPage = require("../../../../locators/Widgets.json");
 const publish = require("../../../../locators/publishWidgetspage.json");
 const testdata = require("../../../../fixtures/testdata.json");
 const pageid = "MyPage";
-import { agHelper, propPane } from "../../../../support/Objects/ObjectsCore";
+import {
+  agHelper,
+  propPane,
+  table,
+} from "../../../../support/Objects/ObjectsCore";
+import PageList from "../../../../support/Pages/PageList";
 
 describe(
   "Binding the multiple Widgets and validating NavigateTo Page",
@@ -33,7 +38,7 @@ describe(
       agHelper.AddDsl("displayWidgetDsl");
       // eslint-disable-next-line cypress/no-unnecessary-waiting
       cy.wait(3000);
-      cy.CheckAndUnfoldEntityItem("Pages");
+      PageList.ShowList();
       PageLeftPane.assertPresence(pageid);
     });
 
@@ -46,12 +51,12 @@ describe(
       cy.get(commonlocators.singleSelectMenuItem)
         .contains(pageid)
         .click({ force: true });
-      cy.assertPageSave();
+      agHelper.AssertAutoSave();
     });
 
     it("3. Validate NavigateTo Page functionality ", function () {
       cy.wait(4000);
-      cy.isSelectRow(1);
+      table.SelectTableRow(1);
       cy.readTabledataPublish("1", "0").then((tabData) => {
         const tabValue = tabData;
         expect(tabValue).to.be.equal("2736212");

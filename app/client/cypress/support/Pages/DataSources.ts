@@ -6,9 +6,14 @@ import EditorNavigation, {
   AppSidebarButton,
   EntityType,
   PageLeftPane,
+  PagePaneSegment,
 } from "./EditorNavigation";
 import datasource from "../../locators/DatasourcesEditor.json";
 import PageList from "./PageList";
+import { anvilLocators } from "./Anvil/Locators";
+import { PluginActionForm } from "./PluginActionForm";
+import ApiEditor from "../../locators/ApiEditor";
+import BottomTabs from "./IDE/BottomTabs";
 
 export const DataSourceKVP = {
   Postgres: "PostgreSQL",
@@ -33,7 +38,9 @@ export enum Widgets {
   Table,
   Chart,
   Text,
+  WDSTable,
 }
+
 type AppModes = "Edit" | "View";
 
 interface RunQueryParams {
@@ -41,6 +48,7 @@ interface RunQueryParams {
   expectedStatus?: boolean;
   waitTimeInterval?: number;
 }
+
 export class DataSources {
   private agHelper = ObjectsRegistry.AggregateHelper;
   private table = ObjectsRegistry.Table;
@@ -49,6 +57,7 @@ export class DataSources {
   private apiPage = ObjectsRegistry.ApiPage;
   private dataManager = ObjectsRegistry.DataManager;
   private assertHelper = ObjectsRegistry.AssertHelper;
+  private pluginActionForm = new PluginActionForm();
 
   public ContainerKVP = (containerName: string) => {
     return {
@@ -59,6 +68,10 @@ export class DataSources {
   }; //Container KeyValuePair
   private _dsReviewSection = "[data-testid='t--ds-review-section']";
   public _addNewDataSource = ".t--add-datasource-button";
+  private _addNewDatasourceFromBlankScreen =
+    ".t--add-datasource-button-blank-screen";
+  public _newDatasourceBtn =
+    ".t--add-datasource-button, .t--add-datasource-button-blank-screen";
   private _createNewPlgin = (pluginName: string) =>
     ".t--plugin-name:contains('" + pluginName + "')";
   public _host = (index = "0") =>
@@ -72,8 +85,8 @@ export class DataSources {
     "//div[text()='" + name + "']/parent::div";
   public _password =
     "input[name $= '.datasourceConfiguration.authentication.password']";
-  private _testDs = ".t--test-datasource";
-  _saveDs = ".t--save-datasource";
+  public _testDs = ".t--test-datasource";
+  public _saveDs = ".t--save-datasource";
   _datasourceCard = ".t--datasource";
   _dsMenuoptions = "div.t--datasource-menu-option";
   _editButton = ".t--edit-datasource";
@@ -83,6 +96,7 @@ export class DataSources {
   _activeDS = "[data-selected='true']";
   _mockDatasourceName = "[data-testid=mockdatasource-name]";
   _templateMenu = ".t--template-menu";
+  _bindDataButton = "[data-testid=t--bind-data]";
   _addSuggestedExisting = "t--suggested-widget-existing";
   _addSuggestedAddNew = "t--suggested-widget-add-new";
   _templateMenuOption = (action: string) =>
@@ -108,7 +122,7 @@ export class DataSources {
     "']";
   _activeDSListReconnectModal = (dbName: string) =>
     "//div[contains(@class, 't--ds-list')]//span[text()='" + dbName + "']";
-  _runQueryBtn = ".t--run-query";
+  _runQueryBtn = "[data-testid='t--run-action']";
   _newDatabases = "#new-datasources";
   _newDatasourceContainer = "#new-integrations-wrapper";
   _selectDatasourceDropdown = "[data-testid=t--datasource-dropdown]";
@@ -124,7 +138,8 @@ export class DataSources {
   _selectedActiveTab = "button[aria-selected='true'] " + this._activeTab;
   _contextMenuDSReviewPage = "[data-testid='t--context-menu-trigger']";
   _contextMenuDelete = ".t--datasource-option-delete";
-  _datasourceCardGeneratePageBtn = ".t--generate-template";
+  _datasourceCardGeneratePageBtn =
+    ".t--generate-template, .t--datasource-generate-page";
   _queryOption = (option: string) =>
     "//div[contains(@class, 'rc-select-item-option-content') and text() = '" +
     option +
@@ -132,14 +147,14 @@ export class DataSources {
     option +
     "']";
   _queryTableResponse =
-    "//div[@data-guided-tour-id='query-table-response']//div[@class='tbody']//div[@class ='td']";
+    "//div[@data-guided-tour-id='query-table-response']//div[@class='tbody']//div[@class ='td as-mask']";
   _queryResponseHeader = (header: string) =>
     "//div[@data-guided-tour-id='query-table-response']//div[@class='table']//div[@role ='columnheader']//span[text()='" +
     header +
     "']";
   _refreshIcon = "button .bp3-icon-refresh";
   _addIcon = "button .bp3-icon-add";
-  _queryError = "[data-testid='t--query-error']";
+  _queryError = "[data-testid='t--response-error']";
   _queryEditorTabs = (responseType: string) =>
     "//button[@role='tab' or @role='tablist']//span[text()='" +
     responseType +
@@ -148,17 +163,17 @@ export class DataSources {
     "//div[@data-testid='t--response-tab-segmented-control']//span[text()='" +
     responseType +
     "']";
+  // TODO: remove this when response UI is ready
   _queryRecordResult = (recordCount: number) =>
     `//div/span[text()='Result:']/span[number(substring-before(normalize-space(text()), ' Record')) >= ${recordCount}]`;
   _noRecordFound = "span[data-testid='no-data-table-message']";
   _usePreparedStatement =
     "input[name='actionConfiguration.pluginSpecifiedTemplates[0].value'][type='checkbox'], input[name='actionConfiguration.formData.preparedStatement.data'][type='checkbox']";
   _mockDB = (dbName: string) =>
-    "//span[text()='" +
+    "//p[text()='" +
     dbName +
     "']/ancestor::div[contains(@class, 't--mock-datasource')][1]";
   private _createBlankGraphQL = ".t--createBlankApiGraphqlCard";
-  private _createBlankCurl = ".t--createBlankCurlCard";
   private _graphQLHeaderKey = "input[name='headers[0].key']";
   private _graphQLHeaderValue = "input[name='headers[0].value']";
   _graphqlQueryEditor = ".t--graphql-query-editor";
@@ -184,27 +199,25 @@ export class DataSources {
   _globalSearchInput = ".t--global-search-input";
   _gsScopeDropdown =
     "[data-testid^='datasourceStorages.'][data-testid$='.datasourceConfiguration.authentication.scopeString']";
-  _gsScopeOptions = ".ads-v2-select__dropdown .rc-select-item-option";
+  _gsScopeOptions = ".ads-v2-radio-group";
   _queryTimeout = "//input[@name='actionConfiguration.timeoutInMillisecond']";
   _getStructureReq = "/api/v1/datasources/*/structure?ignoreCache=true";
   _editDatasourceFromActiveTab = (dsName: string) =>
-    ".t--datasource-name:contains('" + dsName + "')";
+    ".t--plugin-name:contains('" + dsName + "')";
   _mandatoryMark = "//span[text()='*']";
   _deleteDSHostPort = ".t--delete-field";
-
-  private _pageSelectionMenu = "[data-testId='t--page-selection']";
+  _dsTabSchema = "[data-testid='t--tab-DATASOURCE_TAB']";
+  private _pageSelectionMenu = "[data-testid='t--page-selection']";
 
   private _pageSelectMenuItem = ".ads-v2-menu__menu-item";
 
   private _suggestedWidget = (widgetType: string, parentClass: string) =>
-    "//div[contains(@class, '" +
+    "//div[contains(@data-testid, '" +
     parentClass +
-    "')]//div[contains(@class, 't--suggested-widget-" +
+    "')]//div[contains(@data-testid, 't--suggested-widget-" +
     widgetType +
     "')]";
 
-  private _curlTextArea =
-    "//label[text()='Paste CURL Code Here']/parent::form/div";
   _noSchemaAvailable = (dbName: string) =>
     "//div[text()='" +
     dbName +
@@ -256,7 +269,7 @@ export class DataSources {
     "')]/ancestor::div[@class='form-config-top']/following-sibling::div//div[contains(@class, 'rc-select-multiple')]";
   private _datasourceSchemaRefreshBtn = ".datasourceStructure-refresh";
   private _datasourceStructureHeader = ".datasourceStructure-header";
-  _datasourceSchemaColumn = ".t--datasource-column";
+  _datasourceSchemaColumn = ".t--datasource-column .t--field-name";
   _datasourceStructureSearchInput = ".datasourceStructure-search input";
   _jsModeSortingControl = ".t--actionConfiguration\\.formData\\.sortBy\\.data";
   public _queryEditorCollapsibleIcon = ".collapsible-icon";
@@ -282,22 +295,31 @@ export class DataSources {
   _entityExplorerID = (dsName: string) =>
     "[data-testid='t--entity-item-" + dsName + "']";
   _stagingTab = "[data-testid='t--ds-data-filter-Staging']";
-  _graphQlDsFromRightPane = (dsName: string) =>
+  _graphQlDsHintOption = (dsName: string) =>
     "//div/span[text() ='" + dsName + "']";
   _imgFireStoreLogo = "//img[contains(@src, 'firestore.svg')]";
   _dsVirtuosoElement = `div .t--schema-virtuoso-container`;
   private _dsVirtuosoList = `[data-test-id="virtuoso-item-list"]`;
-  private _dsSchemaContainer = `[data-testId="datasource-schema-container"]`;
+  private _dsSchemaContainer = `[data-testid="t--datasource-schema-container"]`;
   private _dsVirtuosoElementTable = (targetTableName: string) =>
-    `.t--entity-item[data-testid='t--entity-item-${targetTableName}']`;
+    `${this._dsSchemaEntityItem}[data-testid='t--entity-item-${targetTableName}']`;
   private _dsPageTabListItem = (buttonText: string) =>
     `//div[contains(@class, 't--datasource-tab-list')]/button/span[text()='${buttonText}']`;
   _dsPageTabContainerTableName = (tableName: string) =>
     `.t--datasource-tab-container ${this._entityExplorerID(tableName)}`;
   _dsPageTableTriggermenuTarget = (tableName: string) =>
-    `${this._dsPageTabContainerTableName(tableName)} .t--template-menu-trigger`;
+    `${this._dsPageTabContainerTableName(tableName)} ${
+      this._entityTriggerElement
+    }`;
   _gSheetQueryPlaceholder = ".CodeMirror-placeholder";
   _dsStructurePreviewMode = ".datasourceStructure-datasource-view-mode";
+  private _dsSchemaEntityItem = ".t--entity-item";
+  private _entityTriggerElement = ".t--template-menu-trigger";
+  _dsSchemaTableResponse = ".t--table-response";
+  _imgSnowflakeLogo = "//img[contains(@src, 'snowflake.svg')]";
+  _dsConfigProperties = (index: number) =>
+    "input[name*='datasourceConfiguration.properties[" + index + "]']";
+  _dsConfigAuthType = `[data-testid*='datasourceConfiguration.authentication.authenticationType']`;
 
   public AssertDSEditViewMode(mode: AppModes) {
     if (mode == "Edit") this.agHelper.AssertElementAbsence(this._editButton);
@@ -312,9 +334,7 @@ export class DataSources {
       datasourceName,
     );
     this.agHelper.GetNClick(this._selectTableDropdown, 0, true);
-    cy.get(
-      `div[role="listbox"] p[kind="span"]:contains("${tableName}")`,
-    ).click();
+    cy.get(`div[role="listbox"] p:contains("${tableName}")`).click();
     this.agHelper.GetNClick(this._generatePageBtn);
     this.assertHelper.AssertNetworkStatus("@replaceLayoutWithCRUDPage", 201);
     this.agHelper.ClickButton("Got it");
@@ -356,7 +376,6 @@ export class DataSources {
         currentURL = url;
         const myRegexp = /applications(.*)/;
         const match = myRegexp.exec(currentURL);
-        cy.log(currentURL + "currentURL from intercept is");
         currentAppId = match ? match[1].split("/")[1] : null;
         data.data.page.applicationId = currentAppId;
         cy.writeFile(fixtureFile, JSON.stringify(data));
@@ -424,9 +443,14 @@ export class DataSources {
     }).as("testDatasource");
   }
 
-  public CreatePlugIn(pluginName: string, waitForToastDisappear = false) {
+  public CreatePlugIn(
+    pluginName: string,
+    waitForToastDisappear = false,
+    index = 0,
+  ) {
     cy.get(this._createNewPlgin(pluginName))
       .parent("div")
+      .eq(index)
       .trigger("click", { force: true });
     this.agHelper.Sleep();
     //this.agHelper.WaitUntilEleAppear(this.locator._toastMsg);
@@ -445,11 +469,14 @@ export class DataSources {
 
   public NavigateToDSCreateNew() {
     AppSidebar.navigate(AppSidebarButton.Data);
-    Cypress._.times(2, () => {
-      this.agHelper.GetNClick(this._addNewDataSource, 0, true);
-      this.agHelper.Sleep();
+    cy.get("body").then(($body) => {
+      if ($body.find(this._addNewDataSource).length > 0) {
+        this.agHelper.GetNClick(this._addNewDataSource, 0, true);
+      } else {
+        this.agHelper.GetNClick(this._addNewDatasourceFromBlankScreen, 0, true);
+      }
     });
-    cy.get(this._newDatabases).should("be.visible");
+    this.agHelper.AssertElementVisibility(this._newDatabases);
   }
 
   CreateMockDB(dbName: "Users" | "Movies"): Cypress.Chainable<string> {
@@ -475,18 +502,23 @@ export class DataSources {
     const databaseName = shouldAddTrailingSpaces
       ? this.dataManager.dsValues[environment].postgres_databaseName + "  "
       : this.dataManager.dsValues[environment].postgres_databaseName;
-    this.agHelper.UpdateInputValue(
+    this.ValidateNSelectDropdown("Connection mode", "Read / Write");
+    this.agHelper.ClearNType(
       this._port,
       this.dataManager.dsValues[environment].postgres_port.toString(),
     );
-    this.agHelper.UpdateInputValue(this._host(), hostAddress);
+    this.agHelper.ClearNType(this._host(), hostAddress);
     this.agHelper.ClearNType(this._databaseName, databaseName);
-    cy.get(this._username).type(
+
+    this.agHelper.ClearNType(
+      this._username,
       username == ""
         ? this.dataManager.dsValues[environment].postgres_username
         : username,
     );
-    cy.get(this._password).type(
+
+    this.agHelper.ClearNType(
+      this._password,
       password == ""
         ? this.dataManager.dsValues[environment].postgres_password
         : password,
@@ -520,20 +552,59 @@ export class DataSources {
     const databaseName = shouldAddTrailingSpaces
       ? this.dataManager.dsValues[environment].oracle_service + "  "
       : this.dataManager.dsValues[environment].oracle_service;
-    this.agHelper.UpdateInputValue(this._host(), hostAddress);
-    this.agHelper.UpdateInputValue(
+    this.agHelper.ClearNType(this._host(), hostAddress);
+    this.agHelper.ClearNType(
       this._port,
       this.dataManager.dsValues[environment].oracle_port.toString(),
     );
-    cy.get(this._databaseName).type(databaseName);
-    cy.get(this._username).type(
+    this.agHelper.ClearNType(this._databaseName, databaseName);
+    this.agHelper.ClearNType(
+      this._username,
       username == ""
         ? this.dataManager.dsValues[environment].oracle_username
         : username,
     );
-    cy.get(this._password).type(
+    this.agHelper.ClearNType(
+      this._password,
       password == ""
         ? this.dataManager.dsValues[environment].oracle_password
+        : password,
+    );
+  }
+
+  public FillSnowflakeDSForm(
+    environment = this.dataManager.defaultEnviorment,
+    username = "",
+    password = "",
+  ) {
+    const accountName =
+      this.dataManager.dsValues[environment].Snowflake_accountName;
+    const warehouseName =
+      this.dataManager.dsValues[environment].Snowflake_warehouseName;
+    const databaseName =
+      this.dataManager.dsValues[environment].Snowflake_databaseName;
+    const schemaName =
+      this.dataManager.dsValues[environment].Snowflake_defaultSchema;
+    const role = this.dataManager.dsValues[environment].Snowflake_role;
+    this.agHelper.ClearNType(datasource.datasourceConfigUrl, accountName);
+    this.agHelper.ClearNType(this._dsConfigProperties(0), warehouseName);
+    this.agHelper.ClearNType(this._dsConfigProperties(1), databaseName);
+    this.agHelper.ClearNType(this._dsConfigProperties(2), schemaName);
+    this.agHelper.ClearNType(this._dsConfigProperties(3), role);
+    this.agHelper.AssertContains("Basic", "exist", this._dsConfigAuthType)
+      ? null
+      : this.agHelper.GetNClick(this._dsConfigAuthType) &&
+        this.agHelper.ContainsNClick("Basic");
+    this.agHelper.ClearNType(
+      this._username,
+      username == ""
+        ? this.dataManager.dsValues[environment].Snowflake_username
+        : username,
+    );
+    this.agHelper.ClearNType(
+      this._password,
+      password == ""
+        ? this.dataManager.dsValues[environment].Snowflake_password
         : password,
     );
   }
@@ -545,8 +616,9 @@ export class DataSources {
     const hostAddress = shouldAddTrailingSpaces
       ? this.dataManager.dsValues[environment].mongo_host + "  "
       : this.dataManager.dsValues[environment].mongo_host;
-    this.agHelper.UpdateInputValue(this._host(), hostAddress);
-    this.agHelper.UpdateInputValue(
+    this.ValidateNSelectDropdown("Connection mode", "Read / Write");
+    this.agHelper.ClearNType(this._host(), hostAddress);
+    this.agHelper.ClearNType(
       this._port,
       this.dataManager.dsValues[environment].mongo_port.toString(),
     );
@@ -568,17 +640,18 @@ export class DataSources {
       ? this.dataManager.dsValues[environment].mysql_databaseName + "  "
       : this.dataManager.dsValues[environment].mysql_databaseName;
 
-    this.agHelper.UpdateInputValue(this._host(), hostAddress);
-    this.agHelper.UpdateInputValue(
+    this.agHelper.ClearNType(this._host(), hostAddress);
+    this.agHelper.ClearNType(
       this._port,
       this.dataManager.dsValues[environment].mysql_port.toString(),
     );
     this.agHelper.ClearNType(this._databaseName, databaseName);
-    this.agHelper.UpdateInputValue(
+    this.agHelper.ClearNType(
       this._username,
       this.dataManager.dsValues[environment].mysql_username,
     );
-    cy.get(this._password).type(
+    this.agHelper.ClearNType(
+      this._password,
       this.dataManager.dsValues[environment].mysql_password,
     );
   }
@@ -587,11 +660,11 @@ export class DataSources {
     environment = this.dataManager.defaultEnviorment,
     leaveDBNameEmpty = true,
   ) {
-    this.agHelper.UpdateInputValue(
+    this.agHelper.ClearNType(
       this._host(),
       this.dataManager.dsValues[environment].mssql_host,
     );
-    this.agHelper.UpdateInputValue(
+    this.agHelper.ClearNType(
       this._port,
       this.dataManager.dsValues[environment].mssql_port.toString(),
     );
@@ -603,15 +676,11 @@ export class DataSources {
         this.dataManager.dsValues[environment].mssql_databaseName;
       this.agHelper.ClearNType(this._databaseName, databaseName);
     }
-    // this.agHelper.UpdateInputValue(
-    //   this._databaseName,
-    //   datasourceFormData["mssql-databaseName"],
-    // ); //Commenting until MsSQL is init loaded into container
-    this.agHelper.UpdateInputValue(
+    this.agHelper.ClearNType(
       this._username,
       this.dataManager.dsValues[environment].mssql_username,
     );
-    this.agHelper.UpdateInputValue(
+    this.agHelper.ClearNType(
       this._password,
       this.dataManager.dsValues[environment].mssql_password,
     );
@@ -633,11 +702,11 @@ export class DataSources {
   }
 
   public FillArangoDSForm(environment = this.dataManager.defaultEnviorment) {
-    this.agHelper.UpdateInputValue(
+    this.agHelper.ClearNType(
       this._host(),
       this.dataManager.dsValues[environment].arango_host,
     );
-    this.agHelper.UpdateInputValue(
+    this.agHelper.ClearNType(
       this._port,
       this.dataManager.dsValues[environment].arango_port.toString(),
     );
@@ -645,27 +714,14 @@ export class DataSources {
     this.agHelper
       .GetText(this._databaseName, "val")
       .then(($dbName) => expect($dbName).to.eq("_system"));
-    this.agHelper.UpdateInputValue(
+    this.agHelper.ClearNType(
       this._username,
       this.dataManager.dsValues[environment].arango_username,
     );
-    this.agHelper.UpdateInputValue(
+    this.agHelper.ClearNType(
       this._password,
       this.dataManager.dsValues[environment].arango_password,
     );
-  }
-
-  public FillCurlNImport(value: string) {
-    this.NavigateToDSCreateNew();
-    this.agHelper.GetNClick(this._createBlankCurl);
-    this.ImportCurlNRun(value);
-  }
-
-  public ImportCurlNRun(value: string) {
-    this.agHelper.UpdateTextArea(this._curlTextArea, value);
-    this.agHelper.Sleep(500); //Clicking import after value settled
-    this.agHelper.ClickButton("Import");
-    this.apiPage.RunAPI();
   }
 
   public FillFirestoreDSForm(environment = this.dataManager.defaultEnviorment) {
@@ -681,41 +737,30 @@ export class DataSources {
         this.locator._inputField,
       this.dataManager.dsValues[environment].firestore_projectID,
     );
-    // cy.fixture("firestore-ServiceAccCreds").then((json: any) => {
-    //   let ServiceAccCreds = JSON.parse(
-    //     JSON.stringify(json.serviceAccCredentials),
-    //   );
-    //   ServiceAccCreds.private_key = Cypress.env("FIRESTORE_PRIVATE_KEY");
-    //   //cy.log("ServiceAccCreds is " + JSON.stringify(ServiceAccCreds));
-    //   cy.log(
-    //     "ServiceAccCreds.private_key  is " +
-    //       JSON.stringify(ServiceAccCreds.private_key),
-    //   );
     this.agHelper.UpdateFieldInput(
       this.locator._inputFieldByName("Service account credentials"),
       JSON.stringify(
         this.dataManager.dsValues[environment].firestore_serviceaccountkey,
       ),
     );
-    //});
   }
 
   public FillElasticSearchDSForm(
     environment = this.dataManager.defaultEnviorment,
   ) {
-    this.agHelper.UpdateInputValue(
+    this.agHelper.ClearNType(
       this._host(),
       this.dataManager.dsValues[environment].elastic_host,
     );
-    this.agHelper.UpdateInputValue(
+    this.agHelper.ClearNType(
       this._port,
       this.dataManager.dsValues[environment].elastic_port.toString(),
     );
-    this.agHelper.UpdateInputValue(
+    this.agHelper.ClearNType(
       this._username,
       this.dataManager.dsValues[environment].elastic_username,
     );
-    this.agHelper.UpdateInputValue(
+    this.agHelper.ClearNType(
       this._password,
       this.dataManager.dsValues[environment].elastic_password,
     );
@@ -725,20 +770,28 @@ export class DataSources {
     environment = this.dataManager.defaultEnviorment,
     enterOrSelectUrl: "enter" | "select" = "enter",
     dsNameToSelect = "",
+    renameCallback?: (queryName: string) => void,
   ) {
     this.agHelper.GetNClick(this._createBlankGraphQL);
     cy.get("@guid").then((uid) => {
-      this.agHelper.RenameWithInPane("GraphQL_API" + "_" + uid, true);
+      const queryName = "GraphQL_API" + "_" + uid;
+      if (typeof renameCallback === "function") {
+        renameCallback(queryName);
+      } else {
+        this.agHelper.RenameQuery(queryName);
+      }
 
       if (enterOrSelectUrl == "enter")
         this.apiPage.EnterURL(
           this.dataManager.dsValues[environment].GraphqlApiUrl_TED,
         );
-      else if (enterOrSelectUrl == "select")
-        this.agHelper.GetNClick(this._graphQlDsFromRightPane(dsNameToSelect));
+      else if (enterOrSelectUrl == "select") {
+        this.agHelper.GetNClick(ApiEditor.dataSourceField);
+        this.agHelper.GetNClick(this._graphQlDsHintOption(dsNameToSelect));
+      }
 
       this.assertHelper.AssertNetworkStatus("@createNewApi", 201);
-      cy.wrap("GraphQL_API" + "_" + uid).as("dsName");
+      cy.wrap(queryName).as("dsName");
     });
   }
 
@@ -759,45 +812,39 @@ export class DataSources {
   ) {
     this.FillAuthenticatedGrapgQLURL(environment);
 
-    this.agHelper.UpdateInputValue(this._graphQLHeaderKey, hKey);
-    this.agHelper.UpdateInputValue(this._graphQLHeaderValue, hValue);
+    this.agHelper.ClearNType(this._graphQLHeaderKey, hKey);
+    this.agHelper.ClearNType(this._graphQLHeaderValue, hValue);
     cy.get("@guid").then((uid: any) => {
       dataSourceName = dataSourceName + " " + uid;
-      this.agHelper.RenameWithInPane(dataSourceName, false);
+      this.agHelper.RenameDatasource(dataSourceName);
       this.SaveDatasource();
       cy.wrap(dataSourceName).as("dsName");
     });
   }
 
   public FillRedisDSForm(environment = this.dataManager.defaultEnviorment) {
-    this.agHelper.UpdateInputValue(
+    this.agHelper.ClearNType(
       this._host(),
       this.dataManager.dsValues[environment].redis_host,
     );
-    this.agHelper.UpdateInputValue(
+    this.agHelper.ClearNType(
       this._port,
       this.dataManager.dsValues[environment].redis_port.toString(),
     );
   }
 
   public FillS3DSForm() {
-    this.agHelper.UpdateInputValue(
-      this._username,
-      Cypress.env("S3_ACCESS_KEY"),
-    );
-    this.agHelper.UpdateInputValue(
-      this._password,
-      Cypress.env("S3_SECRET_KEY"),
-    );
+    this.agHelper.ClearNType(this._username, Cypress.env("S3_ACCESS_KEY"));
+    this.agHelper.ClearNType(this._password, Cypress.env("S3_SECRET_KEY"));
   }
 
   public FillTwilioDSForm(environment = this.dataManager.defaultEnviorment) {
     this.ValidateNSelectDropdown("Authentication type", "", "Basic auth");
-    this.agHelper.UpdateInputValue(
+    this.agHelper.ClearNType(
       this._username,
       this.dataManager.dsValues[environment].twilio_username.toString(),
     );
-    this.agHelper.UpdateInputValue(
+    this.agHelper.ClearNType(
       this._password,
       this.dataManager.dsValues[environment].twilio_password.toString(),
     );
@@ -887,7 +934,7 @@ export class DataSources {
         this.agHelper.AssertContains(
           responseStatus === 200
             ? "datasource deleted successfully"
-            : "action(s) using it",
+            : "Cannot delete datasource",
         );
       });
   }
@@ -911,14 +958,14 @@ export class DataSources {
     });
     //this.assertHelper.AssertNetworkStatus("@createNewApi", 201);
     this.AssertRunButtonVisibility();
-    if (queryName) this.agHelper.RenameWithInPane(queryName);
+    if (queryName) this.agHelper.RenameQuery(queryName);
     if (query) {
       this.EnterQuery(query);
       this.AssertRunButtonDisability(false);
     }
   }
 
-  private AssertRunButtonVisibility() {
+  public AssertRunButtonVisibility() {
     this.agHelper.AssertElementVisibility(
       this.locator._buttonByText("Run"),
       true,
@@ -955,7 +1002,7 @@ export class DataSources {
   }
 
   DeleteQuery(queryName: string) {
-    PageLeftPane.expandCollapseItem("Queries/JS");
+    PageLeftPane.switchSegment(PagePaneSegment.Queries);
     this.entityExplorer.ActionContextMenuByEntityName({
       entityNameinLeftSidebar: queryName,
       action: "Delete",
@@ -997,14 +1044,14 @@ export class DataSources {
     dsName: "PostgreSQL" | "MySQL" | "MongoDB",
   ) {
     this.ReconnectModalValidation(dbName, dsName);
-    this.ValidateNSelectDropdown("Connection mode", "Read / Write");
     if (dsName == "PostgreSQL") this.FillPostgresDSForm();
     else if (dsName == "MySQL") this.FillMySqlDSForm();
     else if (dsName == "MongoDB") this.FillMongoDSForm();
     this.TestSaveDatasource(true, true);
-    this.assertHelper.AssertNetworkStatus("@getPage", 200);
+    this.assertHelper.AssertNetworkStatus("@getConsolidatedData", 200);
     this.assertHelper.AssertNetworkStatus("getWorkspace");
   }
+
   public ReconnectModalValidation(
     dbName: string,
     dsName: "PostgreSQL" | "MySQL" | "MongoDB",
@@ -1104,24 +1151,23 @@ export class DataSources {
     isMongo = false,
   ) {
     let jsonHeaderString = "";
-    this.table.ReadTableRowColumnData(rowindex, colIndex).then(($cellData) => {
-      if (validateCellData) expect($cellData).to.eq(validateCellData);
+    this.table
+      .ReadTableRowColumnData(rowindex, colIndex, "v2")
+      .then(($cellData) => {
+        if (validateCellData) expect($cellData).to.eq(validateCellData);
 
-      jsonHeaderString =
-        isMongo == true
-          ? "Update Document " + headerString + ": " + $cellData
-          : "Update Row " + headerString + ": " + $cellData;
-      this.agHelper
-        .GetText(this.locator._jsonFormHeader)
-        .then(($header: any) => expect($header).to.eq(jsonHeaderString));
-    });
+        jsonHeaderString =
+          isMongo == true
+            ? "Update Document " + headerString + ": " + $cellData
+            : "Update Row " + headerString + ": " + $cellData;
+        this.agHelper
+          .GetText(this.locator._jsonFormHeader)
+          .then(($header: any) => expect($header).to.eq(jsonHeaderString));
+      });
   }
 
-  ToggleUsePreparedStatement(
-    enable = true || false,
-    toNavigateToSettings = false,
-  ) {
-    toNavigateToSettings && this.apiPage.SelectPaneTab("Settings");
+  ToggleUsePreparedStatement(enable = true || false) {
+    this.pluginActionForm.toolbar.toggleSettings();
     if (enable) this.agHelper.CheckUncheck(this._usePreparedStatement, true);
     else this.agHelper.CheckUncheck(this._usePreparedStatement, false);
   }
@@ -1137,22 +1183,33 @@ export class DataSources {
     this.assertHelper.AssertNetworkStatus("@saveAction", 200);
   }
 
-  public RunQueryNVerifyResponseViews(
-    expectedRecordsCount = 1,
-    tableCheck = true,
-  ) {
+  public runQueryAndVerifyResponseViews({
+    count = 1,
+    operator = "eq",
+    responseTypes = ["TABLE", "JSON", "RAW"],
+  }: {
+    count?: number;
+    operator?: Parameters<
+      typeof BottomTabs.response.validateRecordCount
+    >[0]["operator"];
+    responseTypes?: ("TABLE" | "JSON" | "RAW")[];
+  } = {}) {
     this.RunQuery();
-    tableCheck &&
-      this.agHelper.AssertElementVisibility(this._queryResponse("TABLE"));
-    this.agHelper.AssertElementVisibility(this._queryResponse("JSON"));
-    this.agHelper.AssertElementVisibility(this._queryResponse("RAW"));
-    this.CheckResponseRecordsCount(expectedRecordsCount);
-  }
 
-  public CheckResponseRecordsCount(expectedRecordCount: number) {
-    this.agHelper.AssertElementVisibility(
-      this._queryRecordResult(expectedRecordCount),
-    );
+    BottomTabs.response.openResponseTypeMenu();
+
+    responseTypes.forEach((responseType) => {
+      this.agHelper.AssertElementVisibility(
+        BottomTabs.response.locators.responseTypeMenuItem(responseType),
+      );
+    });
+
+    BottomTabs.response.closeResponseTypeMenu();
+
+    BottomTabs.response.validateRecordCount({
+      count,
+      operator,
+    });
   }
 
   public CreateDataSource(
@@ -1188,7 +1245,7 @@ export class DataSources {
         this.CreatePlugIn(DataSourceKVP[dsType]);
         guid = uid;
         dataSourceName = dsType + " " + guid;
-        this.agHelper.RenameWithInPane(dataSourceName, false);
+        this.agHelper.RenameDatasource(dataSourceName);
         // Execute the preDSConfigAction if it is defined
         if (!!preDSConfigAction) {
           preDSConfigAction.bind(this)(environment);
@@ -1246,7 +1303,7 @@ export class DataSources {
     if (query) {
       this.EnterQuery(query, sleep);
     }
-    if (queryName) this.agHelper.RenameWithInPane(queryName);
+    if (queryName) this.agHelper.RenameQuery(queryName);
   }
 
   public UpdateGraphqlQueryAndVariable(options?: {
@@ -1317,15 +1374,14 @@ export class DataSources {
     queryTimeout = 20000,
     action: "QUERY" | "API" = "QUERY",
   ) {
-    this.agHelper.GetNClick(this._queryEditorTabs("Settings"));
+    // open the settings
+    this.pluginActionForm.toolbar.toggleSettings();
     cy.xpath(this._queryTimeout)
       .clear()
       .type(queryTimeout.toString(), { delay: 0 }); //Delay 0 to work like paste!
     this.agHelper.AssertAutoSave();
-
-    if (action === "QUERY") {
-      this.agHelper.GetNClick(this._queryEditorTabs("Query"));
-    }
+    // close the settings
+    this.pluginActionForm.toolbar.toggleSettings();
   }
 
   //Update with new password in the datasource conf page
@@ -1369,22 +1425,12 @@ export class DataSources {
     this.agHelper.GetNClick(this._datasourceSchemaRefreshBtn);
   }
 
-  public VerifySchemaCollapsibleOpenState(isOpen = false) {
-    if (isOpen) {
-      this.agHelper.AssertElementVisibility(
-        this._datasourceStructureSearchInput,
-      );
-    } else {
-      this.agHelper.AssertElementAbsence(this._datasourceStructureSearchInput);
-    }
-  }
-
   public FilterAndVerifyDatasourceSchemaBySearch(
     search: string,
     expectedTableName = search,
   ) {
     this.agHelper.Sleep(2500); //for query editor to load
-    this.agHelper.TypeText(this._datasourceStructureSearchInput, search);
+    this.agHelper.ClearNType(this._datasourceStructureSearchInput, search);
     this.agHelper.Sleep(1000); //for search result to load
     this.VerifyTableSchemaOnQueryEditor(expectedTableName);
   }
@@ -1396,7 +1442,11 @@ export class DataSources {
   ) {
     this.CreateQueryForDS(datasourceName);
     this.AssertTableInVirtuosoList(datasourceName, tableName);
-    cy.get(this._dsVirtuosoElementTable(tableName)).click();
+    this.agHelper.GetNClick(this._dsVirtuosoElementTable(tableName));
+    cy.get(this._dsVirtuosoElementTable(tableName))
+      .find(this._entityTriggerElement)
+      .should("be.visible")
+      .click();
     this.agHelper.GetNClick(
       this.entityExplorer.locator._contextMenuItem(templateName),
       0,
@@ -1494,7 +1544,7 @@ export class DataSources {
       "No",
       "Yes",
     );
-    this.agHelper.UpdateInputValue(
+    this.agHelper.ClearNType(
       this.locator._inputFieldByName("Connection string URI") + "//input",
       this.dataManager.mongo_uri(environment),
     );
@@ -1584,7 +1634,7 @@ export class DataSources {
     clientSecret: string,
     environment = this.dataManager.defaultEnviorment,
   ) {
-    if (dsName) this.agHelper.RenameWithInPane(dsName, false);
+    if (dsName) this.agHelper.RenameDatasource(dsName);
     // Fill Auth Form
     this.agHelper.TypeText(
       this.locator._inputFieldByName("URL") + "//" + this.locator._inputField,
@@ -1631,12 +1681,17 @@ export class DataSources {
     );
   }
 
+  public AssertBindDataVisible() {
+    cy.get(this._bindDataButton).should("be.visible");
+  }
+
   public AddSuggestedWidget(
     widget: Widgets,
     parentClass = this._addSuggestedAddNew,
     force = false,
     index = 0,
   ) {
+    cy.get(this._bindDataButton).should("be.visible").click({ force: true });
     switch (widget) {
       case Widgets.Dropdown:
         this.agHelper.GetNClick(
@@ -1654,6 +1709,16 @@ export class DataSources {
         );
         this.agHelper.AssertElementVisibility(
           this.locator._widgetInCanvas(WIDGET.TABLE),
+        );
+        break;
+      case Widgets.WDSTable:
+        this.agHelper.GetNClick(
+          this._suggestedWidget("TABLE_WIDGET_V2", parentClass),
+          index,
+          force,
+        );
+        this.agHelper.AssertElementVisibility(
+          anvilLocators.anvilWidgetTypeSelector(anvilLocators.WDSTABLE),
         );
         break;
       case Widgets.Chart:
@@ -1819,6 +1884,26 @@ export class DataSources {
     });
   }
 
+  public GeneratePostgresCRUDPage(dbName: string) {
+    PageList.AddNewPage("Generate page with data");
+    this.agHelper.GetNClick(this._selectDatasourceDropdown);
+    this.agHelper.GetNClickByContains(
+      this._dropdownOption,
+      "Connect new datasource",
+    );
+    this.CreateDataSource("Postgres", false);
+    this.assertHelper.AssertNetworkStatus("@getDatasourceStructure");
+    this.agHelper.GetNClick(this._selectTableDropdown, 0, true);
+    this.agHelper.GetNClickByContains(this._dropdownOption, dbName);
+    this.agHelper.GetNClick(this._generatePageBtn);
+    this.assertHelper.AssertNetworkStatus("@replaceLayoutWithCRUDPage", 201);
+    this.agHelper.AssertContains("Successfully generated a page");
+    this.assertHelper.AssertNetworkStatus("@getActions", 200);
+    this.assertHelper.AssertNetworkStatus("@postExecute", 200);
+    this.agHelper.GetNClick(this._visibleTextSpan("Got it"));
+    this.assertHelper.AssertNetworkStatus("@updateLayout", 200);
+  }
+
   public AssertTableInVirtuosoList(
     dsName: string,
     targetTableName: string,
@@ -1828,6 +1913,9 @@ export class DataSources {
     cy.intercept("GET", "/api/v1/datasources/*/structure?ignoreCache=*").as(
       `getDatasourceStructureUpdated_${ds_entity_name}`,
     );
+    cy.get("[data-testid=t--tab-DATASOURCE_TAB]")
+      .first()
+      .click({ force: true });
     this.RefreshDatasourceSchema();
     this.assertHelper
       .WaitForNetworkCall(`@getDatasourceStructureUpdated_${ds_entity_name}`)
@@ -1852,7 +1940,6 @@ export class DataSources {
               );
               // Total height of the parent container holding the tables in the dom normally without virtualization rendering
               const totalScroll = tables.length * elementHeight;
-              cy.log(JSON.stringify({ heightOfParentElement, totalScroll }));
               if (heightOfParentElement < totalScroll) {
                 // Index of the table present in the array of tables which will determine the presence of element inside the parent container
                 let offset = indexOfTable * elementHeight;
@@ -1894,5 +1981,36 @@ export class DataSources {
       .parents(datasource.datasourceCard)
       .find(".ads-v2-listitem__bdesc")
       .invoke("text");
+  }
+
+  public SelectTableFromPreviewSchemaList(targetTableName: string) {
+    this.agHelper.GetNClick(
+      this._dsVirtuosoElementTable(targetTableName),
+      0,
+      false,
+      1000,
+    );
+  }
+
+  private IsTemplateMenuTriggerForSchemaTableVisible(index: number = 0) {
+    this.agHelper
+      .GetElement(`${this._dsSchemaContainer} ${this._dsSchemaEntityItem}`)
+      .eq(index)
+      .find(this._entityTriggerElement)
+      .should("be.visible");
+  }
+
+  public ClickTemplateMenuForSchemaTable(index: number = 0) {
+    this.agHelper
+      .GetElement(`${this._dsSchemaContainer} ${this._dsSchemaEntityItem}`)
+      .eq(index)
+      .realHover();
+    this.IsTemplateMenuTriggerForSchemaTableVisible(index);
+    this.agHelper
+      .GetElement(`${this._dsSchemaContainer} ${this._dsSchemaEntityItem}`)
+      .eq(index)
+      .find(this._entityTriggerElement)
+      .click();
+    this.IsTemplateMenuTriggerForSchemaTableVisible(index);
   }
 }

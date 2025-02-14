@@ -1,5 +1,5 @@
 import type { RenderModes } from "constants/WidgetConstants";
-import type { AdditionalAnvilProperties } from "layoutSystems/anvil/canvas/types";
+import type { AdditionalAnvilProperties } from "layoutSystems/anvil/viewer/canvas/types";
 import type { AdditionalAutoLayoutProperties } from "layoutSystems/autolayout/canvas/types";
 import type { AdditionalFixedLayoutProperties } from "layoutSystems/fixedlayout/canvas/types";
 import { map } from "lodash";
@@ -31,17 +31,23 @@ export function renderChildWidget({
   widgetId: string;
   renderMode: RenderModes;
   layoutSystemProps: LayoutSystemProps;
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   defaultWidgetProps: Record<string, any>;
   noPad: boolean;
-}): React.ReactNode {
+}): React.ReactNode | null {
+  if (!childWidgetData) return null;
+
   const childWidget = {
     ...defaultWidgetProps,
     ...childWidgetData,
     ...layoutSystemProps,
   };
-  if (!childWidgetData) return null;
+
   if (noPad) childWidget.noContainerOffset = true;
+
   childWidget.parentId = widgetId;
+
   return WidgetFactory.createWidget(childWidget, renderMode);
 }
 
@@ -77,5 +83,5 @@ export const renderChildren = (
       renderMode,
       widgetId,
     }),
-  );
+  ).filter(Boolean);
 };

@@ -3,17 +3,12 @@ import * as React from "react";
 import {
   Button,
   Text,
-  CheckboxGroup,
+  ToggleGroup,
   Checkbox,
-  TooltipRoot,
-  TooltipTrigger,
-  TooltipContent,
-  ButtonGroup,
+  ToolbarButtons,
   Flex,
-  SwitchGroup,
   Switch,
   RadioGroup,
-  Radio,
   IconButton,
   TextArea,
   Modal,
@@ -21,12 +16,13 @@ import {
   ModalBody,
   ModalFooter,
   ModalContent,
-} from "@design-system/widgets";
+  TextField,
+  ComboBox,
+  Radio,
+  ListBoxItem,
+  Tooltip,
+} from "@appsmith/wds";
 // This component is used only for testing purpose and is not used in the prod
-// eslint-disable-next-line @typescript-eslint/no-restricted-imports
-import EmotionHappyLineIcon from "remixicon-react/EmotionHappyLineIcon";
-// eslint-disable-next-line @typescript-eslint/no-restricted-imports
-import EmotionUnhappyLineIcon from "remixicon-react/EmotionUnhappyLineIcon";
 
 export const ComplexForm = () => {
   const fakeSubmit = async () => {
@@ -42,61 +38,166 @@ export const ComplexForm = () => {
   const submitRef = useRef(null);
 
   return (
-    <Flex direction="column" gap="spacing-6">
+    <Flex
+      direction="column"
+      gap="spacing-6"
+      style={{
+        background: "var(--color-bg-elevation-1)",
+        borderColor: "var(--color-bd-elevation-1)",
+        borderRadius: "var(--border-radius-elevation-1)",
+        borderStyle: "solid",
+        borderWidth: 1,
+        padding: "var(--outer-spacing-6)",
+      }}
+    >
       <Flex direction="column" gap="spacing-3">
-        <Text variant="heading">Your order</Text>
+        <Text size="heading">Your order</Text>
         <Text>Choose your favorite dishes and place an order.</Text>
       </Flex>
 
       <Flex direction="column" gap="spacing-5">
-        <ButtonGroup>
-          <Button>Fast food</Button>
-          <Button>Salads</Button>
-          <Button>Drinks</Button>
-          <Button>Sauces</Button>
-        </ButtonGroup>
+        <ToolbarButtons
+          items={[
+            { id: 1, label: "Fast food" },
+            { id: 2, label: "Salads" },
+            { id: 3, label: "Salads" },
+            { id: 4, label: "Sauces" },
+          ]}
+        />
 
-        <SwitchGroup label="Repeat order">
-          <Switch value="value-1">Once a week</Switch>
-          <Switch isSelected value="value-2">
-            Twice a week
-          </Switch>
-        </SwitchGroup>
+        <ToggleGroup label="Repeat order">
+          {[
+            {
+              value: "Once a week",
+              label: "Once a week",
+            },
+            {
+              value: "Twice a week",
+              label: "Twice a week",
+            },
+          ].map(({ label, value }) => (
+            <Switch key={value} value={value}>
+              {label}
+            </Switch>
+          ))}
+        </ToggleGroup>
 
-        <CheckboxGroup label="Dishes">
-          <Checkbox value="Hamburger">Hamburger</Checkbox>
-          <Checkbox value="French fries">French fries</Checkbox>
-          <Checkbox value="Coca-Cola">Coca-Cola</Checkbox>
-        </CheckboxGroup>
+        <ToggleGroup label="Dishes">
+          {[
+            {
+              value: "Hamburger",
+              label: "Hamburger",
+            },
+            {
+              value: "French fries",
+              label: "French fries",
+            },
+            {
+              value: "Coca-Cola",
+              label: "Coca-Cola",
+            },
+          ].map(({ label, value }) => (
+            <Checkbox key={value} value={value}>
+              {label}
+            </Checkbox>
+          ))}
+        </ToggleGroup>
 
         <RadioGroup label="Portion size">
-          <Radio value="s">S</Radio>
-          <Radio value="M">M</Radio>
-          <Radio value="L">L</Radio>
-          <Radio value="XL">XL</Radio>
+          {[
+            {
+              value: "s",
+              label: "S",
+            },
+            {
+              value: "m",
+              label: "M",
+            },
+            {
+              value: "l",
+              label: "L",
+            },
+            {
+              value: "xl",
+              label: "XL",
+            },
+          ].map(({ label, value }) => (
+            <Radio key={value} value={value}>
+              {label}
+            </Radio>
+          ))}
         </RadioGroup>
 
         <Flex direction="column" gap="spacing-3">
           <Flex direction="column" gap="spacing-2">
             <Text isBold>Feedback is important to us</Text>
             <Flex>
-              <IconButton icon={EmotionHappyLineIcon} variant="ghost" />
-              <IconButton icon={EmotionUnhappyLineIcon} variant="ghost" />
+              <IconButton icon="star" variant="ghost" />
+              <IconButton icon="star" variant="ghost" />
             </Flex>
           </Flex>
           <TextArea label="Your comment" />
         </Flex>
+        <Flex gap="spacing-2">
+          <TextField />
+          <ComboBox>
+            {[
+              {
+                id: "s",
+                label: "S",
+              },
+              {
+                id: "m",
+                label: "M",
+              },
+              {
+                id: "l",
+                label: "L",
+              },
+              {
+                id: "xl",
+                label: "XL",
+              },
+            ].map(({ id, label }) => (
+              <ListBoxItem key={id} textValue={label}>
+                {label}
+              </ListBoxItem>
+            ))}
+          </ComboBox>
+          <Button>Ok</Button>
+        </Flex>
+        <Flex gap="spacing-2">
+          <TextField size="small" />
+          <ComboBox
+            items={[
+              {
+                id: "s",
+                label: "S",
+              },
+              {
+                id: "m",
+                label: "M",
+              },
+              {
+                id: "l",
+                label: "L",
+              },
+              {
+                id: "xl",
+                label: "XL",
+              },
+            ]}
+            size="small"
+          />
+          <Button size="small">Ok</Button>
+        </Flex>
       </Flex>
 
       <Flex gap="spacing-2">
-        <TooltipRoot>
-          <TooltipTrigger>
-            <Button variant="outlined">Cancel</Button>
-          </TooltipTrigger>
-          <TooltipContent>
-            If you cancel, you will lose your order
-          </TooltipContent>
-        </TooltipRoot>
+        <Tooltip tooltip="Tooltip">
+          <Button variant="outlined">Cancel</Button>
+        </Tooltip>
+
         <Button onPress={() => setModalOpen(!isModalOpen)} ref={submitRef}>
           Ok
         </Button>

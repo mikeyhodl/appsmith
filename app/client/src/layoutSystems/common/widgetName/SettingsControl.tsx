@@ -1,11 +1,11 @@
-import { Classes, Tooltip } from "@blueprintjs/core";
 import { Colors } from "constants/Colors";
 import type { CSSProperties } from "react";
 import React from "react";
 import { useSelector } from "react-redux";
 import { snipingModeSelector } from "selectors/editorSelectors";
 import styled from "styled-components";
-import { Icon } from "design-system";
+import { Icon, Text, Tooltip } from "@appsmith/ads";
+
 // I honestly can't think of a better name for this enum
 export enum Activities {
   HOVERING,
@@ -13,13 +13,7 @@ export enum Activities {
   ACTIVE,
   NONE,
 }
-const StyledTooltip = styled(Tooltip)<{
-  children?: React.ReactNode;
-}>`
-  .${Classes.POPOVER_TARGET} {
-    height: 100%;
-  }
-`;
+
 const WidgetNameBoundary = 1;
 const BORDER_RADIUS = 4;
 const SettingsWrapper = styled.div<{ widgetWidth: number; inverted: boolean }>`
@@ -60,11 +54,9 @@ const WidgetName = styled.span`
   white-space: nowrap;
 `;
 
-const StyledErrorIcon = styled(Icon)`
-  margin-right: ${(props) => props.theme.spaces[1]}px;
-`;
-
 interface SettingsControlProps {
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   toggleSettings: (e: any) => void;
   activity: Activities;
   name: string;
@@ -111,17 +103,17 @@ const getStyles = (
 
 export function SettingsControl(props: SettingsControlProps) {
   const isSnipingMode = useSelector(snipingModeSelector);
-  const errorIcon = <StyledErrorIcon name="warning" size="sm" />;
+  const errorIcon = <Icon name="warning" size="sm" />;
 
   return (
-    <StyledTooltip
+    <Tooltip
       content={
-        isSnipingMode
-          ? `Bind to widget ${props.name}`
-          : "Edit widget properties"
+        <Text color="var(--ads-v2-color-white)">
+          {isSnipingMode ? `Bind to widget ${props.name}` : `Edit widget`}
+        </Text>
       }
-      hoverOpenDelay={500}
-      position="top-right"
+      mouseEnterDelay={0}
+      placement="topRight"
     >
       <SettingsWrapper
         className="t--widget-propertypane-toggle"
@@ -143,7 +135,7 @@ export function SettingsControl(props: SettingsControlProps) {
           {isSnipingMode ? `Bind to ${props.name}` : props.name}
         </WidgetName>
       </SettingsWrapper>
-    </StyledTooltip>
+    </Tooltip>
   );
 }
 

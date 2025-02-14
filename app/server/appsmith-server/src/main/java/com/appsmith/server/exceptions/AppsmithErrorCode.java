@@ -16,8 +16,6 @@ public enum AppsmithErrorCode {
     PAGE_DOESNT_BELONG_TO_USER_WORKSPACE("AE-APP-4006", "Page doesn't belong to user workspace"),
     UNSUPPORTED_OPERATION("AE-APP-4007", "Unsupported operation"),
     DEPRECATED_API("AE-APP-4008", "Deprecated api"),
-    USER_DOESNT_BELONG_ANY_WORKSPACE("AE-APP-4009", "User doesn't belong any workspace"),
-    USER_DOESNT_BELONG_TO_WORKSPACE("AE-APP-4010", "User doesn't belong to workspace"),
     USER_NOT_ASSIGNED_TO_ROLE("AE-APP-4011", "User is not assigned to role"),
     INVALID_ACTION("AE-APP-4012", "Invalid action"),
     PAYLOAD_TOO_LARGE("AE-APP-4013", "Payload too large"),
@@ -47,7 +45,6 @@ public enum AppsmithErrorCode {
     PLUGIN_LOAD_FORM_JSON_FAIL("AE-APP-5004", "Plugin load form json fail"),
     PLUGIN_LOAD_TEMPLATES_FAIL("AE-APP-5005", "Plugin load templates fail"),
     OAUTH_NOT_AVAILABLE("AE-APP-5006", "Oauth not available"),
-    MARKETPLACE_NOT_CONFIGURED("AE-APP-5007", "Marketplace not configured"),
     FAIL_UPDATE_USER_IN_SESSION("AE-APP-5008", "Fail update user in session"),
     UNKNOWN_ACTION_RESULT_DATA_TYPE("AE-APP-5009", "Unknown action result data type"),
     AUTHENTICATION_FAILURE("AE-APP-5010", "Authentication failure"),
@@ -64,14 +61,15 @@ public enum AppsmithErrorCode {
     SERVER_NOT_READY("AE-APP-5024", "Appsmith server is not ready"),
     SESSION_BAD_STATE("AE-APP-5025", "Invalid user session"),
     PLUGIN_EXECUTION_TIMEOUT("AE-APP-5040", "Plugin execution timeout"),
-    MARKETPLACE_TIMEOUT("AE-APP-5041", "Marketplace timeout"),
     GOOGLE_RECAPTCHA_TIMEOUT("AE-APP-5042", "Google recaptcha timeout"),
     MIGRATION_FAILED("AE-APP-5043", "Migration failed"),
     INVALID_PROPERTIES_CONFIGURATION("AE-APP-5044", "Property configuration is wrong or malformed"),
     NAME_CLASH_NOT_ALLOWED_IN_REFACTOR("AE-AST-4009", "Name clash not allowed in refactor"),
     GENERIC_BAD_REQUEST("AE-BAD-4000", "Generic bad request"),
     MALFORMED_REQUEST("AE-BAD-4001", "Malformed request body"),
+    VERSION_MISMATCH("AE-BAD-4002", "Appsmith version mismatch"),
     GOOGLE_RECAPTCHA_FAILED("AE-CAP-4035", "Google recaptcha failed"),
+    GOOGLE_RECAPTCHA_INVITE_FLOW_FAILED("AE-CAP-4100", "Google recaptcha failed"),
     INVALID_CRUD_PAGE_REQUEST("AE-CRD-4039", "Invalid crud page request"),
     EMPTY_CURL_INPUT_STATEMENT("AE-CRL-4054", "Invalid CURL input statement"),
     INVALID_CURL_COMMAND("AE-CRL-4029", "Invalid curl command"),
@@ -117,7 +115,6 @@ public enum AppsmithErrorCode {
     TOO_MANY_REQUESTS("AE-TMR-4029", "Too many requests"),
     TOO_MANY_FAILED_DATASOURCE_CONNECTION_REQUESTS("AE-TMR-4030", "Too many failed datasource connectoin requests"),
     USER_NOT_FOUND("AE-USR-4004", "User not found"),
-    CSRF_TOKEN_INVALID("AE-APP-4039", "CSRF token missing/invalid"),
     UNSUPPORTED_IMPORT_OPERATION("AE-APP-4040", "Unsupported operation for import application via file"),
     DUPLICATE_DATASOURCE_CONFIGURATION("AE-APP-4093", "Duplicate datasource configuration"),
 
@@ -133,7 +130,10 @@ public enum AppsmithErrorCode {
     INVALID_METHOD_LEVEL_ANNOTATION_USAGE("AE-APP-4094", "Invalid usage for custom annotation"),
     FEATURE_FLAG_MIGRATION_FAILURE("AE-APP-5045", "Feature flag based migration error"),
     DATASOURCE_CONNECTION_RATE_LIMIT_BLOCKING_FAILED(
-            "AE-TMR-4031", "Rate limit exhausted, blocking the host name failed");
+            "AE-TMR-4031", "Rate limit exhausted, blocking the host name failed"),
+    TRIGGER_PARAMETERS_EMPTY("AE-DS-4001", "Trigger parameters empty."),
+    INSUFFICIENT_PASSWORD_STRENGTH("AE-PSW-4002", "Insufficient password strength"),
+    ;
     private final String code;
     private final String description;
 

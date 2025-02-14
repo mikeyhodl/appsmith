@@ -2,51 +2,51 @@ import React, { memo, useCallback } from "react";
 import Entity, { EntityClassNames } from "../Entity";
 import history, { NavigationMethod } from "utils/history";
 import JSCollectionEntityContextMenu from "./JSActionContextMenu";
-import { saveJSObjectName } from "actions/jsActionActions";
 import { useSelector } from "react-redux";
-import { getJSCollection } from "@appsmith/selectors/entitiesSelector";
-import type { AppState } from "@appsmith/reducers";
+import { getJsCollectionByBaseId } from "ee/selectors/entitiesSelector";
+import type { AppState } from "ee/reducers";
 import type { JSCollection } from "entities/JSCollection";
 import { JsFileIconV2 } from "../ExplorerIcons";
-import type { PluginType } from "entities/Action";
-import { jsCollectionIdURL } from "@appsmith/RouteBuilder";
-import AnalyticsUtil from "utils/AnalyticsUtil";
+import { jsCollectionIdURL } from "ee/RouteBuilder";
+import AnalyticsUtil from "ee/utils/AnalyticsUtil";
 import { useLocation } from "react-router";
 import {
   getHasDeleteActionPermission,
   getHasManageActionPermission,
-} from "@appsmith/utils/BusinessFeatures/permissionPageHelpers";
+} from "ee/utils/BusinessFeatures/permissionPageHelpers";
 import { useFeatureFlag } from "utils/hooks/useFeatureFlag";
-import { FEATURE_FLAG } from "@appsmith/entities/FeatureFlag";
-import { Icon } from "design-system";
+import { FEATURE_FLAG } from "ee/entities/FeatureFlag";
+import { saveJSObjectNameBasedOnIdeType } from "ee/actions/helpers";
+import { convertToBaseParentEntityIdSelector } from "selectors/pageListSelectors";
+import { getIDETypeByUrl } from "ee/entities/IDE/utils";
 
 interface ExplorerJSCollectionEntityProps {
   step: number;
   searchKeyword?: string;
-  id: string;
+  baseCollectionId: string;
   isActive: boolean;
-  type: PluginType;
   parentEntityId: string;
 }
-
-const getUpdateJSObjectName = (id: string, name: string) => {
-  return saveJSObjectName({ id, name });
-};
 
 export const ExplorerJSCollectionEntity = memo(
   (props: ExplorerJSCollectionEntityProps) => {
     const jsAction = useSelector((state: AppState) =>
-      getJSCollection(state, props.id),
+      getJsCollectionByBaseId(state, props.baseCollectionId),
     ) as JSCollection;
     const location = useLocation();
     const { parentEntityId } = props;
+    const baseParentEntityId = useSelector((state) =>
+      convertToBaseParentEntityIdSelector(state, parentEntityId),
+    );
+    const ideType = getIDETypeByUrl(location.pathname);
+
     const navigateToUrl = jsCollectionIdURL({
-      parentEntityId,
-      collectionId: jsAction.id,
+      baseParentEntityId,
+      baseCollectionId: jsAction.baseId,
       params: {},
     });
     const navigateToJSCollection = useCallback(() => {
-      if (jsAction.id) {
+      if (jsAction.baseId) {
         AnalyticsUtil.logEvent("ENTITY_EXPLORER_CLICK", {
           type: "JSOBJECT",
           fromUrl: location.pathname,
@@ -57,7 +57,7 @@ export const ExplorerJSCollectionEntity = memo(
           invokedBy: NavigationMethod.EntityExplorer,
         });
       }
-    }, [parentEntityId, jsAction.id, jsAction.name, location.pathname]);
+    }, [baseParentEntityId, jsAction.baseId, jsAction.name, location.pathname]);
 
     const jsActionPermissions = jsAction.userPermissions || [];
 
@@ -78,27 +78,30 @@ export const ExplorerJSCollectionEntity = memo(
         canDelete={canDeleteJSAction}
         canManage={canManageJSAction}
         className={EntityClassNames.CONTEXT_MENU}
+        hideMenuItems={Boolean(jsAction?.isMainJSCollection)}
         id={jsAction.id}
         name={jsAction.name}
-        showMenuItems={jsAction?.isMainJSCollection || false}
       />
     );
+
     return (
       <Entity
         action={navigateToJSCollection}
         active={props.isActive}
-        alwaysShowRightIcon={!!jsAction.isMainJSCollection}
-        canEditEntityName={canManageJSAction}
+        canEditEntityName={
+          canManageJSAction && !Boolean(jsAction?.isMainJSCollection)
+        }
         className="t--jsaction"
         contextMenu={contextMenu}
         entityId={jsAction.id}
         icon={JsFileIconV2(16, 16)}
         key={jsAction.id}
-        name={jsAction.name}
-        rightIcon={!!jsAction.isMainJSCollection && <Icon name="pin-3" />}
+        name={jsAction?.displayName || jsAction.name}
         searchKeyword={props.searchKeyword}
         step={props.step}
-        updateEntityName={getUpdateJSObjectName}
+        updateEntityName={(id, name) =>
+          saveJSObjectNameBasedOnIdeType(id, name, ideType)
+        }
       />
     );
   },

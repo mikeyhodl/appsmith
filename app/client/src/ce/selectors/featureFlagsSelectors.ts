@@ -1,17 +1,30 @@
-import type { AppState } from "@appsmith/reducers";
-import type { FeatureFlag } from "@appsmith/entities/FeatureFlag";
+import type { AppState } from "ee/reducers";
+import type { FeatureFlag, FeatureFlags } from "ee/entities/FeatureFlag";
+import memoize from "micro-memoize";
+import type { OverriddenFeatureFlags } from "utils/hooks/useFeatureFlagOverride";
 
-export const selectFeatureFlags = (state: AppState) =>
-  state.ui.users.featureFlag.data;
+const combineFeatureFlags = memoize(
+  (featureFlags: FeatureFlags, overriddenFlags: OverriddenFeatureFlags) => {
+    return { ...featureFlags, ...overriddenFlags };
+  },
+);
 
-// React hooks should not be placed in a selectors file.
+export const selectFeatureFlags = (state: AppState) => {
+  return combineFeatureFlags(
+    state.ui.users.featureFlag.data,
+    state.ui.users.featureFlag.overriddenFlags,
+  );
+};
+
 export const selectFeatureFlagCheck = (
   state: AppState,
   flagName: FeatureFlag,
 ): boolean => {
   const flagValues = selectFeatureFlags(state);
+
   if (flagName in flagValues) {
     return flagValues[flagName];
   }
+
   return false;
 };

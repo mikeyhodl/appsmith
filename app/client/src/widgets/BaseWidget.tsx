@@ -16,15 +16,15 @@ import type {
   WidgetType,
 } from "constants/WidgetConstants";
 import { RenderModes } from "constants/WidgetConstants";
-import { ENTITY_TYPE } from "entities/AppsmithConsole";
+import { ENTITY_TYPE } from "ee/entities/AppsmithConsole/utils";
 import type { SetterConfig, Stylesheet } from "entities/AppTheming";
-import type { Context, ReactNode, RefObject } from "react";
+import type { Context, ReactNode, RefObject, SVGProps } from "react";
 import { Component } from "react";
 import type {
   ModifyMetaWidgetPayload,
   UpdateMetaWidgetPropertyPayload,
 } from "reducers/entityReducers/metaWidgetsReducer";
-import type { SelectionRequestType } from "sagas/WidgetSelectUtils";
+import { SelectionRequestType } from "sagas/WidgetSelectUtils";
 import shallowequal from "shallowequal";
 import AppsmithConsole from "utils/AppsmithConsole";
 import type {
@@ -41,18 +41,25 @@ import type {
   WidgetDefaultProps,
   WidgetMethods,
 } from "../WidgetProvider/constants";
-import type { WidgetEntity } from "@appsmith/entities/DataTree/types";
+import type { WidgetEntity } from "ee/entities/DataTree/types";
 import type { AutocompletionDefinitions } from "../WidgetProvider/constants";
 import type {
   FlexVerticalAlignment,
   LayoutDirection,
   ResponsiveBehavior,
 } from "layoutSystems/common/utils/constants";
-import type { FeatureFlag } from "@appsmith/entities/FeatureFlag";
+import type { FeatureFlag } from "ee/entities/FeatureFlag";
 import store from "store";
-import { selectFeatureFlags } from "@appsmith/selectors/featureFlagsSelectors";
+import { selectFeatureFlags } from "ee/selectors/featureFlagsSelectors";
 import type { WidgetFeatures } from "utils/WidgetFeatures";
 import { LayoutSystemTypes } from "layoutSystems/types";
+import type { CanvasWidgetsReduxState } from "reducers/entityReducers/canvasWidgetsReducer";
+import type {
+  CopiedWidgetData,
+  PasteDestinationInfo,
+  PastePayload,
+} from "layoutSystems/anvil/utils/paste/types";
+import { type CallEffect, call } from "redux-saga/effects";
 
 /***
  * BaseWidget
@@ -126,6 +133,8 @@ abstract class BaseWidget<
     return {};
   }
 
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   static getDefaultPropertiesMap(): Record<string, any> {
     return {};
   }
@@ -135,6 +144,8 @@ abstract class BaseWidget<
   }
 
   // TODO Find a way to enforce this, (dont let it be set)
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   static getMetaPropertiesMap(): Record<string, any> {
     return {};
   }
@@ -145,6 +156,33 @@ abstract class BaseWidget<
 
   static getAutocompleteDefinitions(): AutocompletionDefinitions {
     return {};
+  }
+
+  /* eslint-disable @typescript-eslint/no-unused-vars */
+  static pasteOperationChecks(
+    allWidgets: CanvasWidgetsReduxState, // All widgets
+    oldWidget: FlattenedWidgetProps, // Original copied widget
+    newWidget: FlattenedWidgetProps, // Newly generated widget
+    widgetIdMap: Record<string, string>, // Map of oldWidgetId -> newWidgetId
+  ): FlattenedWidgetProps | null {
+    return null;
+  }
+
+  /* eslint-disable @typescript-eslint/no-unused-vars */
+  static *performPasteOperation(
+    allWidgets: CanvasWidgetsReduxState, // All widgets
+    copiedWidgets: CopiedWidgetData[], // Original copied widgets
+    destinationInfo: PasteDestinationInfo, // Destination info of copied widgets
+    widgetIdMap: Record<string, string>, // Map of oldWidgetId -> newWidgetId
+    reverseWidgetIdMap: Record<string, string>, // Map of newWidgetId -> oldWidgetId
+    // TODO: Fix this the next time the file is edited
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ): Generator<CallEffect<PastePayload>, PastePayload, any> {
+    const res: PastePayload = yield call(function* () {
+      return { widgets: allWidgets, widgetIdMap, reverseWidgetIdMap };
+    });
+
+    return res;
   }
 
   /**
@@ -167,6 +205,7 @@ abstract class BaseWidget<
    */
   executeAction(actionPayload: ExecuteTriggerPayload): void {
     const { executeAction } = this.context;
+
     executeAction &&
       executeAction({
         ...actionPayload,
@@ -178,7 +217,7 @@ abstract class BaseWidget<
 
     actionPayload.triggerPropertyName &&
       AppsmithConsole.info({
-        text: `${actionPayload.triggerPropertyName} triggered`,
+        text: `Event ${actionPayload.triggerPropertyName} fired`,
         source: {
           type: ENTITY_TYPE.WIDGET,
           id: this.props.widgetId,
@@ -189,21 +228,26 @@ abstract class BaseWidget<
 
   disableDrag(disable: boolean) {
     const { disableDrag } = this.context;
+
     disableDrag && disable !== undefined && disableDrag(disable);
   }
 
   updateWidget(
     operationName: string,
     widgetId: string,
+    // TODO: Fix this the next time the file is edited
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     widgetProperties: any,
   ): void {
     const { updateWidget } = this.context;
+
     updateWidget && updateWidget(operationName, widgetId, widgetProperties);
   }
 
   deleteWidgetProperty(propertyPaths: string[]): void {
     const { deleteWidgetProperty } = this.context;
     const { widgetId } = this.props;
+
     if (deleteWidgetProperty && widgetId) {
       deleteWidgetProperty(widgetId, propertyPaths);
     }
@@ -215,11 +259,14 @@ abstract class BaseWidget<
   ): void {
     const { batchUpdateWidgetProperty } = this.context;
     const { widgetId } = this.props;
+
     if (batchUpdateWidgetProperty && widgetId) {
       batchUpdateWidgetProperty(widgetId, updates, shouldReplay);
     }
   }
 
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   updateWidgetProperty(propertyName: string, propertyValue: any): void {
     this.batchUpdateWidgetProperty({
       modify: { [propertyName]: propertyValue },
@@ -228,6 +275,7 @@ abstract class BaseWidget<
 
   resetChildrenMetaProperty(widgetId: string) {
     const { resetChildrenMetaProperty } = this.context;
+
     if (resetChildrenMetaProperty) resetChildrenMetaProperty(widgetId);
   }
 
@@ -236,8 +284,17 @@ abstract class BaseWidget<
     payload?: string[],
   ) => {
     const { selectWidgetRequest } = this.context;
+
     if (selectWidgetRequest) {
       selectWidgetRequest(selectionRequestType, payload);
+    }
+  };
+
+  unfocusWidget = () => {
+    const { unfocusWidget } = this.context;
+
+    if (unfocusWidget) {
+      unfocusWidget();
     }
   };
 
@@ -332,6 +389,10 @@ abstract class BaseWidget<
 
   updateOneClickBindingOptionsVisibility(visibility: boolean) {
     const { updateOneClickBindingOptionsVisibility } = this.context;
+
+    if (visibility) {
+      this.selectWidgetRequest(SelectionRequestType.One, [this.props.widgetId]);
+    }
 
     updateOneClickBindingOptionsVisibility?.(visibility);
   }
@@ -464,16 +525,22 @@ export interface WidgetPositionProps extends WidgetRowCols {
   width?: number;
 }
 
+export interface WidgetCanvasProps {
+  isWidgetSelected?: boolean;
+}
+
 export const WIDGET_DISPLAY_PROPS = {
   isVisible: true,
   isLoading: true,
   isDisabled: true,
   backgroundColor: true,
 };
+
 export interface WidgetError extends Error {
   type: "property" | "configuration" | "other";
   path?: string;
 }
+
 export interface WidgetErrorProps {
   errors?: WidgetError[];
 }
@@ -495,7 +562,8 @@ export interface WidgetDataProps
   extends WidgetBaseProps,
     WidgetErrorProps,
     WidgetPositionProps,
-    WidgetDisplayProps {}
+    WidgetDisplayProps,
+    WidgetCanvasProps {}
 
 export interface WidgetProps
   extends WidgetDataProps,
@@ -504,6 +572,8 @@ export interface WidgetProps
   key?: string;
   isDefaultClickDisabled?: boolean;
 
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   [key: string]: any;
 }
 
@@ -513,9 +583,14 @@ export interface WidgetCardProps {
   type: WidgetType;
   key?: string;
   displayName: string;
+  displayOrder?: number;
   icon: string;
+  thumbnail?: string;
   isBeta?: boolean;
   tags?: WidgetTags[];
+  isSearchWildcard?: boolean;
+  IconCmp?: (props: SVGProps<SVGSVGElement>) => JSX.Element;
+  ThumbnailCmp?: (props: SVGProps<SVGSVGElement>) => JSX.Element;
 }
 
 export const WidgetOperations = {

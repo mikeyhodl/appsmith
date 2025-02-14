@@ -85,6 +85,7 @@ public class GraphQLPlugin extends BasePlugin {
                 DatasourceConfiguration datasourceConfiguration,
                 ActionConfiguration actionConfiguration) {
 
+            log.debug(Thread.currentThread().getName() + ": executeParameterized() called for GraphQL plugin.");
             final List<Property> properties = actionConfiguration.getPluginSpecifiedTemplates();
             List<Map.Entry<String, String>> parameters = new ArrayList<>();
 
@@ -161,6 +162,7 @@ public class GraphQLPlugin extends BasePlugin {
                 ActionConfiguration actionConfiguration,
                 List<Map.Entry<String, String>> insertedParams) {
 
+            log.debug(Thread.currentThread().getName() + ": executeCommon() called for GraphQL plugin.");
             // Initializing object for error condition
             ActionExecutionResult errorResult = new ActionExecutionResult();
             initUtils.initializeResponseWithError(errorResult);
@@ -281,11 +283,12 @@ public class GraphQLPlugin extends BasePlugin {
                             objectMapper,
                             hintMessages,
                             errorResult,
-                            requestCaptureFilter)
+                            requestCaptureFilter,
+                            datasourceConfiguration)
                     .onErrorResume(error -> {
                         boolean isBodySentWithApiRequest = requestBodyObj == null ? false : true;
                         errorResult.setRequest(requestCaptureFilter.populateRequestFields(
-                                actionExecutionRequest, isBodySentWithApiRequest));
+                                actionExecutionRequest, isBodySentWithApiRequest, datasourceConfiguration));
                         errorResult.setIsExecutionSuccess(false);
                         if (!(error instanceof AppsmithPluginException)) {
                             error = new AppsmithPluginException(

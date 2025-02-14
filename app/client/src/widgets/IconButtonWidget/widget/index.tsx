@@ -19,6 +19,7 @@ import type {
 import { ICON_BUTTON_MIN_WIDTH } from "constants/minWidthConstants";
 import { ResponsiveBehavior } from "layoutSystems/common/utils/constants";
 import IconSVG from "../icon.svg";
+import ThumbnailSVG from "../thumbnail.svg";
 
 import { WIDGET_TAGS } from "constants/WidgetConstants";
 
@@ -27,6 +28,7 @@ const ICON_BUTTON_SIZE_IN_AUTOLAYOUT = 32;
 const ICON_NAMES = Object.keys(IconNames).map(
   (name: string) => IconNames[name as keyof typeof IconNames],
 );
+
 export interface IconButtonWidgetProps extends WidgetProps {
   iconName?: IconName;
   backgroundColor: string;
@@ -46,6 +48,7 @@ class IconButtonWidget extends BaseWidget<IconButtonWidgetProps, WidgetState> {
     return {
       name: "Icon button",
       iconSVG: IconSVG,
+      thumbnailSVG: ThumbnailSVG,
       tags: [WIDGET_TAGS.BUTTONS],
       searchTags: ["click", "submit"],
     };

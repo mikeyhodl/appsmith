@@ -81,10 +81,10 @@ const IconButtonContainer = styled.div<IconButtonContainerProps>`
         getCustomHoverColor(theme, buttonVariant, buttonColor) !== "none"
           ? getCustomHoverColor(theme, buttonVariant, buttonColor)
           : buttonVariant === ButtonVariantTypes.SECONDARY
-          ? theme.colors.button.primary.secondary.hoverColor
-          : buttonVariant === ButtonVariantTypes.TERTIARY
-          ? theme.colors.button.primary.tertiary.hoverColor
-          : theme.colors.button.primary.primary.hoverColor
+            ? theme.colors.button.primary.secondary.hoverColor
+            : buttonVariant === ButtonVariantTypes.TERTIARY
+              ? theme.colors.button.primary.tertiary.hoverColor
+              : theme.colors.button.primary.primary.hoverColor
       } !important;
     }`
       : ""
@@ -116,6 +116,11 @@ export const StyledButton = styled((props) => (
       "dimension",
       "hasOnClickAction",
       "compactMode",
+      "buttonColor",
+      "primaryColor",
+      "navColorStyle",
+      "isMinimal",
+      "insideSidebar",
     ])}
   />
 ))<ThemeProp & ButtonStyleProps>`
@@ -144,8 +149,8 @@ export const StyledButton = styled((props) => (
         getCustomBackgroundColor(buttonVariant, buttonColor) !== "none"
           ? getCustomBackgroundColor(buttonVariant, buttonColor)
           : buttonVariant === ButtonVariantTypes.PRIMARY
-          ? theme.colors.button.primary.primary.bgColor
-          : "none"
+            ? theme.colors.button.primary.primary.bgColor
+            : "none"
       } !important;
     }
 
@@ -156,10 +161,10 @@ export const StyledButton = styled((props) => (
           getCustomHoverColor(theme, buttonVariant, buttonColor) !== "none"
             ? getCustomHoverColor(theme, buttonVariant, buttonColor)
             : buttonVariant === ButtonVariantTypes.SECONDARY
-            ? theme.colors.button.primary.secondary.hoverColor
-            : buttonVariant === ButtonVariantTypes.TERTIARY
-            ? theme.colors.button.primary.tertiary.hoverColor
-            : theme.colors.button.primary.primary.hoverColor
+              ? theme.colors.button.primary.secondary.hoverColor
+              : buttonVariant === ButtonVariantTypes.TERTIARY
+                ? theme.colors.button.primary.tertiary.hoverColor
+                : theme.colors.button.primary.primary.hoverColor
         } !important;
       }`
         : ""
@@ -197,8 +202,8 @@ export const StyledButton = styled((props) => (
       getCustomBorderColor(buttonVariant, buttonColor) !== "none"
         ? `1px solid ${getCustomBorderColor(buttonVariant, buttonColor)}`
         : buttonVariant === ButtonVariantTypes.SECONDARY
-        ? `1px solid ${theme.colors.button.primary.secondary.borderColor}`
-        : "none"
+          ? `1px solid ${theme.colors.button.primary.secondary.borderColor}`
+          : "none"
     } !important;
 
     & > span {
@@ -212,11 +217,11 @@ export const StyledButton = styled((props) => (
         buttonVariant === ButtonVariantTypes.PRIMARY
           ? getComplementaryGrayscaleColor(buttonColor)
           : getCustomBackgroundColor(
-              ButtonVariantTypes.PRIMARY,
-              buttonColor,
-            ) !== "none"
-          ? getCustomBackgroundColor(ButtonVariantTypes.PRIMARY, buttonColor)
-          : `${theme.colors.button.primary.secondary.textColor}`
+                ButtonVariantTypes.PRIMARY,
+                buttonColor,
+              ) !== "none"
+            ? getCustomBackgroundColor(ButtonVariantTypes.PRIMARY, buttonColor)
+            : `${theme.colors.button.primary.secondary.textColor}`
       } !important;
     }
 

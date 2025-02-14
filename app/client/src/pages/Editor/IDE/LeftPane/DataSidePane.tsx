@@ -1,130 +1,146 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import styled from "styled-components";
-import { List, Text } from "design-system";
+import { EntityGroupsList, Flex } from "@appsmith/ads";
 import { useSelector } from "react-redux";
 import {
-  getActions,
   getDatasources,
+  getDatasourcesGroupedByPluginCategory,
   getPlugins,
-} from "@appsmith/selectors/entitiesSelector";
+} from "ee/selectors/entitiesSelector";
 import history from "utils/history";
-import { datasourcesEditorIdURL } from "@appsmith/RouteBuilder";
-import { getSelectedDatasourceId } from "../../../../navigation/FocusSelectors";
-import { countBy, groupBy, keyBy } from "lodash";
-import { PluginType } from "entities/Action";
+import { datasourcesEditorIdURL, integrationEditorURL } from "ee/RouteBuilder";
+import { getSelectedDatasourceId } from "ee/navigation/FocusSelectors";
+import { get, keyBy } from "lodash";
 import CreateDatasourcePopover from "./CreateDatasourcePopover";
 import { useLocation } from "react-router";
 import {
   createMessage,
   DATA_PANE_TITLE,
-  DATASOURCE_BLANK_STATE_MESSAGE,
-  DATASOURCE_LIST_BLANK_TITLE,
-} from "@appsmith/constants/messages";
+  DATASOURCE_BLANK_STATE_CTA,
+  DATASOURCE_LIST_BLANK_DESCRIPTION,
+} from "ee/constants/messages";
 import PaneHeader from "./PaneHeader";
-import { useEditorType } from "@appsmith/hooks";
-
-const PaneContainer = styled.div`
-  width: 300px;
-`;
+import { INTEGRATION_TABS } from "constants/routes";
+import type { AppState } from "ee/reducers";
+import { getCurrentAppWorkspace } from "ee/selectors/selectedWorkspaceSelectors";
+import { useFeatureFlag } from "utils/hooks/useFeatureFlag";
+import { FEATURE_FLAG } from "ee/entities/FeatureFlag";
+import { getHasCreateDatasourcePermission } from "ee/utils/BusinessFeatures/permissionPageHelpers";
+import { EmptyState } from "@appsmith/ads";
+import { getAssetUrl } from "ee/utils/airgapHelpers";
+import { getCurrentBasePageId } from "selectors/editorSelectors";
 
 const PaneBody = styled.div`
-  padding: 12px;
+  padding: var(--ads-v2-spaces-3) 0;
   height: calc(100vh - 120px);
-  overflow-y: scroll;
-`;
-
-const SubListContainer = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-`;
-
-const EmptyStateContainer = styled.div`
-  display: flex;
-  align-items: flex-start;
-  flex-direction: column;
-  max-width: 300px;
+  overflow-y: auto;
 `;
 
 const DatasourceIcon = styled.img`
   height: 16px;
   width: 16px;
-  align-self: flex-start;
 `;
 
-const DataSidePane = () => {
-  const editorType = useEditorType(history.location.pathname);
+interface DataSidePaneProps {
+  dsUsageMap: Record<string, string>;
+}
+
+const DataSidePane = (props: DataSidePaneProps) => {
+  const { dsUsageMap } = props;
+  const basePageId = useSelector(getCurrentBasePageId) as string;
   const [currentSelectedDatasource, setCurrentSelectedDatasource] = useState<
     string | undefined
   >("");
   const datasources = useSelector(getDatasources);
+  const groupedDatasources = useSelector(getDatasourcesGroupedByPluginCategory);
   const plugins = useSelector(getPlugins);
   const groupedPlugins = keyBy(plugins, "id");
-  const actions = useSelector(getActions);
-  const actionCount = countBy(actions, "config.datasource.id");
-  const groupedDatasources = groupBy(datasources, (d) => {
-    const plugin = groupedPlugins[d.pluginId];
-    if (
-      plugin.type === PluginType.SAAS ||
-      plugin.type === PluginType.REMOTE ||
-      plugin.type === PluginType.AI
-    ) {
-      return "Integrations";
-    }
-    if (plugin.type === PluginType.DB) return "Databases";
-    if (plugin.type === PluginType.API) return "APIs";
-    return "Others";
-  });
+  const location = useLocation();
   const goToDatasource = useCallback((id: string) => {
     history.push(datasourcesEditorIdURL({ datasourceId: id }));
   }, []);
 
-  const location = useLocation();
   useEffect(() => {
     setCurrentSelectedDatasource(getSelectedDatasourceId(location.pathname));
   }, [location]);
 
+  const userWorkspacePermissions = useSelector(
+    (state: AppState) => getCurrentAppWorkspace(state).userPermissions ?? [],
+  );
+
+  const isFeatureEnabled = useFeatureFlag(FEATURE_FLAG.license_gac_enabled);
+
+  const canCreateDatasource = getHasCreateDatasourcePermission(
+    isFeatureEnabled,
+    userWorkspacePermissions,
+  );
+
+  const addButtonClickHandler = useCallback(() => {
+    history.push(
+      integrationEditorURL({
+        basePageId,
+        selectedTab: INTEGRATION_TABS.NEW,
+      }),
+    );
+  }, [basePageId]);
+
+  const blankStateButtonProps = useMemo(
+    () => ({
+      className: "t--add-datasource-button-blank-screen",
+      testId: "t--add-datasource-button-blank-screen",
+      text: createMessage(DATASOURCE_BLANK_STATE_CTA),
+      onClick: canCreateDatasource ? addButtonClickHandler : undefined,
+    }),
+    [addButtonClickHandler, canCreateDatasource],
+  );
+
   return (
-    <PaneContainer>
+    <Flex flexDirection="column" height="100%" width="100%">
       <PaneHeader
-        rightIcon={<CreateDatasourcePopover />}
+        rightIcon={
+          canCreateDatasource && datasources.length !== 0 ? (
+            <CreateDatasourcePopover />
+          ) : undefined
+        }
         title={createMessage(DATA_PANE_TITLE)}
       />
       <PaneBody>
         {datasources.length === 0 ? (
-          <EmptyStateContainer>
-            <Text kind="heading-xs">
-              {createMessage(DATASOURCE_LIST_BLANK_TITLE)}
-            </Text>
-            <Text kind="body-s">
-              {createMessage(DATASOURCE_BLANK_STATE_MESSAGE)}
-            </Text>
-          </EmptyStateContainer>
+          <EmptyState
+            button={blankStateButtonProps}
+            description={createMessage(DATASOURCE_LIST_BLANK_DESCRIPTION)}
+            icon={"datasource-v3"}
+          />
         ) : null}
-        {Object.entries(groupedDatasources).map(([key, value]) => (
-          <SubListContainer key={key}>
-            <Text kind="heading-xs">{key}</Text>
-            <List
-              items={value.map((data) => ({
-                className: "t--datasource",
-                title: data.name,
-                onClick: () => goToDatasource(data.id),
-                description: `${
-                  actionCount[data.id] || "No"
-                } queries in this ${editorType}`,
-                descriptionType: "block",
-                isSelected: currentSelectedDatasource === data.id,
-                startIcon: (
-                  <DatasourceIcon
-                    src={groupedPlugins[data.pluginId].iconLocation}
-                  />
-                ),
-              }))}
-            />
-          </SubListContainer>
-        ))}
+        <EntityGroupsList
+          flexProps={{ px: "spaces-3" }}
+          groups={Object.entries(groupedDatasources).map(([key, value]) => {
+            return {
+              groupTitle: key,
+              items: value.map((data) => {
+                return {
+                  id: data.id,
+                  title: data.name,
+                  startIcon: (
+                    <DatasourceIcon
+                      src={getAssetUrl(
+                        groupedPlugins[data.pluginId].iconLocation,
+                      )}
+                    />
+                  ),
+                  description: get(dsUsageMap, data.id, ""),
+                  descriptionType: "block",
+                  className: "t--datasource",
+                  isSelected: currentSelectedDatasource === data.id,
+                  onClick: () => goToDatasource(data.id),
+                };
+              }),
+              className: "",
+            };
+          })}
+        />
       </PaneBody>
-    </PaneContainer>
+    </Flex>
   );
 };
 

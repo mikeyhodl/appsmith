@@ -1,11 +1,8 @@
-import type {
-  EvaluationReduxAction,
-  ReduxAction,
-} from "@appsmith/constants/ReduxActionConstants";
+import type { ReduxAction } from "actions/ReduxActionTypes";
 import {
   ReduxActionErrorTypes,
   ReduxActionTypes,
-} from "@appsmith/constants/ReduxActionConstants";
+} from "ee/constants/ReduxActionConstants";
 import { put, select, call } from "redux-saga/effects";
 import {
   updateActionData,
@@ -13,6 +10,8 @@ import {
 } from "actions/pluginActionActions";
 import type { JSAction, JSCollection } from "entities/JSCollection";
 import {
+  closeJSActionTab,
+  closeJsActionTabSuccess,
   copyJSCollectionError,
   copyJSCollectionSuccess,
   createJSCollectionSuccess,
@@ -25,12 +24,16 @@ import {
 } from "actions/jsActionActions";
 import {
   getJSCollection,
+  getNewEntityName,
   getPageNameByPageId,
-} from "@appsmith/selectors/entitiesSelector";
+} from "ee/selectors/entitiesSelector";
 import history from "utils/history";
-import { getCurrentPageId } from "selectors/editorSelectors";
-import type { JSCollectionCreateUpdateResponse } from "@appsmith/api/JSActionAPI";
-import JSActionAPI from "@appsmith/api/JSActionAPI";
+import {
+  getCurrentBasePageId,
+  getCurrentPageId,
+} from "selectors/editorSelectors";
+import type { JSCollectionCreateUpdateResponse } from "ee/api/JSActionAPI";
+import JSActionAPI from "ee/api/JSActionAPI";
 import {
   createMessage,
   ERROR_JS_ACTION_COPY_FAIL,
@@ -39,38 +42,54 @@ import {
   JS_ACTION_COPY_SUCCESS,
   JS_ACTION_DELETE_SUCCESS,
   JS_ACTION_MOVE_SUCCESS,
-} from "@appsmith/constants/messages";
-import { validateResponse } from "../../sagas/ErrorSagas";
+} from "ee/constants/messages";
+import { validateResponse } from "sagas/ErrorSagas";
 import type {
   FetchPageRequest,
   FetchPageResponse,
   PageLayout,
 } from "api/PageApi";
 import PageApi from "api/PageApi";
-import { updateCanvasWithDSL } from "@appsmith/sagas/PageSagas";
-import type { JSCollectionData } from "@appsmith/reducers/entityReducers/jsActionsReducer";
+import { updateCanvasWithDSL } from "ee/sagas/PageSagas";
+import type { JSCollectionData } from "ee/reducers/entityReducers/jsActionsReducer";
 import type { ApiResponse } from "api/ApiResponses";
 import AppsmithConsole from "utils/AppsmithConsole";
-import { ENTITY_TYPE } from "entities/AppsmithConsole";
+import { ENTITY_TYPE } from "ee/entities/AppsmithConsole/utils";
 import LOG_TYPE from "entities/AppsmithConsole/logtype";
-import type { CreateJSCollectionRequest } from "@appsmith/api/JSActionAPI";
+import type { CreateJSCollectionRequest } from "ee/api/JSActionAPI";
 import * as log from "loglevel";
-import { builderURL, jsCollectionIdURL } from "@appsmith/RouteBuilder";
-import type { EventLocation } from "@appsmith/utils/analyticsUtilTypes";
-import AnalyticsUtil from "utils/AnalyticsUtil";
-import { checkAndLogErrorsIfCyclicDependency } from "../../sagas/helper";
-import { toast } from "design-system";
+import { builderURL, jsCollectionIdURL } from "ee/RouteBuilder";
+import type { EventLocation } from "ee/utils/analyticsUtilTypes";
+import AnalyticsUtil from "ee/utils/AnalyticsUtil";
+import {
+  checkAndLogErrorsIfCyclicDependency,
+  getFromServerWhenNoPrefetchedResult,
+} from "sagas/helper";
+import { toast } from "@appsmith/ads";
 import { updateAndSaveLayout } from "actions/pageActions";
 import type { CanvasWidgetsReduxState } from "reducers/entityReducers/canvasWidgetsReducer";
-import { getIsServerDSLMigrationsEnabled } from "selectors/pageSelectors";
-import { getWidgets } from "../../sagas/selectors";
+import { getWidgets } from "sagas/selectors";
+import FocusRetention from "sagas/FocusRetentionSaga";
+import { handleJSEntityRedirect } from "sagas/IDESaga";
+import { getIDETypeByUrl } from "ee/entities/IDE/utils";
+import { IDE_TYPE } from "ee/IDE/Interfaces/IDETypes";
+import { CreateNewActionKey } from "ee/entities/Engine/actionHelpers";
+import { getAllActionTestPayloads } from "utils/storage";
+import { convertToBasePageIdSelector } from "selectors/pageListSelectors";
+import type { EvaluationReduxAction } from "actions/EvaluationReduxActionTypes";
 
 export function* fetchJSCollectionsSaga(
   action: EvaluationReduxAction<FetchActionsPayload>,
 ) {
+  const { unpublishedActionCollections, ...payload } = action.payload;
+
   try {
-    const response: ApiResponse<JSCollection[]> =
-      yield JSActionAPI.fetchJSCollections(action.payload);
+    const response: ApiResponse<JSCollection[]> = yield call(
+      getFromServerWhenNoPrefetchedResult,
+      unpublishedActionCollections,
+      async () => JSActionAPI.fetchJSCollections(payload),
+    );
+
     yield put({
       type: ReduxActionTypes.FETCH_JS_ACTIONS_SUCCESS,
       payload: response.data || [],
@@ -94,8 +113,10 @@ export function* createJSCollectionSaga(
     const response: JSCollectionCreateUpdateResponse =
       yield JSActionAPI.createJSCollection(payload);
     const isValidResponse: boolean = yield validateResponse(response);
+
     if (isValidResponse) {
       const actionName = payload.name ? payload.name : "";
+
       AnalyticsUtil.logEvent("JS_OBJECT_CREATED", {
         name: actionName,
         from: actionPayload.payload.from,
@@ -105,15 +126,13 @@ export function* createJSCollectionSaga(
         text: `JS Object created`,
         source: {
           type: ENTITY_TYPE.JSACTION,
-          // @ts-expect-error: response.data is of type unknown
           id: response.data.id,
-          // @ts-expect-error: response.data is of type unknown
           name: response.data.name,
         },
       });
 
       const newAction = response.data;
-      // @ts-expect-error: response.data is of type unknown
+
       yield put(createJSCollectionSuccess(newAction));
     }
   } catch (error) {
@@ -123,6 +142,7 @@ export function* createJSCollectionSaga(
     });
   }
 }
+
 export function* copyJSCollectionSaga(
   action: ReduxAction<{ id: string; destinationPageId: string; name: string }>,
 ) {
@@ -130,32 +150,46 @@ export function* copyJSCollectionSaga(
     getJSCollection,
     action.payload.id,
   );
+  const newName: string = yield select(getNewEntityName, {
+    prefix: action.payload.name,
+    parentEntityId: action.payload.destinationPageId,
+    parentEntityKey: CreateNewActionKey.PAGE,
+    suffix: "Copy",
+    startWithoutIndex: true,
+  });
+
   try {
     if (!actionObject) throw new Error("Could not find js collection to copy");
+
     const copyJSCollection = Object.assign({}, actionObject, {
-      name: action.payload.name,
+      name: newName,
       pageId: action.payload.destinationPageId,
     }) as Partial<JSCollection>;
+
     delete copyJSCollection.id;
+
     if (copyJSCollection.actions && copyJSCollection.actions.length > 0) {
       const newJSSubActions: JSAction[] = [];
+
       copyJSCollection.actions.forEach((action) => {
         const jsSubAction = JSON.parse(JSON.stringify(action));
+
         delete jsSubAction.id;
         delete jsSubAction.collectionId;
         newJSSubActions.push(jsSubAction);
       });
       copyJSCollection.actions = newJSSubActions;
     }
+
     const response: JSCollectionCreateUpdateResponse =
       yield JSActionAPI.copyJSCollection(copyJSCollection);
 
     const isValidResponse: boolean = yield validateResponse(response);
     const pageName: string = yield select(
       getPageNameByPageId,
-      // @ts-expect-error: response.data is of type unknown
       response.data.pageId,
     );
+
     if (isValidResponse) {
       toast.show(
         createMessage(JS_ACTION_COPY_SUCCESS, actionObject.name, pageName),
@@ -165,27 +199,33 @@ export function* copyJSCollectionSaga(
       );
       const payload = response.data;
 
-      // @ts-expect-error: response.data is of type unknown
       yield put(copyJSCollectionSuccess(payload));
     }
   } catch (e) {
     const actionName = actionObject ? actionObject.name : "";
-    toast.show(createMessage(ERROR_JS_ACTION_COPY_FAIL, actionName), {
-      kind: "error",
-    });
-    yield put(copyJSCollectionError(action.payload));
+
+    yield put(
+      copyJSCollectionError({
+        ...action.payload,
+        show: true,
+        error: {
+          message: createMessage(ERROR_JS_ACTION_COPY_FAIL, actionName),
+        },
+      }),
+    );
   }
 }
 
 export function* handleMoveOrCopySaga(
-  actionPayload: ReduxAction<{ id: string }>,
+  actionPayload: ReduxAction<JSCollection>,
 ) {
-  const { id } = actionPayload.payload;
-  const { pageId }: JSCollection = yield select(getJSCollection, id);
+  const { baseId: baseCollectionId, pageId } = actionPayload.payload;
+  const basePageId: string = yield select(convertToBasePageIdSelector, pageId);
+
   history.push(
     jsCollectionIdURL({
-      pageId: pageId,
-      collectionId: id,
+      basePageId,
+      baseCollectionId: baseCollectionId,
     }),
   );
 }
@@ -201,11 +241,18 @@ export function* moveJSCollectionSaga(
     getJSCollection,
     action.payload.id,
   );
+  const newName: string = yield select(getNewEntityName, {
+    prefix: action.payload.name,
+    parentEntityId: action.payload.destinationPageId,
+    parentEntityKey: CreateNewActionKey.PAGE,
+    startWithoutIndex: true,
+  });
+
   try {
     const response: ApiResponse = yield JSActionAPI.moveJSCollection({
       collectionId: actionObject.id,
       destinationPageId: action.payload.destinationPageId,
-      name: action.payload.name,
+      name: newName,
     });
 
     const isValidResponse: boolean = yield validateResponse(response);
@@ -214,6 +261,7 @@ export function* moveJSCollectionSaga(
       // @ts-expect-error: response.data is of type unknown
       response.data.pageId,
     );
+
     if (isValidResponse) {
       toast.show(
         createMessage(
@@ -227,16 +275,25 @@ export function* moveJSCollectionSaga(
         },
       );
     }
+
+    yield call(
+      closeJSActionTabSaga,
+      closeJSActionTab({
+        id: action.payload.id,
+        parentId: actionObject.pageId,
+      }),
+    );
     // @ts-expect-error: response.data is of type unknown
     yield put(moveJSCollectionSuccess(response.data));
   } catch (e) {
-    toast.show(createMessage(ERROR_JS_ACTION_MOVE_FAIL, actionObject.name), {
-      kind: "error",
-    });
     yield put(
       moveJSCollectionError({
         id: action.payload.id,
         originalPageId: actionObject.pageId,
+        show: true,
+        error: {
+          message: createMessage(ERROR_JS_ACTION_MOVE_FAIL, actionObject.name),
+        },
       }),
     );
   }
@@ -248,6 +305,7 @@ export const getIndexToBeRedirected = (
 ): number | undefined => {
   let resultIndex = undefined;
   let redirectIndex = undefined;
+
   if (jsActions.length > 1) {
     for (let i = 0; i < jsActions.length; i++) {
       if (id === jsActions[i].config.id) {
@@ -255,11 +313,13 @@ export const getIndexToBeRedirected = (
       }
     }
   }
+
   if (resultIndex && resultIndex > 0) {
     redirectIndex = resultIndex - 1;
   } else if (resultIndex === 0 && jsActions.length > 1) {
     redirectIndex = resultIndex + 1;
   }
+
   return redirectIndex;
 };
 
@@ -268,16 +328,25 @@ export function* deleteJSCollectionSaga(
 ) {
   try {
     const id = actionPayload.payload.id;
-    const pageId: string = yield select(getCurrentPageId);
+    const currentUrl = window.location.pathname;
+    const basePageId: string = yield select(getCurrentBasePageId);
     const response: ApiResponse = yield JSActionAPI.deleteJSCollection(id);
     const isValidResponse: boolean = yield validateResponse(response);
+    const ideType = getIDETypeByUrl(currentUrl);
 
     if (isValidResponse) {
       // @ts-expect-error: response.data is of type unknown
       toast.show(createMessage(JS_ACTION_DELETE_SUCCESS, response.data.name), {
         kind: "success",
       });
-      history.push(builderURL({ pageId }));
+      yield call(FocusRetention.handleRemoveFocusHistory, currentUrl);
+
+      if (ideType === IDE_TYPE.App) {
+        yield call(handleJSEntityRedirect, id);
+      } else {
+        history.push(builderURL({ basePageId }));
+      }
+
       AppsmithConsole.info({
         logType: LOG_TYPE.ENTITY_DELETED,
         text: "JS Object was deleted",
@@ -290,15 +359,19 @@ export function* deleteJSCollectionSaga(
         },
       });
       yield put(deleteJSCollectionSuccess({ id }));
+      yield put(closeJsActionTabSuccess({ id, parentId: basePageId }));
 
       const widgets: CanvasWidgetsReduxState = yield select(getWidgets);
-      yield put(
-        updateAndSaveLayout(widgets, {
-          shouldReplay: false,
-          isRetry: false,
-          updatedWidgetIds: [],
-        }),
-      );
+
+      if (basePageId) {
+        yield put(
+          updateAndSaveLayout(widgets, {
+            shouldReplay: false,
+            isRetry: false,
+            updatedWidgetIds: [],
+          }),
+        );
+      }
     }
   } catch (error) {
     yield put(deleteJSCollectionError({ id: actionPayload.payload.id }));
@@ -315,7 +388,9 @@ export function* saveJSObjectName(
       (jsAction: JSCollectionData) => jsAction.config.id === collectionId,
     ),
   );
+
   if (!collection) return;
+
   try {
     yield refactorJSObjectName(
       collection.config.id,
@@ -329,15 +404,15 @@ export function* saveJSObjectName(
       payload: {
         actionId: action.payload.id,
         oldName: collection.config.name,
+        show: true,
+        error: {
+          message: createMessage(
+            ERROR_JS_COLLECTION_RENAME_FAIL,
+            action.payload.name,
+          ),
+        },
       },
     });
-    toast.show(
-      createMessage(ERROR_JS_COLLECTION_RENAME_FAIL, action.payload.name),
-      {
-        kind: "error",
-      },
-    );
-    log.error(e);
   }
 }
 
@@ -347,14 +422,11 @@ export function* refactorJSObjectName(
   oldName: string,
   newName: string,
 ) {
-  const isServerDSLMigrationsEnabled = select(getIsServerDSLMigrationsEnabled);
-  const params: FetchPageRequest = { id: pageId };
-  if (isServerDSLMigrationsEnabled) {
-    params.migrateDSL = true;
-  }
+  const params: FetchPageRequest = { pageId, migrateDSL: true };
   const pageResponse: FetchPageResponse = yield call(PageApi.fetchPage, params);
   // check if page request is successful
   const isPageRequestSuccessful: boolean = yield validateResponse(pageResponse);
+
   if (isPageRequestSuccessful) {
     // get the layoutId from the page response
     const layoutId = pageResponse.data.layouts[0].id;
@@ -384,6 +456,7 @@ export function* refactorJSObjectName(
         getJSCollection(state, id),
       );
       const functions = jsObject.actions;
+
       if (currentPageId === pageId) {
         // @ts-expect-error: refactorResponse.data is of type unknown
         yield updateCanvasWithDSL(refactorResponse.data, pageId, layoutId);
@@ -400,6 +473,7 @@ export function* refactorJSObjectName(
       } else {
         yield put(fetchJSCollectionsForPage(pageId));
       }
+
       checkAndLogErrorsIfCyclicDependency(
         (refactorResponse.data as PageLayout).layoutOnLoadActionErrors,
       );
@@ -411,12 +485,14 @@ export function* fetchJSCollectionsForPageSaga(
   action: ReduxAction<{ pageId: string }>,
 ) {
   const { pageId } = action.payload;
+
   try {
     const response: ApiResponse<JSCollection[]> = yield call(
       JSActionAPI.fetchJSCollectionsByPageId,
       pageId,
     );
     const isValidResponse: boolean = yield validateResponse(response);
+
     if (isValidResponse) {
       yield put(fetchJSCollectionsForPageSuccess(response.data));
     }
@@ -431,12 +507,18 @@ export function* fetchJSCollectionsForPageSaga(
 export function* fetchJSCollectionsForViewModeSaga(
   action: ReduxAction<FetchActionsPayload>,
 ) {
-  const { applicationId } = action.payload;
+  const { applicationId, publishedActionCollections } = action.payload;
+
   try {
-    const response: ApiResponse<JSCollection[]> =
-      yield JSActionAPI.fetchJSCollectionsForViewMode(applicationId);
+    const response: ApiResponse<JSCollection[]> = yield call(
+      getFromServerWhenNoPrefetchedResult,
+      publishedActionCollections,
+      async () => JSActionAPI.fetchJSCollectionsForViewMode(applicationId),
+    );
+
     const resultJSCollections = response.data;
     const isValidResponse: boolean = yield validateResponse(response);
+
     if (isValidResponse) {
       yield put({
         type: ReduxActionTypes.FETCH_JS_ACTIONS_VIEW_MODE_SUCCESS,
@@ -448,5 +530,56 @@ export function* fetchJSCollectionsForViewModeSaga(
       type: ReduxActionErrorTypes.FETCH_JS_ACTIONS_VIEW_MODE_ERROR,
       payload: { error },
     });
+  }
+}
+
+export function* closeJSActionTabSaga(
+  actionPayload: ReduxAction<{ id: string; parentId: string }>,
+) {
+  const { id, parentId } = actionPayload.payload;
+  const currentUrl = window.location.pathname;
+
+  yield call(FocusRetention.handleRemoveFocusHistory, currentUrl);
+  yield call(handleJSEntityRedirect, id);
+  yield put(closeJsActionTabSuccess({ id, parentId }));
+}
+
+// Saga to fetch stored test payloads for all collections present in the application
+export function* fetchStoredTestPayloadsSaga(collections: JSCollection[]) {
+  try {
+    //fetch stored test payloads for all collections
+    const storedPayloads: Record<string, unknown> | null =
+      yield getAllActionTestPayloads();
+
+    if (!!storedPayloads && collections.length > 0) {
+      for (const collection of collections) {
+        // TODO: Fix this the next time the file is edited
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const testPayloadForCollection: Record<string, any> = {};
+        let hasStoredPayload = false;
+
+        for (const action of collection.actions) {
+          if (
+            storedPayloads.hasOwnProperty(action.id) &&
+            !!storedPayloads[action.id]
+          ) {
+            hasStoredPayload = true;
+            testPayloadForCollection[action.id] = storedPayloads[action.id];
+          }
+        }
+
+        if (hasStoredPayload) {
+          yield put({
+            type: ReduxActionTypes.UPDATE_TEST_PAYLOAD_FOR_COLLECTION,
+            payload: {
+              collectionId: collection.id,
+              testPayload: testPayloadForCollection,
+            },
+          });
+        }
+      }
+    }
+  } catch (error) {
+    log.error("Error fetching stored test payloads", error);
   }
 }

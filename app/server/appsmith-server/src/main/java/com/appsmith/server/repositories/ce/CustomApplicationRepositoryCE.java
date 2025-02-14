@@ -3,9 +3,7 @@ package com.appsmith.server.repositories.ce;
 import com.appsmith.server.acl.AclPermission;
 import com.appsmith.server.domains.Application;
 import com.appsmith.server.domains.ApplicationPage;
-import com.appsmith.server.domains.GitAuth;
 import com.appsmith.server.repositories.AppsmithRepository;
-import com.mongodb.client.result.UpdateResult;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -35,49 +33,37 @@ public interface CustomApplicationRepositoryCE extends AppsmithRepository<Applic
 
     Flux<Application> findByClonedFromApplicationId(String applicationId, AclPermission permission);
 
-    Mono<UpdateResult> addPageToApplication(
-            String applicationId, String pageId, boolean isDefault, String defaultPageId);
+    Mono<Integer> addPageToApplication(String applicationId, String pageId, boolean isDefault, String basePageId);
 
-    Mono<UpdateResult> setPages(String applicationId, List<ApplicationPage> pages);
+    Mono<Integer> setPages(String applicationId, List<ApplicationPage> pages);
 
-    Mono<UpdateResult> setDefaultPage(String applicationId, String pageId);
+    Mono<Void> setDefaultPage(String applicationId, String pageId);
 
-    Mono<UpdateResult> setGitAuth(String applicationId, GitAuth gitAuth, AclPermission aclPermission);
+    Mono<Application> getApplicationByGitBranchAndBaseApplicationId(
+            String baseApplicationId, String branchName, Optional<AclPermission> permission);
 
-    Mono<Application> getApplicationByGitBranchAndDefaultApplicationId(
-            String defaultApplicationId, String branchName, Optional<AclPermission> permission);
+    Mono<Application> getApplicationByGitBranchAndBaseApplicationId(
+            String baseApplicationId, String branchName, AclPermission aclPermission);
 
-    Mono<Application> getApplicationByGitBranchAndDefaultApplicationId(
-            String defaultApplicationId, String branchName, AclPermission aclPermission);
-
-    Mono<Application> getApplicationByGitBranchAndDefaultApplicationId(
-            String defaultApplicationId,
+    Mono<Application> getApplicationByGitBranchAndBaseApplicationId(
+            String baseApplicationId,
             List<String> projectionFieldNames,
             String branchName,
             AclPermission aclPermission);
 
-    Flux<Application> getApplicationByGitDefaultApplicationId(String defaultApplicationId, AclPermission permission);
+    Flux<Application> getApplicationByGitBaseApplicationId(String baseApplicationId, AclPermission permission);
 
-    Mono<List<String>> getAllApplicationId(String workspaceId);
-
-    Mono<UpdateResult> setAppTheme(
+    Mono<Integer> setAppTheme(
             String applicationId, String editModeThemeId, String publishedModeThemeId, AclPermission aclPermission);
-
-    Mono<Long> countByWorkspaceId(String workspaceId);
 
     Mono<Long> getGitConnectedApplicationWithPrivateRepoCount(String workspaceId);
 
     Flux<Application> getGitConnectedApplicationByWorkspaceId(String workspaceId);
 
-    Mono<Application> getApplicationByDefaultApplicationIdAndDefaultBranch(String defaultApplicationId);
+    Mono<Application> getApplicationByBaseApplicationIdAndDefaultBranch(String baseApplicationId);
 
-    Mono<UpdateResult> updateFieldByDefaultIdAndBranchName(
-            String defaultId,
-            String defaultIdPath,
-            Map<String, Object> fieldNameValueMap,
-            String branchName,
-            String branchNamePath,
-            AclPermission permission);
+    Mono<Integer> updateFieldById(
+            String id, String idPath, Map<String, Object> fieldNameValueMap, AclPermission permission);
 
     Mono<Long> countByNameAndWorkspaceId(String applicationName, String workspaceId, AclPermission permission);
 
@@ -87,8 +73,24 @@ public interface CustomApplicationRepositoryCE extends AppsmithRepository<Applic
     Mono<Long> getAllApplicationsCountAccessibleToARoleWithPermission(
             AclPermission permission, String permissionGroupId);
 
-    Mono<UpdateResult> unprotectAllBranches(String applicationId, AclPermission permission);
+    Mono<Integer> unprotectAllBranches(String applicationId, AclPermission permission);
 
-    Mono<UpdateResult> protectBranchedApplications(
-            String applicationId, List<String> branchNames, AclPermission permission);
+    Mono<Integer> protectBranchedApplications(String applicationId, List<String> branchNames, AclPermission permission);
+
+    Flux<String> findBranchedApplicationIdsByBaseApplicationId(String baseApplicationId);
+
+    Flux<String> findAllBranchedApplicationIdsByBranchedApplicationId(
+            String branchedApplicationId, AclPermission permission);
+
+    Flux<Application> findByIdIn(List<String> ids);
+
+    Flux<Application> findByWorkspaceId(String workspaceId);
+
+    Mono<Long> countByWorkspaceId(String workspaceId);
+
+    Flux<Application> findByClonedFromApplicationId(String clonedFromApplicationId);
+
+    Mono<Long> countByDeletedAtNull();
+
+    Mono<Application> findByIdAndExportWithConfiguration(String id, boolean exportWithConfiguration);
 }

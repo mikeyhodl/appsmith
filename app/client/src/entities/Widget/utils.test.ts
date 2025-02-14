@@ -5,7 +5,7 @@ import {
   contentConfig,
   styleConfig,
 } from "widgets/ChartWidget/widget/propertyConfig";
-import { EvaluationSubstitutionType } from "entities/DataTree/dataTreeFactory";
+import { EvaluationSubstitutionType } from "ee/entities/DataTree/types";
 import { ValidationTypes } from "constants/WidgetValidation";
 
 describe("getAllPathsFromPropertyConfig", () => {
@@ -512,13 +512,8 @@ describe("getAllPathsFromPropertyConfig", () => {
       ],
       setAdaptiveYMin: "0",
     };
-    const customEChartEnabled = true;
-    const showFusionChartDeprecationMessage = true;
 
-    const config = [
-      ...contentConfig(customEChartEnabled, showFusionChartDeprecationMessage),
-      ...styleConfig,
-    ];
+    const config = [...contentConfig(), ...styleConfig];
 
     const bindingPaths = {
       chartType: EvaluationSubstitutionType.TEMPLATE,

@@ -4,6 +4,7 @@ import BaseControl from "./BaseControl";
 import { StyledDynamicInput } from "./StyledControls";
 import type { InputType } from "components/constants";
 import type { CodeEditorExpected } from "components/editorComponents/CodeEditor";
+import type { FieldEntityInformation } from "components/editorComponents/CodeEditor/EditorConfig";
 import {
   CodeEditorBorder,
   EditorModes,
@@ -23,6 +24,8 @@ export function InputText(props: {
   onBlur?: () => void;
   onChange: (event: React.ChangeEvent<HTMLTextAreaElement> | string) => void;
   onFocus?: () => void;
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   evaluatedValue?: any;
   expected?: CodeEditorExpected;
   placeholder?: string;
@@ -32,8 +35,10 @@ export function InputText(props: {
   hideEvaluatedValue?: boolean;
   enableAI?: boolean;
   isEditorHidden?: boolean;
+  blockCompletions?: FieldEntityInformation["blockCompletions"];
 }) {
   const {
+    blockCompletions,
     dataTreePath,
     enableAI = true,
     evaluatedValue,
@@ -53,6 +58,7 @@ export function InputText(props: {
       <LazyCodeEditor
         AIAssisted={enableAI}
         additionalDynamicData={props.additionalAutocomplete}
+        blockCompletions={blockCompletions}
         border={CodeEditorBorder.ALL_SIDE}
         dataTreePath={dataTreePath}
         evaluatedPopUpLabel={label}
@@ -120,6 +126,7 @@ class InputTextControl extends BaseControl<InputControlProps> {
 
   isNumberType(): boolean {
     const { inputType } = this.props;
+
     switch (inputType) {
       case "CURRENCY":
       case "INTEGER":
@@ -133,9 +140,11 @@ class InputTextControl extends BaseControl<InputControlProps> {
 
   onTextChange = (event: React.ChangeEvent<HTMLTextAreaElement> | string) => {
     let value = event;
+
     if (typeof event !== "string") {
       value = event.target.value;
     }
+
     this.updateProperty(this.props.propertyName, value, true);
   };
 
@@ -149,6 +158,8 @@ export interface InputControlProps extends ControlProps {
   inputType: InputType;
   validationMessage?: string;
   isDisabled?: boolean;
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   defaultValue?: any;
   onFocus?: () => void;
   onBlur?: () => void;

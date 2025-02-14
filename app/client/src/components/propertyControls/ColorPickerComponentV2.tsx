@@ -6,7 +6,7 @@ import React, {
   useCallback,
 } from "react";
 import styled from "styled-components";
-import { Icon, Switch } from "design-system";
+import { Switch } from "@appsmith/ads";
 import {
   Popover,
   InputGroup,
@@ -29,12 +29,9 @@ import {
 import { TAILWIND_COLORS } from "constants/ThemeConstants";
 import useDSEvent from "utils/hooks/useDSEvent";
 import { DSEventTypes } from "utils/AppsmithUtils";
-import { getBrandColors } from "@appsmith/selectors/tenantSelectors";
+import { getBrandColors } from "ee/selectors/tenantSelectors";
 import FocusTrap from "focus-trap-react";
-import {
-  createMessage,
-  FULL_COLOR_PICKER_LABEL,
-} from "@appsmith/constants/messages";
+import { createMessage, FULL_COLOR_PICKER_LABEL } from "ee/constants/messages";
 
 const MAX_COLS = 10;
 
@@ -74,16 +71,7 @@ const ColorIcon = styled.div<{ color: string }>`
   background: ${(props) => (props.color ? props.color : "transparent")};
 `;
 
-const ColorPickerIconContainer = styled.div`
-  position: absolute;
-  top: 11px;
-  left: 6px;
-  height: 24px;
-  width: 24px;
-  z-index: 1;
-`;
-
-const StyledInputGroup = styled(InputGroup)<{
+export const StyledInputGroup = styled(InputGroup)<{
   $isValid?: boolean;
   $isFullColorPicker?: boolean;
 }>`
@@ -107,14 +95,13 @@ const StyledInputGroup = styled(InputGroup)<{
       props.theme.colors.propertyPane.multiDropdownBoxHoverBg};
     color: ${(props) => props.theme.colors.propertyPane.label};
 
-    &:focus {
+    &:focus-visible {
       outline: var(--ads-v2-border-width-outline) solid
         var(--ads-v2-color-outline);
       outline-offset: var(--ads-v2-offset-outline);
     }
 
-    &:hover,
-    &:focus {
+    &:hover {
       border-color: ${({ $isValid }) =>
         $isValid
           ? "var(--ads-v2-color-border-emphasis)"
@@ -332,7 +319,7 @@ interface LeftIconProps {
   handleInputClick?: () => void;
 }
 
-function LeftIcon(props: LeftIconProps) {
+export function LeftIcon(props: LeftIconProps) {
   return isValidColor(props.color) && !isEmptyOrNill(props.color) ? (
     <ColorIcon
       className="rounded-full cursor-pointer"
@@ -340,12 +327,11 @@ function LeftIcon(props: LeftIconProps) {
       onClick={props.handleInputClick}
     />
   ) : (
-    <ColorPickerIconContainer
-      className="cursor-pointer"
+    <ColorIcon
+      className="rounded-full cursor-pointer"
+      color="white"
       onClick={props.handleInputClick}
-    >
-      <Icon name="sip-line" size="md" />
-    </ColorPickerIconContainer>
+    />
   );
 }
 
@@ -357,6 +343,8 @@ const POPOVER_MODFIER = {
 };
 
 const ColorPickerComponent = React.forwardRef(
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (props: ColorPickerProps, containerRef: any) => {
     const {
       isFullColorPicker: defaultFullColorPickerValue = false,
@@ -378,12 +366,11 @@ const ColorPickerComponent = React.forwardRef(
       defaultFullColorPickerValue,
     );
 
-    const debouncedOnChange = React.useCallback(
-      debounce((color: string, isUpdatedViaKeyboard: boolean) => {
+    const debouncedOnChange = useMemo(() => {
+      return debounce((color: string, isUpdatedViaKeyboard: boolean) => {
         props.changeColor(color, isUpdatedViaKeyboard);
-      }, DEBOUNCE_TIMER),
-      [],
-    );
+      }, DEBOUNCE_TIMER);
+    }, [props]);
 
     useEffect(() => {
       setIsOpen(isOpenProp);
@@ -422,17 +409,24 @@ const ColorPickerComponent = React.forwardRef(
           case "Tab":
             emitKeyPressEvent(`${e.shiftKey ? "Shift+" : ""}${e.key}`);
             currentFocus.current = 0;
+
             if (document.activeElement === inputGroupRef.current) {
               setTimeout(() => {
                 const firstElement = popupRef.current?.querySelectorAll(
                   "[tabindex='0']",
+                  // TODO: Fix this the next time the file is edited
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 )?.[0] as any;
+
                 firstElement?.focus();
               });
             }
+
             break;
           case "Enter":
             emitKeyPressEvent(e.key);
+            // TODO: Fix this the next time the file is edited
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             (document.activeElement as any)?.click();
             setTimeout(() => {
               inputGroupRef.current?.focus();
@@ -443,7 +437,9 @@ const ColorPickerComponent = React.forwardRef(
             emitKeyPressEvent(e.key);
             const totalColors =
               document.activeElement?.parentElement?.childElementCount ?? 0;
+
             currentFocus.current = currentFocus.current + 1;
+
             if (
               currentFocus.current % MAX_COLS === 0 ||
               currentFocus.current >= totalColors
@@ -452,9 +448,12 @@ const ColorPickerComponent = React.forwardRef(
                 currentFocus.current % MAX_COLS === 0
                   ? currentFocus.current - MAX_COLS
                   : totalColors - (totalColors % MAX_COLS);
+
             (
               document.activeElement?.parentElement?.childNodes[
                 currentFocus.current
+                // TODO: Fix this the next time the file is edited
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
               ] as any
             ).focus();
             break;
@@ -463,18 +462,24 @@ const ColorPickerComponent = React.forwardRef(
             emitKeyPressEvent(e.key);
             const totalColors =
               document.activeElement?.parentElement?.childElementCount ?? 0;
+
             currentFocus.current = currentFocus.current - 1;
+
             if (
               currentFocus.current < 0 ||
               currentFocus.current % MAX_COLS === MAX_COLS - 1
             ) {
               currentFocus.current = currentFocus.current + MAX_COLS;
+
               if (currentFocus.current > totalColors)
                 currentFocus.current = totalColors - 1;
             }
+
             (
               document.activeElement?.parentElement?.childNodes[
                 currentFocus.current
+                // TODO: Fix this the next time the file is edited
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
               ] as any
             ).focus();
             break;
@@ -483,13 +488,19 @@ const ColorPickerComponent = React.forwardRef(
             emitKeyPressEvent(e.key);
             const totalColors =
               document.activeElement?.parentElement?.childElementCount ?? 0;
+
             if (totalColors < MAX_COLS) break;
+
             currentFocus.current = currentFocus.current + MAX_COLS;
+
             if (currentFocus.current >= totalColors)
               currentFocus.current = currentFocus.current % MAX_COLS;
+
             (
               document.activeElement?.parentElement?.childNodes[
                 currentFocus.current
+                // TODO: Fix this the next time the file is edited
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
               ] as any
             ).focus();
             break;
@@ -498,18 +509,25 @@ const ColorPickerComponent = React.forwardRef(
             emitKeyPressEvent(e.key);
             const totalColors =
               document.activeElement?.parentElement?.childElementCount ?? 0;
+
             if (totalColors < MAX_COLS) break;
+
             currentFocus.current = currentFocus.current - MAX_COLS;
+
             if (currentFocus.current < 0) {
               const factor = Math.floor(totalColors / MAX_COLS) * MAX_COLS;
               const nextIndex = factor + currentFocus.current + MAX_COLS;
+
               if (nextIndex >= totalColors)
                 currentFocus.current = nextIndex - MAX_COLS;
               else currentFocus.current = nextIndex;
             }
+
             (
               document.activeElement?.parentElement?.childNodes[
                 currentFocus.current
+                // TODO: Fix this the next time the file is edited
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
               ] as any
             ).focus();
             break;
@@ -522,7 +540,10 @@ const ColorPickerComponent = React.forwardRef(
             setIsOpen(true);
             const firstElement = popupRef.current?.querySelectorAll(
               "[tabindex='0']",
+              // TODO: Fix this the next time the file is edited
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
             )?.[0] as any;
+
             firstElement?.focus();
             break;
           case "Escape":
@@ -537,18 +558,24 @@ const ColorPickerComponent = React.forwardRef(
 
     useEffect(() => {
       document.body.addEventListener("keydown", handleKeydown);
+
       return () => {
         document.body.removeEventListener("keydown", handleKeydown);
       };
     }, [handleKeydown]);
 
-    const handleChangeColor = (event: React.ChangeEvent<HTMLInputElement>) => {
-      const value = event.target.value;
-      if (isValidColor(value)) {
-        debouncedOnChange(value, true);
-      }
-      setColor(value);
-    };
+    const handleChangeColor = useCallback(
+      (event: React.ChangeEvent<HTMLInputElement>) => {
+        const value = event.target.value || "";
+
+        if (isValidColor(value)) {
+          debouncedOnChange(value, true);
+        }
+
+        setColor(value);
+      },
+      [debouncedOnChange],
+    );
 
     // if props.color changes and state color is different,
     // sets the state color to props color
@@ -578,6 +605,7 @@ const ColorPickerComponent = React.forwardRef(
       if (isOpen !== nextOpenState) {
         if (isClick.current) setIsOpen(true);
         else setIsOpen(nextOpenState);
+
         isClick.current = false;
       }
     };

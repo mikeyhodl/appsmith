@@ -1,14 +1,7 @@
 import type { AxiosProgressEvent, AxiosPromise } from "axios";
 import Api from "api/Api";
 import type { ApiResponse } from "api/ApiResponses";
-import type {
-  WorkspaceRole,
-  Workspace,
-} from "@appsmith/constants/workspaceConstants";
-
-export interface FetchWorkspaceRolesResponse extends ApiResponse {
-  data: WorkspaceRole[];
-}
+import type { WorkspaceRole, Workspace } from "ee/constants/workspaceConstants";
 
 export interface FetchWorkspacesResponse extends ApiResponse {
   data: Workspace[];
@@ -67,17 +60,11 @@ export interface CreateWorkspaceRequest {
 }
 
 class WorkspaceApi extends Api {
-  static rolesURL = "v1/groups";
   static workspacesURL = "v1/workspaces";
-  static async fetchRoles(): Promise<
-    AxiosPromise<FetchWorkspaceRolesResponse>
-  > {
-    return Api.get(WorkspaceApi.rolesURL);
-  }
-  static async fetchWorkspaces(): Promise<
+  static async fetchAllWorkspaces(): Promise<
     AxiosPromise<FetchWorkspacesResponse>
   > {
-    return Api.get(WorkspaceApi.workspacesURL);
+    return Api.get(`${WorkspaceApi.workspacesURL}/home`);
   }
   static async fetchWorkspace(
     request: FetchWorkspaceRequest,
@@ -133,6 +120,7 @@ class WorkspaceApi extends Api {
     request: SaveWorkspaceLogo,
   ): Promise<AxiosPromise<ApiResponse>> {
     const formData = new FormData();
+
     if (request.logo) {
       formData.append("file", request.logo);
     }

@@ -84,6 +84,7 @@ const CheckboxCellComponent = (props: CheckboxCellProps) => {
       borderRadius={borderRadius}
       isChecked={value}
       isDisabled={!!disabledCheckbox || !isCellEditable}
+      isFullWidth={false}
       isLoading={false}
       isRequired={false}
       label=""
@@ -92,6 +93,7 @@ const CheckboxCellComponent = (props: CheckboxCellProps) => {
       widgetId={""}
     />
   );
+
   return (
     <CheckboxCellWrapper
       cellBackground={cellBackground}

@@ -1,29 +1,22 @@
 import React from "react";
 import styled from "styled-components";
-import {
-  Button,
-  Menu,
-  MenuItem,
-  MenuContent,
-  MenuTrigger,
-} from "design-system";
+import { Button, Icon, Menu, MenuContent, MenuTrigger } from "@appsmith/ads";
 import {
   EditInteractionKind,
   EditableText,
   SavingState,
   notEmptyValidator,
-} from "design-system-old";
-import type { Workspace } from "@appsmith/constants/workspaceConstants";
+} from "@appsmith/ads-old";
+import type { Workspace } from "ee/constants/workspaceConstants";
 import {
   DropdownOnSelectActions,
   getOnSelectAction,
 } from "pages/common/CustomizedDropdown/dropdownHelpers";
-import { ManageEnvironmentsMenu } from "@appsmith/pages/Applications/ManageEnvironmentsMenu";
+import { ManageEnvironmentsMenu } from "ee/pages/Applications/ManageEnvironmentsMenu";
 
 interface WorkspaceMenuProps {
   canDeleteWorkspace: boolean;
   canInviteToWorkspace: boolean;
-  enableImportExport: boolean;
   handleDeleteWorkspace: (workspaceId: string) => void;
   handleResetMenuState: () => void;
   handleWorkspaceMenuClose: (open: boolean) => void;
@@ -32,7 +25,6 @@ interface WorkspaceMenuProps {
   isFetchingResources: boolean;
   isSavingWorkspaceInfo: boolean;
   leaveWS: (workspaceId: string) => void;
-  setSelectedWorkspaceIdForImportApplication: (workspaceId?: string) => void;
   setWarnLeavingWorkspace: (show: boolean) => void;
   setWarnDeleteWorkspace: (show: boolean) => void;
   setWorkspaceToOpenMenu: (value: string | null) => void;
@@ -47,19 +39,35 @@ const WorkspaceRename = styled(EditableText)`
   padding: 0 2px;
 `;
 
+export const CustomMenuItem = styled.span`
+  display: flex;
+  align-items: center;
+  padding: var(--ads-v2-spaces-3);
+  margin-bottom: var(--ads-v2-spaces-1);
+  gap: var(--ads-v2-spaces-3);
+  border-radius: var(--ads-v2-border-radius);
+  cursor: pointer;
+  position: relative;
+  color: var(--ads-v2-color-fg);
+  min-height: 36px;
+  box-sizing: border-box;
+  font-size: var(--ads-v2-font-size-4);
+
+  &:hover {
+    background-color: var(--ads-v2-color-bg-subtle);
+  }
+`;
+
 function WorkspaceMenu({
   canDeleteWorkspace,
   canInviteToWorkspace,
-  enableImportExport,
   handleDeleteWorkspace,
   handleResetMenuState,
   handleWorkspaceMenuClose,
-  hasCreateNewApplicationPermission,
   hasManageWorkspacePermissions,
   isFetchingResources,
   isSavingWorkspaceInfo,
   leaveWS,
-  setSelectedWorkspaceIdForImportApplication,
   setWarnDeleteWorkspace,
   setWarnLeavingWorkspace,
   setWorkspaceToOpenMenu,
@@ -127,71 +135,62 @@ function WorkspaceMenu({
                 underline
               />
             </div>
-            <MenuItem
+            <CustomMenuItem
+              className="workspace-menu-item"
               data-testid="t--workspace-setting"
-              onSelect={() =>
+              onClick={() =>
                 getOnSelectAction(DropdownOnSelectActions.REDIRECT, {
                   path: `/workspace/${workspace.id}/settings/general`,
                 })
               }
-              startIcon="settings-2-line"
             >
+              <Icon name="settings-v3" size="md" />
               Settings
-            </MenuItem>
+            </CustomMenuItem>
           </>
         )}
-        {enableImportExport && hasCreateNewApplicationPermission && (
-          <MenuItem
-            data-testid="t--workspace-import-app"
-            onSelect={() =>
-              setSelectedWorkspaceIdForImportApplication(workspace.id)
-            }
-            startIcon="download"
-          >
-            Import
-          </MenuItem>
-        )}
         {hasManageWorkspacePermissions && canInviteToWorkspace && (
-          <MenuItem
-            onSelect={() =>
+          <CustomMenuItem
+            className="workspace-menu-item"
+            onClick={() =>
               getOnSelectAction(DropdownOnSelectActions.REDIRECT, {
                 path: `/workspace/${workspace.id}/settings/members`,
               })
             }
-            startIcon="member"
           >
+            <Icon name="group-line" size="md" />
             Members
-          </MenuItem>
+          </CustomMenuItem>
         )}
         <ManageEnvironmentsMenu
           workspaceId={workspace.id}
           workspacePermissions={workspace.userPermissions || []}
         />
         {canInviteToWorkspace && (
-          <MenuItem
-            className="error-menuitem"
-            onSelect={() => {
+          <CustomMenuItem
+            className="error-menuitem workspace-menu-item"
+            onClick={() => {
               !warnLeavingWorkspace
                 ? setWarnLeavingWorkspace(true)
                 : leaveWS(workspace.id);
             }}
-            startIcon="logout"
           >
+            <Icon name="logout" size="md" />
             {!warnLeavingWorkspace ? "Leave workspace" : "Are you sure?"}
-          </MenuItem>
+          </CustomMenuItem>
         )}
         {canDeleteWorkspace && (
-          <MenuItem
-            className="error-menuitem"
-            onSelect={() => {
+          <CustomMenuItem
+            className="error-menuitem workspace-menu-item"
+            onClick={() => {
               warnDeleteWorkspace
                 ? handleDeleteWorkspace(workspace.id)
                 : setWarnDeleteWorkspace(true);
             }}
-            startIcon="delete-bin-line"
           >
+            <Icon name="delete-bin-line" size="md" />
             {!warnDeleteWorkspace ? "Delete workspace" : "Are you sure?"}
-          </MenuItem>
+          </CustomMenuItem>
         )}
       </MenuContent>
     </Menu>

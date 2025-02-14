@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { getTypographyByKey } from "design-system-old";
+import { getTypographyByKey } from "@appsmith/ads-old";
 import styled, { useTheme } from "styled-components";
 import { useDispatch, useSelector } from "react-redux";
 
@@ -27,12 +27,9 @@ import BranchListHotkeys from "./BranchListHotkeys";
 import {
   createMessage,
   FIND_OR_CREATE_A_BRANCH,
-  // GO_TO_SETTINGS,
-  // LEARN_MORE,
-  // NOW_PROTECT_BRANCH,
   SWITCH_BRANCHES,
   SYNC_BRANCHES,
-} from "@appsmith/constants/messages";
+} from "ee/constants/messages";
 import {
   Icon,
   Spinner,
@@ -40,15 +37,14 @@ import {
   Button,
   SearchInput,
   Text,
-  // Callout,
-} from "design-system";
+} from "@appsmith/ads";
 import { get } from "lodash";
 import {
   isLocalBranch,
   isRemoteBranch,
   removeSpecialChars,
 } from "pages/Editor/gitSync/utils";
-import AnalyticsUtil from "utils/AnalyticsUtil";
+import AnalyticsUtil from "ee/utils/AnalyticsUtil";
 import { useActiveHoverIndex, useFilteredBranches } from "../hooks";
 import { BranchListItemContainer } from "./BranchListItemContainer";
 import { RemoteBranchList } from "./RemoteBranchList";
@@ -114,7 +110,8 @@ function CreateNewBranch({
   hovered,
   isCreatingNewBranch,
   onClick,
-  shouldScrollIntoView,
+  shouldScrollIntoView, // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
 }: any) {
   useEffect(() => {
     if (itemRef.current && shouldScrollIntoView)
@@ -286,10 +283,12 @@ export default function BranchList(props: {
 
   const handleCreateNewBranch = () => {
     if (isCreatingNewBranch) return;
+
     AnalyticsUtil.logEvent("GS_CREATE_NEW_BRANCH", {
       source: "BRANCH_LIST_POPUP_FROM_BOTTOM_BAR",
     });
     const branch = searchText;
+
     setIsCreatingNewBranch(true);
     dispatch(
       createNewBranchInit({
@@ -299,6 +298,7 @@ export default function BranchList(props: {
         },
         onSuccessCallback: () => {
           setIsCreatingNewBranch(false);
+
           if (typeof props.setIsPopupOpen === "function")
             props.setIsPopupOpen(false);
         },
@@ -369,6 +369,7 @@ export default function BranchList(props: {
             <SearchInput
               autoFocus
               className="branch-search t--branch-search-input"
+              // @ts-expect-error Fix this the next time the file is edited
               fill
               onChange={changeSearchText}
               placeholder={createMessage(FIND_OR_CREATE_A_BRANCH)}
@@ -381,32 +382,6 @@ export default function BranchList(props: {
         {loading && <BranchesLoading />}
         {!loading && (
           <ListContainer>
-            {/* keeping it commented for future use */}
-            {/* <Callout
-              isClosable
-              links={[
-                {
-                  children: createMessage(GO_TO_SETTINGS),
-                  onClick: () => {
-                    props.setIsPopupOpen?.(false);
-                    dispatch(
-                      setIsGitSyncModalOpen({
-                        isOpen: true,
-                        tab: GitSyncModalTab.SETTINGS,
-                      }),
-                    );
-                  },
-                },
-                {
-                  children: createMessage(LEARN_MORE),
-                  to: "https://docs.appsmith.com/advanced-concepts/version-control-with-git",
-                  target: "_blank",
-                },
-              ]}
-              style={{ width: 300 }}
-            >
-              {createMessage(NOW_PROTECT_BRANCH)}
-            </Callout> */}
             <Space size={5} />
             {isCreateNewBranchInputValid && (
               <CreateNewBranch

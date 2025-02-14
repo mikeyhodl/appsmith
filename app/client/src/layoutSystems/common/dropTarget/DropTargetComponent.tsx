@@ -1,4 +1,4 @@
-import type { AppState } from "@appsmith/reducers";
+import type { AppState } from "ee/reducers";
 import {
   GridDefaults,
   MAIN_CONTAINER_WIDGET_ID,
@@ -11,7 +11,6 @@ import React, {
   useEffect,
   useMemo,
   useRef,
-  useState,
 } from "react";
 import { useSelector } from "react-redux";
 import styled from "styled-components";
@@ -22,11 +21,7 @@ import {
 } from "actions/autoHeightActions";
 import { useDispatch } from "react-redux";
 import { getDragDetails } from "sagas/selectors";
-import {
-  combinedPreviewModeSelector,
-  getIsMobileCanvasLayout,
-  getOccupiedSpacesSelectorForContainer,
-} from "selectors/editorSelectors";
+import { getOccupiedSpacesSelectorForContainer } from "selectors/editorSelectors";
 import { getCanvasSnapRows } from "utils/WidgetPropsUtils";
 import { useAutoHeightUIState } from "utils/hooks/autoHeightUIHooks";
 import { useShowPropertyPane } from "utils/hooks/dragResizeHooks";
@@ -36,21 +31,15 @@ import { calculateDropTargetRows } from "./DropTargetUtils";
 import { LayoutSystemTypes } from "layoutSystems/types";
 import { getIsAppSettingsPaneWithNavigationTabOpen } from "selectors/appSettingsPaneSelectors";
 import { getLayoutSystemType } from "selectors/layoutSystemSelectors";
-import { getCurrentUser } from "selectors/usersSelectors";
-import {
-  getUsersFirstApplicationId,
-  isUserSignedUpFlagSet,
-} from "utils/storage";
+import { getWidgetSelectionBlock } from "selectors/ui";
 import {
   isAutoHeightEnabledForWidget,
   isAutoHeightEnabledForWidgetWithLimits,
 } from "widgets/WidgetUtils";
 import DragLayerComponent from "./DragLayerComponent";
-import StarterBuildingBlocks from "./starterBuildingBlocks";
-import { useFeatureFlag } from "utils/hooks/useFeatureFlag";
-import { FEATURE_FLAG } from "@appsmith/entities/FeatureFlag";
-import useCurrentAppState from "pages/Editor/IDE/hooks";
-import { EditorState as IDEAppState } from "entities/IDE/constants";
+import Onboarding from "./OnBoarding";
+import { isDraggingBuildingBlockToCanvas } from "selectors/buildingBlocksSelectors";
+import { selectCombinedPreviewMode } from "selectors/gitModSelectors";
 
 export type DropTargetComponentProps = PropsWithChildren<{
   snapColumnSpace: number;
@@ -74,46 +63,6 @@ const StyledDropTarget = styled.div`
   z-index: 1;
 `;
 
-function Onboarding() {
-  const [isUsersFirstApp, setIsUsersFirstApp] = useState(false);
-  const isMobileCanvas = useSelector(getIsMobileCanvasLayout);
-  const appState = useCurrentAppState();
-  const user = useSelector(getCurrentUser);
-  const showStarterTemplatesInsteadofBlankCanvas = useFeatureFlag(
-    FEATURE_FLAG.ab_show_templates_instead_of_blank_canvas_enabled,
-  );
-
-  const currentApplicationId = useSelector(
-    (state: AppState) => state.ui.applications.currentApplication?.id,
-  );
-
-  const shouldShowStarterTemplates = useMemo(
-    () =>
-      showStarterTemplatesInsteadofBlankCanvas &&
-      !isMobileCanvas &&
-      isUsersFirstApp,
-    [isMobileCanvas, isUsersFirstApp, showStarterTemplatesInsteadofBlankCanvas],
-  );
-  useEffect(() => {
-    (async () => {
-      const firstApplicationId = await getUsersFirstApplicationId();
-      const isNew = !!user && (await isUserSignedUpFlagSet(user.email));
-      const isFirstApp = firstApplicationId === currentApplicationId;
-      setIsUsersFirstApp(isNew && isFirstApp);
-    })();
-  }, [user, currentApplicationId]);
-
-  if (shouldShowStarterTemplates && appState === IDEAppState.EDITOR)
-    return <StarterBuildingBlocks />;
-  else if (!shouldShowStarterTemplates && appState === IDEAppState.EDITOR)
-    return (
-      <h2 className="absolute top-0 left-0 right-0 flex items-end h-108 justify-center text-2xl font-bold text-gray-300">
-        Drag and drop a widget here
-      </h2>
-    );
-  else return null;
-}
-
 /*
   This context will provide the function which will help the draglayer and resizablecomponents trigger
   an update of the main container's rows
@@ -136,6 +85,7 @@ const updateHeight = (
 ) => {
   if (ref.current) {
     const height = currentRows * GridDefaults.DEFAULT_GRID_ROW_HEIGHT;
+
     ref.current.style.height = `${height}px`;
     ref.current
       .closest(".scroll-parent")
@@ -197,11 +147,13 @@ function useUpdateRows(
       occupiedSpacesByChildren,
       widgetId,
     );
+
     // If the current number of rows in the drop target is less
     // than the expected number of rows in the drop target
     if (rowRef.current < newRows) {
       // Set the new value locally
       rowRef.current = newRows;
+
       // If the parent container like widget has auto height enabled
       // We'd like to immediately update the parent's height
       // based on the auto height computations
@@ -223,8 +175,10 @@ function useUpdateRows(
           updateHeight(dropTargetRef, rowRef.current);
         }
       }
+
       return newRows;
     }
+
     return false;
   };
   // memoizing context values
@@ -240,7 +194,7 @@ function useUpdateRows(
 
 export function DropTargetComponent(props: DropTargetComponentProps) {
   // Get if this is in preview mode.
-  const isPreviewMode = useSelector(combinedPreviewModeSelector);
+  const isPreviewMode = useSelector(selectCombinedPreviewMode);
   const isAppSettingsPaneWithNavigationTabOpen = useSelector(
     getIsAppSettingsPaneWithNavigationTabOpen,
   );
@@ -261,11 +215,18 @@ export function DropTargetComponent(props: DropTargetComponentProps) {
     (state: AppState) => state.ui.widgetDragResize.isResizing,
   );
   // Are we currently dragging?
-  const isDragging = useSelector(
+  const isDraggingWidget = useSelector(
     (state: AppState) => state.ui.widgetDragResize.isDragging,
+  );
+  const isDraggingBuildingBlock = useSelector(isDraggingBuildingBlockToCanvas);
+
+  const isDragging = useMemo(
+    () => isDraggingWidget || isDraggingBuildingBlock,
+    [isDraggingWidget, isDraggingBuildingBlock],
   );
   // Are we changing the auto height limits by dragging the signifiers?
   const { isAutoHeightWithLimitsChanging } = useAutoHeightUIState();
+  const isWidgetSelectionBlocked = useSelector(getWidgetSelectionBlock);
 
   const dispatch = useDispatch();
 
@@ -286,7 +247,7 @@ export function DropTargetComponent(props: DropTargetComponentProps) {
   // This shows the property pane
   const showPropertyPane = useShowPropertyPane();
 
-  const { deselectAll, focusWidget } = useWidgetSelection();
+  const { focusWidget, goToWidgetAdd } = useWidgetSelection();
 
   // Everytime we get a new bottomRow, or we toggle shouldScrollContents
   // we call this effect
@@ -297,9 +258,11 @@ export function DropTargetComponent(props: DropTargetComponentProps) {
       props.isMobile,
       isAutoLayoutActive,
     );
+
     // If the current ref is not set to the new snaprows we've received (based on bottomRow)
     if (rowRef.current !== snapRows && !isDragging && !isResizing) {
       rowRef.current = snapRows;
+
       if (!isAutoLayoutActive || !props.isListWidgetCanvas) {
         updateHeight(dropTargetRef, snapRows);
       }
@@ -334,10 +297,15 @@ export function DropTargetComponent(props: DropTargetComponentProps) {
       (e.target as HTMLDivElement).dataset.testid === selectionDiv ||
       (e.target as HTMLDivElement).dataset.testid === mainCanvasId;
 
-    if (!isResizing && !isDragging && !isAutoHeightWithLimitsChanging) {
+    if (
+      !isResizing &&
+      !isDragging &&
+      !isAutoHeightWithLimitsChanging &&
+      !isWidgetSelectionBlocked
+    ) {
       // Check if Target is the MainCanvas
       if (isTargetMainCanvas) {
-        deselectAll();
+        goToWidgetAdd();
         focusWidget && focusWidget(props.widgetId);
         showPropertyPane && showPropertyPane();
         e.preventDefault();

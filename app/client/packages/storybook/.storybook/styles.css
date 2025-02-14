@@ -8,6 +8,8 @@
 @import url("https://fonts.googleapis.com/css2?family=Rubik:ital,wght@0,300;0,400;0,500;0,700;1,300;1,400;1,500;1,700&display=swap");
 @import url("https://fonts.googleapis.com/css2?family=Ubuntu:ital,wght@0,300;0,400;0,500;0,700;1,300;1,400;1,500;1,700&display=swap");
 
+@import url("@appsmith/ads/src/__theme__/default/index.css"); /* This is to make theme variable available for stories */
+
 html,
 body,
 #storybook-root {
@@ -15,8 +17,9 @@ body,
   width: 100%;
 }
 
+.sb-show-main.sb-main-padded,
 .sbdocs.sbdocs-wrapper {
-  padding: 20px;
+  padding: 0;
 }
 
 .sbdocs.sbdocs-content {

@@ -1,20 +1,35 @@
 import React, { createContext, useMemo } from "react";
-import type { ActionParentEntityTypeInterface } from "@appsmith/entities/Engine/actionHelpers";
-import { ACTION_PARENT_ENTITY_TYPE } from "@appsmith/entities/Engine/actionHelpers";
+import type { ActionParentEntityTypeInterface } from "ee/entities/Engine/actionHelpers";
 
 export enum ActionEntityContextMenuItemsEnum {
-  EDIT_NAME = "Edit Name",
+  RENAME = "Rename",
   SHOW_BINDING = "Show Bindings",
+  CONVERT_QUERY_MODULE_INSTANCE = "Create Module",
   COPY = "Copy",
   MOVE = "Move",
   DELETE = "Delete",
 }
 
+export const defaultMenuItems = [
+  ActionEntityContextMenuItemsEnum.RENAME,
+  ActionEntityContextMenuItemsEnum.DELETE,
+  ActionEntityContextMenuItemsEnum.SHOW_BINDING,
+  ActionEntityContextMenuItemsEnum.COPY,
+  ActionEntityContextMenuItemsEnum.MOVE,
+  ActionEntityContextMenuItemsEnum.CONVERT_QUERY_MODULE_INSTANCE,
+];
+
 interface FilesContextContextProps {
   canCreateActions: boolean;
   editorId: string; // applicationId, workflowId or packageId
+  menuItems?: ActionEntityContextMenuItemsEnum[];
   parentEntityId: string; // page, workflow or module
   parentEntityType: ActionParentEntityTypeInterface;
+  showModules?: boolean;
+  showWorkflows?: boolean;
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  selectFilesForExplorer?: (state: any) => any;
 }
 
 type FilesContextProviderProps =
@@ -34,29 +49,34 @@ export const FilesContextProvider = ({
   canCreateActions,
   children,
   editorId,
+  menuItems,
   parentEntityId,
   parentEntityType,
+  selectFilesForExplorer,
+  showModules,
+  showWorkflows,
 }: FilesContextProviderProps) => {
-  const menuItems = [
-    ActionEntityContextMenuItemsEnum.EDIT_NAME,
-    ActionEntityContextMenuItemsEnum.DELETE,
-  ];
-  if (parentEntityType === ACTION_PARENT_ENTITY_TYPE.PAGE) {
-    menuItems.push(
-      ActionEntityContextMenuItemsEnum.SHOW_BINDING,
-      ActionEntityContextMenuItemsEnum.COPY,
-      ActionEntityContextMenuItemsEnum.MOVE,
-    );
-  }
   const value = useMemo(() => {
     return {
       canCreateActions,
       editorId,
       parentEntityId,
       parentEntityType,
-      menuItems,
+      menuItems: menuItems || defaultMenuItems,
+      selectFilesForExplorer,
+      showModules,
+      showWorkflows,
     };
-  }, [canCreateActions, parentEntityId, parentEntityType]);
+  }, [
+    canCreateActions,
+    parentEntityId,
+    parentEntityType,
+    menuItems,
+    showModules,
+    showWorkflows,
+    selectFilesForExplorer,
+    editorId,
+  ]);
 
   return (
     <FilesContext.Provider value={value}>{children}</FilesContext.Provider>

@@ -7,7 +7,7 @@ import {
   LOGIN_FORM_NAME,
   LOGIN_FORM_EMAIL_FIELD_NAME,
   LOGIN_FORM_PASSWORD_FIELD_NAME,
-} from "@appsmith/constants/forms";
+} from "ee/constants/forms";
 import { FORGOT_PASSWORD_URL, SETUP, SIGN_UP_URL } from "constants/routes";
 import {
   LOGIN_PAGE_TITLE,
@@ -24,21 +24,21 @@ import {
   LOGIN_PAGE_INVALID_CREDS_FORGOT_PASSWORD_LINK,
   NEW_TO_APPSMITH,
   createMessage,
-  LOGIN_PAGE_SUBTITLE,
-} from "@appsmith/constants/messages";
-import { FormGroup } from "design-system-old";
-import { Button, Link, Callout } from "design-system";
+} from "ee/constants/messages";
+import { FormGroup } from "@appsmith/ads-old";
+import { Button, Link, Callout } from "@appsmith/ads";
 import FormTextField from "components/utils/ReduxFormTextField";
 import ThirdPartyAuth from "pages/UserAuth/ThirdPartyAuth";
 import { isEmail, isEmptyString } from "utils/formhelpers";
 import type { LoginFormValues } from "pages/UserAuth/helpers";
 
-import { SpacedSubmitForm, FormActions } from "pages/UserAuth/StyledComponents";
-import AnalyticsUtil from "utils/AnalyticsUtil";
-import { LOGIN_SUBMIT_PATH } from "@appsmith/constants/ApiConstants";
-import PerformanceTracker, {
-  PerformanceTransactionName,
-} from "utils/PerformanceTracker";
+import {
+  SpacedSubmitForm,
+  FormActions,
+  EmailFormWrapper,
+} from "pages/UserAuth/StyledComponents";
+import AnalyticsUtil from "ee/utils/AnalyticsUtil";
+import { LOGIN_SUBMIT_PATH } from "ee/constants/ApiConstants";
 import { getIsSafeRedirectURL } from "utils/helpers";
 import { getCurrentUser } from "selectors/usersSelectors";
 import Container from "pages/UserAuth/Container";
@@ -46,23 +46,26 @@ import {
   getThirdPartyAuths,
   getIsFormLoginEnabled,
   getTenantConfig,
-} from "@appsmith/selectors/tenantSelectors";
+} from "ee/selectors/tenantSelectors";
 import Helmet from "react-helmet";
 import { useFeatureFlag } from "utils/hooks/useFeatureFlag";
-import { FEATURE_FLAG } from "@appsmith/entities/FeatureFlag";
-import { getHTMLPageTitle } from "@appsmith/utils/BusinessFeatures/brandingPageHelpers";
-
+import { FEATURE_FLAG } from "ee/entities/FeatureFlag";
+import { getHTMLPageTitle } from "ee/utils/BusinessFeatures/brandingPageHelpers";
+import * as Sentry from "@sentry/react";
+import { Severity } from "@sentry/react";
 const validate = (values: LoginFormValues, props: ValidateProps) => {
   const errors: LoginFormValues = {};
   const email = values[LOGIN_FORM_EMAIL_FIELD_NAME] || "";
   const password = values[LOGIN_FORM_PASSWORD_FIELD_NAME];
   const { isPasswordFieldDirty, touch } = props;
+
   if (!password || isEmptyString(password)) {
     isPasswordFieldDirty && touch?.(LOGIN_FORM_PASSWORD_FIELD_NAME);
     errors[LOGIN_FORM_PASSWORD_FIELD_NAME] = createMessage(
       FORM_VALIDATION_EMPTY_PASSWORD,
     );
   }
+
   if (!isEmptyString(email) && !isEmail(email)) {
     touch?.(LOGIN_FORM_EMAIL_FIELD_NAME);
     errors[LOGIN_FORM_EMAIL_FIELD_NAME] = createMessage(
@@ -103,32 +106,44 @@ export function Login(props: LoginFormProps) {
   let showError = false;
   let errorMessage = "";
   const currentUser = useSelector(getCurrentUser);
+
   if (currentUser?.emptyInstance) {
     return <Redirect to={SETUP} />;
   }
+
   if (queryParams.get("error")) {
     errorMessage = queryParams.get("message") || queryParams.get("error") || "";
     showError = true;
+    Sentry.captureException("Login failed", {
+      level: Severity.Error,
+      extra: {
+        error: new Error(errorMessage),
+      },
+    });
   }
+
   let loginURL = "/api/v1/" + LOGIN_SUBMIT_PATH;
   let signupURL = SIGN_UP_URL;
   const redirectUrl = queryParams.get("redirectUrl");
+
   if (redirectUrl != null && getIsSafeRedirectURL(redirectUrl)) {
     const encodedRedirectUrl = encodeURIComponent(redirectUrl);
+
     loginURL += `?redirectUrl=${encodedRedirectUrl}`;
     signupURL += `?redirectUrl=${encodedRedirectUrl}`;
   }
 
   let forgotPasswordURL = `${FORGOT_PASSWORD_URL}`;
+
   if (props.emailValue && !isEmptyString(props.emailValue)) {
     forgotPasswordURL += `?email=${props.emailValue}`;
   }
 
   const footerSection = isFormLoginEnabled && (
-    <div className="px-2 py-4 flex align-center justify-center text-base text-center text-[color:var(--ads-v2\-color-fg)] text-[14px]">
-      {createMessage(NEW_TO_APPSMITH)}
+    <div className="px-2 flex align-center justify-center text-center text-[color:var(--ads-v2\-color-fg)] text-[14px]">
+      {createMessage(NEW_TO_APPSMITH)}&nbsp;
       <Link
-        className="t--sign-up t--signup-link pl-[var(--ads-v2\-spaces-3)]"
+        className="t--sign-up t--signup-link"
         kind="primary"
         target="_self"
         to={signupURL}
@@ -139,11 +154,7 @@ export function Login(props: LoginFormProps) {
   );
 
   return (
-    <Container
-      footer={footerSection}
-      subtitle={createMessage(LOGIN_PAGE_SUBTITLE)}
-      title={createMessage(LOGIN_PAGE_TITLE)}
-    >
+    <Container footer={footerSection} title={createMessage(LOGIN_PAGE_TITLE)}>
       <Helmet>
         <title>{htmlPageTitle}</title>
       </Helmet>
@@ -171,7 +182,7 @@ export function Login(props: LoginFormProps) {
         <ThirdPartyAuth logins={socialLoginList} type={"SIGNIN"} />
       )}
       {isFormLoginEnabled && (
-        <>
+        <EmailFormWrapper>
           <SpacedSubmitForm action={loginURL} method="POST">
             <FormGroup
               intent={error ? "danger" : "none"}
@@ -202,9 +213,6 @@ export function Login(props: LoginFormProps) {
                 isDisabled={!isFormValid}
                 kind="primary"
                 onClick={() => {
-                  PerformanceTracker.startTracking(
-                    PerformanceTransactionName.LOGIN_CLICK,
-                  );
                   AnalyticsUtil.logEvent("LOGIN_CLICK", {
                     loginMethod: "EMAIL",
                   });
@@ -218,18 +226,20 @@ export function Login(props: LoginFormProps) {
           </SpacedSubmitForm>
           <Link
             className="justify-center"
+            kind="secondary"
             target="_self"
             to={forgotPasswordURL}
           >
             {createMessage(LOGIN_PAGE_FORGOT_PASSWORD_TEXT)}
           </Link>
-        </>
+        </EmailFormWrapper>
       )}
     </Container>
   );
 }
 
 const selector = formValueSelector(LOGIN_FORM_NAME);
+
 export default connect((state) => ({
   emailValue: selector(state, LOGIN_FORM_EMAIL_FIELD_NAME),
   isPasswordFieldDirty: isDirty(LOGIN_FORM_NAME)(

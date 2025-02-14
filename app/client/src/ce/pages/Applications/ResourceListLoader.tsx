@@ -3,9 +3,9 @@ import { noop } from "lodash";
 
 import Card from "components/common/Card";
 import CardList from "pages/Applications/CardList";
-import { Button } from "design-system";
+import { Button } from "@appsmith/ads";
 import { PaddingWrapper } from "pages/Applications/CommonElements";
-import type { ApplicationPayload } from "@appsmith/constants/ReduxActionConstants";
+import type { ApplicationPayload } from "entities/Application";
 
 interface ResourcesLoaderProps {
   isMobile: boolean;
@@ -14,11 +14,16 @@ interface ResourcesLoaderProps {
 
 const DEFAULT_BACKGROUND_COLOR = "#9747FF1A";
 const DEFAULT_ICON = "book";
+const DEAFULT_RESOURCES = [{ id: "default", name: "Default Resource" }];
 
 function ResourceListLoader({ isMobile, resources }: ResourcesLoaderProps) {
+  const resourcesToUse = resources?.length ? resources : DEAFULT_RESOURCES;
+
   return (
     <CardList isLoading isMobile={isMobile} title="Apps">
-      {resources.map((resource: any) => {
+      {/* TODO: Fix this the next time the file is edited */}
+      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+      {resourcesToUse.map((resource: any) => {
         return (
           <PaddingWrapper isMobile={isMobile} key={resource.id}>
             <Card

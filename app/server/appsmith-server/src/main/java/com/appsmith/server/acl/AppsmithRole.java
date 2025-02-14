@@ -2,8 +2,6 @@ package com.appsmith.server.acl;
 
 import lombok.Getter;
 
-import java.util.Arrays;
-import java.util.List;
 import java.util.Set;
 
 import static com.appsmith.server.acl.AclPermission.DELETE_WORKSPACES;
@@ -30,7 +28,7 @@ import static com.appsmith.server.constants.FieldName.WORKSPACE_VIEWER_DESCRIPTI
 
 @Getter
 public enum AppsmithRole {
-    ORGANIZATION_ADMIN(
+    WORKSPACE_ADMIN(
             ADMINISTRATOR,
             WORKSPACE_ADMINISTRATOR_DESCRIPTION,
             Set.of(
@@ -42,7 +40,7 @@ public enum AppsmithRole {
                     WORKSPACE_DELETE_DATASOURCES,
                     WORKSPACE_DELETE_APPLICATIONS,
                     DELETE_WORKSPACES)),
-    ORGANIZATION_DEVELOPER(
+    WORKSPACE_DEVELOPER(
             DEVELOPER,
             WORKSPACE_DEVELOPER_DESCRIPTION,
             Set.of(
@@ -56,7 +54,7 @@ public enum AppsmithRole {
                     WORKSPACE_CREATE_DATASOURCE,
                     WORKSPACE_DELETE_DATASOURCES,
                     WORKSPACE_DELETE_APPLICATIONS)),
-    ORGANIZATION_VIEWER(
+    WORKSPACE_VIEWER(
             VIEWER,
             WORKSPACE_VIEWER_DESCRIPTION,
             Set.of(
@@ -75,15 +73,5 @@ public enum AppsmithRole {
         this.name = name;
         this.description = description;
         this.permissions = permissions;
-    }
-
-    public static AppsmithRole generateAppsmithRoleFromName(String name) {
-        List<AppsmithRole> appsmithRoles = Arrays.asList(AppsmithRole.values());
-        for (AppsmithRole role : appsmithRoles) {
-            if (role.getName().equals(name)) {
-                return role;
-            }
-        }
-        return null;
     }
 }

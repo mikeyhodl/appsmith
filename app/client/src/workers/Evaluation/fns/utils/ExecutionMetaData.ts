@@ -1,4 +1,4 @@
-import type { TriggerMeta } from "@appsmith/sagas/ActionExecution/ActionExecutionSagas";
+import type { TriggerMeta } from "ee/sagas/ActionExecution/ActionExecutionSagas";
 import type {
   EventType,
   TriggerSource,
@@ -16,7 +16,9 @@ export default class ExecutionMetaData {
     enableJSFnPostProcessors?: boolean;
     enableJSVarUpdateTracking?: boolean;
   }) {
+    // triggerMeta.onPageLoad is not used in this function. A default value, false, is passed to it to comply with TriggerMeta interface
     const metaDataEntries = Object.entries(metaData);
+
     for (const [key, value] of metaDataEntries) {
       // @ts-expect-error: type unknown
       ExecutionMetaData[key] = value;
@@ -25,11 +27,15 @@ export default class ExecutionMetaData {
   static getExecutionMetaData() {
     const { source, triggerKind, triggerPropertyName } =
       ExecutionMetaData.triggerMeta || {};
+
     return {
       triggerMeta: {
         source: { ...source } as TriggerSource,
         triggerPropertyName,
         triggerKind,
+
+        // triggerMeta.onPageLoad is not used in this function. A default value, false, is passed to it to comply with TriggerMeta interface
+        onPageLoad: false,
       },
       eventType: ExecutionMetaData.eventType,
       enableJSVarUpdateTracking: ExecutionMetaData.enableJSVarUpdateTracking,

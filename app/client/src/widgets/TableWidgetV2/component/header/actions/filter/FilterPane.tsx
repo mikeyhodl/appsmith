@@ -2,7 +2,7 @@ import React, { Component } from "react";
 import { connect } from "react-redux";
 import { get } from "lodash";
 import * as log from "loglevel";
-import type { AppState } from "@appsmith/reducers";
+import type { AppState } from "ee/reducers";
 import styled from "styled-components";
 
 import { Colors } from "constants/Colors";
@@ -17,11 +17,9 @@ import Popper from "pages/Editor/Popper";
 import { generateClassName } from "utils/generators";
 import { getTableFilterState } from "selectors/tableFilterSelectors";
 import { getWidgetMetaProps } from "sagas/selectors";
-import { ReduxActionTypes } from "@appsmith/constants/ReduxActionConstants";
+import { ReduxActionTypes } from "ee/constants/ReduxActionConstants";
 import type { WidgetProps } from "widgets/BaseWidget";
-import { selectWidgetInitAction } from "actions/widgetSelectionActions";
-import { SelectionRequestType } from "sagas/WidgetSelectUtils";
-import { importSvg } from "design-system-old";
+import { importSvg } from "@appsmith/ads-old";
 import { CANVAS_ART_BOARD } from "constants/componentClassNameConstants";
 
 const DragHandleIcon = importSvg(
@@ -71,6 +69,8 @@ class TableFilterPane extends Component<Props> {
     return ThemeMode.LIGHT;
   }
 
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   handlePositionUpdate = (position: any) => {
     this.props.setPanePosition(
       this.props.tableFilterPane.widgetId as string,
@@ -145,8 +145,12 @@ const mapStateToProps = (state: AppState, ownProps: TableFilterPaneProps) => {
   };
 };
 
+// TODO: Fix this the next time the file is edited
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const mapDispatchToProps = (dispatch: any) => {
   return {
+    // TODO: Fix this the next time the file is edited
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     setPanePosition: (widgetId: string, position: any) => {
       dispatch({
         type: ReduxActionTypes.TABLE_PANE_MOVED,
@@ -155,15 +159,14 @@ const mapDispatchToProps = (dispatch: any) => {
           position,
         },
       });
-      dispatch(selectWidgetInitAction(SelectionRequestType.One, [widgetId]));
     },
     hideFilterPane: (widgetId: string) => {
       dispatch({
         type: ReduxActionTypes.HIDE_TABLE_FILTER_PANE,
         payload: { widgetId },
       });
-      dispatch(selectWidgetInitAction(SelectionRequestType.One, [widgetId]));
     },
   };
 };
+
 export default connect(mapStateToProps, mapDispatchToProps)(TableFilterPane);

@@ -11,10 +11,11 @@ import type {
   EditorProps,
   EditorStyleProps,
 } from "components/editorComponents/CodeEditor";
-import { Spinner } from "design-system";
+import { Spinner } from "@appsmith/ads";
 import { JS_OBJECT_START_STATEMENT } from "plugins/Linting/constants";
 
 export default function CodeEditorFallback({
+  borderLess,
   height,
   input,
   isReadOnly,
@@ -28,11 +29,12 @@ export default function CodeEditorFallback({
 > & {
   onInteracted: () => void;
   showLoadingProgress: boolean;
-} & Pick<EditorStyleProps, "height">) {
+} & Pick<EditorStyleProps, "height" | "borderLess">) {
   const parsedValue = parseInputValue();
 
   let contentKind: ContentKind;
   let fallbackToRender: string;
+
   if (!parsedValue) {
     contentKind = ContentKind.PLACEHOLDER;
     fallbackToRender = placeholder || "";
@@ -53,8 +55,10 @@ export default function CodeEditorFallback({
 
   function parseInputValue() {
     const value = input.value;
+
     try {
       if (value && typeof value === "string") return value;
+
       return JSON.parse(value);
     } catch (e) {
       return value;
@@ -63,6 +67,7 @@ export default function CodeEditorFallback({
 
   return (
     <ContentWrapper
+      borderLess={!!borderLess}
       contentKind={contentKind}
       height={height}
       showLineNumbers={showLineNumbers}

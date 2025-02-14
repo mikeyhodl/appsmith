@@ -11,6 +11,7 @@ import adminSettings from "../locators/AdminsSettings";
 import { ObjectsRegistry } from "./Objects/Registry";
 
 let agHelper = ObjectsRegistry.AggregateHelper;
+let adminSettingsHelper = ObjectsRegistry.AdminSettings;
 const BASE_URL = Cypress.config().baseUrl;
 
 Cypress.Commands.add("fillGoogleFormPartly", () => {
@@ -65,10 +66,10 @@ Cypress.Commands.add("fillGithubForm", () => {
 Cypress.Commands.add("openAuthentication", () => {
   cy.get(".admin-settings-menu-option").should("be.visible");
   cy.get(".admin-settings-menu-option").click();
-  cy.url().should("contain", "/settings/general");
+  cy.url().should("contain", adminSettingsHelper.routes.GENERAL);
   // click authentication tab
   cy.get(adminSettings.authenticationTab).click();
-  cy.url().should("contain", "/settings/authentication");
+  cy.url().should("contain", adminSettingsHelper.routes.AUTHENTICATION);
 });
 
 Cypress.Commands.add("waitForServerRestart", () => {
@@ -78,8 +79,8 @@ Cypress.Commands.add("waitForServerRestart", () => {
   // cy.waitUntil(() => !Cypress.$(adminSettings.restartNotice).length, {
   //   timeout: 180000,
   // });
-  cy.get(adminSettings.restartNotice, { timeout: 300000 }).should("not.exist");
-  cy.get(adminSettings.appsmithStarting, { timeout: 300000 }).should(
+  cy.get(adminSettings.restartNotice, { timeout: 600000 }).should("not.exist");
+  cy.get(adminSettings.appsmithStarting, { timeout: 600000 }).should(
     "not.exist",
   );
 

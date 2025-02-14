@@ -1,21 +1,17 @@
 import { ValidationTypes } from "constants/WidgetValidation";
-import { EvaluationSubstitutionType } from "entities/DataTree/dataTreeFactory";
+import { EvaluationSubstitutionType } from "ee/entities/DataTree/types";
 import type { ChartWidgetProps } from "widgets/ChartWidget/widget";
 import {
   CUSTOM_CHART_TYPES,
   LabelOrientation,
   LABEL_ORIENTATION_COMPATIBLE_CHARTS,
-  messages,
 } from "../constants";
 import type { WidgetProps } from "widgets/BaseWidget";
 
 export const isLabelOrientationApplicableFor = (chartType: string) =>
   LABEL_ORIENTATION_COMPATIBLE_CHARTS.includes(chartType);
 
-const labelOptions = (
-  customEChartsEnabled: boolean,
-  showCustomFusionChartDeprecationMessage: boolean,
-) => {
+const labelOptions = () => {
   const options = [
     {
       label: "Line chart",
@@ -38,26 +34,19 @@ const labelOptions = (
       value: "AREA_CHART",
     },
     {
-      label: messages.customFusionChartOptionLabel(
-        showCustomFusionChartDeprecationMessage,
-      ),
+      label: "Custom EChart",
+      value: "CUSTOM_ECHART",
+    },
+    {
+      label: "Custom Fusion Charts (deprecated)",
       value: "CUSTOM_FUSION_CHART",
     },
   ];
 
-  if (customEChartsEnabled) {
-    options.splice(options.length - 1, 0, {
-      label: "Custom EChart",
-      value: "CUSTOM_ECHART",
-    });
-  }
   return options;
 };
 
-export const contentConfig = (
-  customEChartsEnabled: boolean,
-  showCustomFusionChartDeprecationMessage: boolean,
-) => {
+export const contentConfig = () => {
   return [
     {
       sectionName: "Data",
@@ -67,10 +56,7 @@ export const contentConfig = (
           propertyName: "chartType",
           label: "Chart type",
           controlType: "DROP_DOWN",
-          options: labelOptions(
-            customEChartsEnabled,
-            showCustomFusionChartDeprecationMessage,
-          ),
+          options: labelOptions(),
           isJSConvertible: true,
           isBindProperty: true,
           isTriggerProperty: false,
@@ -99,7 +85,7 @@ export const contentConfig = (
             wrapperCode: {
               prefix: "{{ ((chartType) => ( ",
               suffix: (widget: WidgetProps) =>
-                `))(${widget.widgetName}.chartType); }}`,
+                `))(${widget.widgetName}.chartType) }}`,
             },
           },
           isBindProperty: true,
@@ -332,6 +318,8 @@ export const contentConfig = (
           isBindProperty: true,
           isTriggerProperty: false,
           validation: { type: ValidationTypes.BOOLEAN },
+          // TODO: Fix this the next time the file is edited
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           hidden: (props: any) => props.chartType == "CUSTOM_ECHART",
         },
         {
@@ -343,6 +331,8 @@ export const contentConfig = (
           isBindProperty: true,
           isTriggerProperty: false,
           validation: { type: ValidationTypes.TEXT },
+          // TODO: Fix this the next time the file is edited
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           hidden: (props: any) =>
             ["CUSTOM_FUSION_CHART", "CUSTOM_ECHART"].includes(props.chartType),
           dependencies: ["chartType"],
@@ -356,6 +346,8 @@ export const contentConfig = (
           isBindProperty: true,
           isTriggerProperty: false,
           validation: { type: ValidationTypes.TEXT },
+          // TODO: Fix this the next time the file is edited
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           hidden: (props: any) =>
             ["CUSTOM_FUSION_CHART", "CUSTOM_ECHART"].includes(props.chartType),
           dependencies: ["chartType"],

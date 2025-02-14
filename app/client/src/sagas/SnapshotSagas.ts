@@ -3,11 +3,11 @@ import {
   updateSnapshotDetails,
 } from "actions/autoLayoutActions";
 import type { ApiResponse } from "api/ApiResponses";
-import ApplicationApi from "@appsmith/api/ApplicationApi";
-import type { PageDefaultMeta } from "@appsmith/api/ApplicationApi";
-import { ReduxActionTypes } from "@appsmith/constants/ReduxActionConstants";
+import ApplicationApi from "ee/api/ApplicationApi";
+import type { PageDefaultMeta } from "ee/api/ApplicationApi";
+import { ReduxActionTypes } from "ee/constants/ReduxActionConstants";
 import log from "loglevel";
-import type { SnapShotDetails } from "reducers/uiReducers/layoutConversionReducer";
+import type { SnapshotDetails } from "reducers/uiReducers/layoutConversionReducer";
 import { CONVERSION_STATES } from "reducers/uiReducers/layoutConversionReducer";
 import { all, call, put, select, takeLatest } from "redux-saga/effects";
 import { getCurrentApplicationId } from "selectors/editorSelectors";
@@ -15,14 +15,16 @@ import { getLogToSentryFromResponse } from "utils/helpers";
 import { validateResponse } from "./ErrorSagas";
 import { updateApplicationLayoutType } from "./AutoLayoutUpdateSagas";
 import { LayoutSystemTypes } from "layoutSystems/types";
-import AnalyticsUtil from "utils/AnalyticsUtil";
+import AnalyticsUtil from "ee/utils/AnalyticsUtil";
 import { getLayoutSystemType } from "selectors/layoutSystemSelectors";
 
 //Saga to create application snapshot
 export function* createSnapshotSaga() {
   let response: ApiResponse | undefined;
+
   try {
     const applicationId: string = yield select(getCurrentApplicationId);
+
     response = yield ApplicationApi.createApplicationSnapShot({
       applicationId,
     });
@@ -43,9 +45,11 @@ export function* createSnapshotSaga() {
 
 //Saga to fetch application snapshot
 export function* fetchSnapshotSaga() {
-  let response: ApiResponse<SnapShotDetails> | undefined;
+  let response: ApiResponse<SnapshotDetails> | undefined;
+
   try {
     const applicationId: string = yield select(getCurrentApplicationId);
+
     response = yield ApplicationApi.getSnapShotDetails({
       applicationId,
     });
@@ -57,9 +61,7 @@ export function* fetchSnapshotSaga() {
     );
 
     if (isValidResponse) {
-      const snapShotDetails = response?.data;
-
-      return snapShotDetails;
+      return response?.data;
     }
   } catch (error) {
     if (getLogToSentryFromResponse(response)) {
@@ -71,8 +73,11 @@ export function* fetchSnapshotSaga() {
 
 //Saga to restore application snapshot
 function* restoreApplicationFromSnapshotSaga() {
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let response: ApiResponse<any> | undefined;
   let appId = "";
+
   try {
     appId = yield select(getCurrentApplicationId);
     AnalyticsUtil.logEvent("RESTORE_SNAPSHOT", {
@@ -80,6 +85,7 @@ function* restoreApplicationFromSnapshotSaga() {
     });
 
     const applicationId: string = yield select(getCurrentApplicationId);
+
     response = yield ApplicationApi.restoreApplicationFromSnapshot({
       applicationId,
     });
@@ -100,9 +106,11 @@ function* restoreApplicationFromSnapshotSaga() {
         payload: {
           pages: response.data.pages.map((page: PageDefaultMeta) => ({
             pageId: page.id,
+            basePageId: page.baseId,
             isDefault: page.isDefault,
           })),
           applicationId,
+          baseApplicationId: response.data.baseId,
         },
       });
     }
@@ -121,8 +129,11 @@ function* restoreApplicationFromSnapshotSaga() {
         setLayoutConversionStateAction(CONVERSION_STATES.COMPLETED_SUCCESS),
       );
     }
+    // TODO: Fix this the next time the file is edited
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } catch (e: any) {
     let error: Error = e;
+
     if (error) {
       error.message = `Layout conversion error - while restoring snapshot: ${error.message}`;
     } else {
@@ -145,8 +156,10 @@ function* restoreApplicationFromSnapshotSaga() {
 //Saga to delete application snapshot
 export function* deleteApplicationSnapshotSaga() {
   let response: ApiResponse | undefined;
+
   try {
     const applicationId: string = yield select(getCurrentApplicationId);
+
     response = yield ApplicationApi.deleteApplicationSnapShot({
       applicationId,
     });
@@ -169,15 +182,10 @@ export function* deleteApplicationSnapshotSaga() {
 //Saga to update snapshot details by fetching info from backend
 function* updateSnapshotDetailsSaga() {
   try {
-    const snapShotDetails: { updatedTime: Date } | undefined =
+    const snapshotDetails: SnapshotDetails | undefined =
       yield call(fetchSnapshotSaga);
-    yield put(
-      updateSnapshotDetails(
-        snapShotDetails && snapShotDetails.updatedTime
-          ? { lastUpdatedTime: snapShotDetails.updatedTime?.toString() }
-          : undefined,
-      ),
-    );
+
+    yield put(updateSnapshotDetails(snapshotDetails));
   } catch (error) {
     throw error;
   }

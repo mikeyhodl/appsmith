@@ -5,8 +5,8 @@ import {
   GSHEET_SHEET_LOADING,
   GSHEET_SPREADSHEET_LOADING,
   LOADING_SCHEMA,
-} from "@appsmith/constants/messages";
-import { Spinner, Text } from "design-system";
+} from "ee/constants/messages";
+import { Spinner, Text } from "@appsmith/ads";
 import { MessageWrapper } from "./SchemaViewModeCSS";
 
 type LoadingItemType = "SPREADSHEET" | "SHEET" | "DATA" | "SCHEMA";
@@ -22,10 +22,10 @@ const ItemLoadingIndicator = ({ type }: { type: LoadingItemType }) => {
           type === "SPREADSHEET"
             ? GSHEET_SPREADSHEET_LOADING
             : type === "SHEET"
-            ? GSHEET_SHEET_LOADING
-            : type === "SCHEMA"
-            ? LOADING_SCHEMA
-            : GSHEET_DATA_LOADING,
+              ? GSHEET_SHEET_LOADING
+              : type === "SCHEMA"
+                ? LOADING_SCHEMA
+                : GSHEET_DATA_LOADING,
         )}
       </Text>
     </MessageWrapper>

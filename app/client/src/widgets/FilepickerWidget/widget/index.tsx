@@ -1,26 +1,29 @@
-import React from "react";
 import type { Uppy } from "@uppy/core";
-import type { WidgetProps, WidgetState } from "../../BaseWidget";
-import BaseWidget from "../../BaseWidget";
-import FilePickerComponent from "../component";
-import { ValidationTypes } from "constants/WidgetValidation";
-import { EventType } from "constants/AppsmithActionConstants/ActionConstants";
-import type { DerivedPropertiesMap } from "WidgetProvider/factory";
 import type Dashboard from "@uppy/dashboard";
-import shallowequal from "shallowequal";
-import _ from "lodash";
-import FileDataTypes from "./FileDataTypes";
-import log from "loglevel";
-import { EvaluationSubstitutionType } from "entities/DataTree/dataTreeFactory";
-import { DefaultAutocompleteDefinitions } from "widgets/WidgetUtils";
 import type {
   AutocompletionDefinitions,
   PropertyUpdates,
   SnipingModeProperty,
+  WidgetCallout,
 } from "WidgetProvider/constants";
-import { importUppy, isUppyLoaded } from "utils/importUppy";
+import type { DerivedPropertiesMap } from "WidgetProvider/factory";
+import { EventType } from "constants/AppsmithActionConstants/ActionConstants";
+import { WIDGET_TAGS } from "constants/WidgetConstants";
+import { ValidationTypes } from "constants/WidgetValidation";
 import type { SetterConfig } from "entities/AppTheming";
+import { EvaluationSubstitutionType } from "ee/entities/DataTree/types";
+import _ from "lodash";
+import log from "loglevel";
+import { buildDeprecationWidgetMessage } from "pages/Editor/utils";
+import React from "react";
+import shallowequal from "shallowequal";
+import { importUppy, isUppyLoaded } from "utils/importUppy";
+import { DefaultAutocompleteDefinitions } from "widgets/WidgetUtils";
+import type { WidgetProps, WidgetState } from "../../BaseWidget";
+import BaseWidget from "../../BaseWidget";
+import FilePickerComponent from "../component";
 import IconSVG from "../icon.svg";
+import FileDataTypes from "./FileDataTypes";
 
 class FilePickerWidget extends BaseWidget<
   FilePickerWidgetProps,
@@ -44,6 +47,7 @@ class FilePickerWidget extends BaseWidget<
       hideCard: true,
       isDeprecated: true,
       replacement: "FILE_PICKER_WIDGET_V2",
+      tags: [WIDGET_TAGS.INPUTS],
     };
   }
 
@@ -77,6 +81,15 @@ class FilePickerWidget extends BaseWidget<
             propertyPath: "onFilesSelected",
             propertyValue: propValueMap.run,
             isDynamicPropertyPath: true,
+          },
+        ];
+      },
+      getEditorCallouts(): WidgetCallout[] {
+        return [
+          {
+            message: buildDeprecationWidgetMessage(
+              FilePickerWidget.getConfig().name,
+            ),
           },
         ];
       },
@@ -285,9 +298,11 @@ class FilePickerWidget extends BaseWidget<
       },
     ];
   }
+
   static getDefaultPropertiesMap(): Record<string, string> {
     return {};
   }
+
   static getDerivedPropertiesMap(): DerivedPropertiesMap {
     return {
       isValid: `{{ this.isRequired ? this.files.length > 0 : true }}`,
@@ -295,6 +310,8 @@ class FilePickerWidget extends BaseWidget<
     };
   }
 
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   static getMetaPropertiesMap(): Record<string, any> {
     return {
       selectedFiles: [],
@@ -359,6 +376,7 @@ class FilePickerWidget extends BaseWidget<
     };
 
     const uppy = await this.loadAndInitUppyOnce();
+
     uppy.setOptions(uppyState);
   };
 
@@ -418,30 +436,38 @@ class FilePickerWidget extends BaseWidget<
       });
     }
 
+    // TODO: Fix this the next time the file is edited
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     uppy.on("file-removed", (file: any) => {
       const updatedFiles = this.props.selectedFiles
         ? this.props.selectedFiles.filter((dslFile) => {
             return file.id !== dslFile.id;
           })
         : [];
+
       this.props.updateWidgetMetaProperty("selectedFiles", updatedFiles);
     });
 
+    // TODO: Fix this the next time the file is edited
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     uppy.on("files-added", (files: any[]) => {
       const dslFiles = this.props.selectedFiles
         ? [...this.props.selectedFiles]
         : [];
       const fileReaderPromises = files.map(async (file) => {
         const reader = new FileReader();
+
         return new Promise((resolve) => {
           reader.readAsDataURL(file.data);
           reader.onloadend = () => {
             const base64data = reader.result;
             const binaryReader = new FileReader();
+
             binaryReader.readAsBinaryString(file.data);
             binaryReader.onloadend = () => {
               const rawData = binaryReader.result;
               const textReader = new FileReader();
+
               textReader.readAsText(file.data);
               textReader.onloadend = () => {
                 const text = textReader.result;
@@ -455,8 +481,8 @@ class FilePickerWidget extends BaseWidget<
                     this.props.fileDataType === FileDataTypes.Base64
                       ? base64data
                       : this.props.fileDataType === FileDataTypes.Binary
-                      ? rawData
-                      : text,
+                        ? rawData
+                        : text,
                   name: file.meta ? file.meta.name : undefined,
                 };
 
@@ -556,6 +582,7 @@ class FilePickerWidget extends BaseWidget<
           const uppy = await this.loadAndInitUppyOnce();
 
           const dashboardPlugin = uppy.getPlugin("Dashboard") as Dashboard;
+
           dashboardPlugin.closeModal();
         }}
         files={this.props.selectedFiles || []}
@@ -574,13 +601,17 @@ class FilePickerWidget extends BaseWidget<
           // Copying the `isUppyLoaded` value because `isUppyLoaded` *will* always be true
           // by the time `await this.initUppyInstanceOnce()` resolves.
           const isUppyLoadedByThisPoint = isUppyLoaded;
+
           if (!isUppyLoadedByThisPoint)
             this.setState({ isWaitingForUppyToLoad: true });
+
           const uppy = await this.loadAndInitUppyOnce();
+
           if (!isUppyLoadedByThisPoint)
             this.setState({ isWaitingForUppyToLoad: false });
 
           const dashboardPlugin = uppy.getPlugin("Dashboard") as Dashboard;
+
           dashboardPlugin.openModal();
         }}
         widgetId={this.props.widgetId}
@@ -598,6 +629,8 @@ export interface FilePickerWidgetProps extends WidgetProps {
   label: string;
   maxNumFiles?: number;
   maxFileSize?: number;
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   selectedFiles?: any[];
   allowedFileTypes: string[];
   onFilesSelected?: string;

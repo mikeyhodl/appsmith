@@ -4,12 +4,11 @@ import {
 } from "../../../../../support/Pages/EditorNavigation";
 
 const publish = require("../../../../../locators/publishWidgetspage.json");
-const explorer = require("../../../../../locators/explorerlocators.json");
 import * as _ from "../../../../../support/Objects/ObjectsCore";
 
 describe(
   "Checkbox Group Widget Functionality",
-  { tags: ["@tag.Widget", "@tag.Checkbox"] },
+  { tags: ["@tag.Widget", "@tag.Checkbox", "@tag.Binding"] },
   function () {
     let dsName;
     before(() => {
@@ -33,7 +32,6 @@ describe(
       _.dataSources.RunQuery();
 
       // add checkbox group widget
-      cy.get(explorer.addWidget).click();
       cy.dragAndDropToCanvas("checkboxgroupwidget", { x: 300, y: 300 });
       cy.openPropertyPane("checkboxgroupwidget");
 

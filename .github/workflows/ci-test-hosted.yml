@@ -69,7 +69,7 @@ jobs:
       # In case this is second attempt try restoring status of the prior attempt from cache
       - name: Restore the previous run result
         id: cache-appsmith
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: |
             ~/run_result
@@ -105,18 +105,20 @@ jobs:
 
       - name: Use Node.js
         if: steps.run_result.outputs.run_result != 'success'
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version-file: app/client/package.json
 
-      # actions/setup-node@v3 doesn’t work properly with Yarn 3
+      # actions/setup-node@v4 doesn’t work properly with Yarn 3
       # when the project lives in a subdirectory: https://github.com/actions/setup-node/issues/488
       # Restoring the cache manually instead
       - name: Restore Yarn cache
         if: steps.run_result.outputs.run_result != 'success'
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
-          path: app/client/.yarn/cache
+          path: |
+            app/client/.yarn/cache
+            app/client/node_modules/.cache/webpack/
           key: v1-yarn3-${{ hashFiles('app/client/yarn.lock') }}
           restore-keys: |
             v1-yarn3-
@@ -125,8 +127,7 @@ jobs:
       - name: Install dependencies
         if: steps.run_result.outputs.run_result != 'success'
         working-directory: app/client
-        run: |
-          yarn install --immutable
+        run: yarn install --immutable
 
       - name: Setting up the cypress tests
         if: steps.run_result.outputs.run_result != 'success'
@@ -136,11 +137,14 @@ jobs:
           chmod a+x ./cypress/setup-test-ci.sh
           ./cypress/setup-test-ci.sh
 
-      - uses: browser-actions/setup-chrome@latest
-        with:
-          chrome-version: stable
-      - run: |
-          echo "BROWSER_PATH=$(which chrome)" >> $GITHUB_ENV
+      - name: Install Google Chrome 129.0.6668.100
+        run: |
+          sudo apt-get remove google-chrome-stable
+          wget -q https://dl.google.com/linux/chrome/deb/pool/main/g/google-chrome-stable/google-chrome-stable_129.0.6668.100-1_amd64.deb
+          sudo apt-get update
+          sudo apt-get install -y ./google-chrome-stable_129.0.6668.100-1_amd64.deb
+          echo "BROWSER_PATH=$(which google-chrome)" >> $GITHUB_ENV
+          google-chrome --version
 
       - name: Save Git values
         # pass env variables from this step to other steps
@@ -155,7 +159,7 @@ jobs:
           echo COMMIT_INFO_SHA=$(git show -s --pretty=%H) >> $GITHUB_ENV
           echo COMMIT_INFO_TIMESTAMP=$(git show -s --pretty=%ct) >> $GITHUB_ENV
           echo COMMIT_INFO_REMOTE=$(git config --get remote.origin.url) >> $GITHUB_ENV
-          # delete the .git folder afterwords to use the environment values
+          # delete the .git folder afterwords to use the environment values 
           rm -rf .git
 
       - name: Show Git values
@@ -179,7 +183,6 @@ jobs:
           fi
 
       - name: Run the cypress test
-        uses: cypress-io/github-action@v6
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CYPRESS_USERNAME: ${{ secrets.CYPRESS_USERNAME }}
@@ -194,15 +197,12 @@ jobs:
           CYPRESS_TESTPASSWORD4: ${{ secrets.CYPRESS_TESTPASSWORD4 }}
           CYPRESS_S3_ACCESS_KEY: ${{ secrets.CYPRESS_S3_ACCESS_KEY }}
           CYPRESS_S3_SECRET_KEY: ${{ secrets.CYPRESS_S3_SECRET_KEY }}
-          CYPRESS_GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
           CYPRESS_AIRTABLE_BEARER: ${{ secrets.AIRTABLE_BEARER }}
           CYPRESS_ORACLE_HOST: ${{ secrets.ORACLE_HOST }}
           CYPRESS_ORACLE_SERVICE: ${{ secrets.ORACLE_SERVICE }}
           CYPRESS_ORACLE_USERNAME: ${{ secrets.ORACLE_USERNAME }}
           CYPRESS_ORACLE_PASSWORD: ${{ secrets.ORACLE_PASSWORD }}
           CYPRESS_FIRESTORE_PRIVATE_KEY: ${{ secrets.FIRESTORE_PRIVATE_KEY }}
-          CYPRESS_GITHUB_PERSONAL_ACCESS_TOKEN: ${{ secrets.CYPRESS_GITHUB_PERSONAL_ACCESS_TOKEN }}
-          CYPRESS_TEST_GITHUB_USER_NAME: ${{ secrets.CYPRESS_TEST_GITHUB_USER_NAME }}
           CYPRESS_APPSMITH_OAUTH2_GOOGLE_CLIENT_ID: ${{ secrets.CYPRESS_APPSMITH_OAUTH2_GOOGLE_CLIENT_ID }}
           CYPRESS_APPSMITH_OAUTH2_GOOGLE_CLIENT_SECRET: ${{ secrets.CYPRESS_APPSMITH_OAUTH2_GOOGLE_CLIENT_SECRET }}
           CYPRESS_APPSMITH_OAUTH2_GITHUB_CLIENT_ID: ${{ secrets.CYPRESS_APPSMITH_OAUTH2_GITHUB_CLIENT_ID }}
@@ -243,11 +243,18 @@ jobs:
           CYPRESS_DB_PWD: ${{ secrets.CYPRESS_DB_PWD }}
           CYPRESS_S3_ACCESS: ${{ secrets.CYPRESS_S3_ACCESS }}
           CYPRESS_S3_SECRET: ${{ secrets.CYPRESS_S3_SECRET }}
-        with:
-          install: false
-          config-file: cypress_ci_hosted.config.ts
-          working-directory: app/client
-          env: "NODE_ENV=development"
+          CYPRESS_STATIC_ALLOCATION: true
+          CYPRESS_SNOWFLAKE_ACCOUNT_NAME: ${{ secrets.SNOWFLAKE_ACCOUNT_NAME }}
+          CYPRESS_SNOWFLAKE_USERNAME: ${{ secrets.SNOWFLAKE_USERNAME }}
+          CYPRESS_SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
+          NODE_ENV: development
+          GITHUB_WORKFLOW : ${{ github.workflow }}
+        run: |
+            cd app/client
+            npx cypress-repeat-pro run -n 3 --rerun-failed-only \
+                --config-file "cypress_ci_hosted.config.ts" \
+                --browser "${{ env.BROWSER_PATH }}"
+            cat cy-repeat-summary.txt
 
       - name: Rename reports
         if: failure()
@@ -257,17 +264,19 @@ jobs:
 
       - name: Upload cypress report
         if: failure()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: results-${{github.run_attempt}}
           path: ~/results
+          overwrite: true
 
       - name: Upload cypress snapshots
         if: failure()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: snapshots
           path: ${{ github.workspace }}/app/client/cypress/snapshots
+          overwrite: true
 
       # Set status = failedtest
       - name: Set fail if there are test failures
@@ -280,7 +289,7 @@ jobs:
       # Force store previous run result to cache
       - name: Store the previous run result
         if: failure()
-        uses: actions/cache/save@v3
+        uses: actions/cache/save@v4
         with:
           path: |
             ~/run_result
@@ -292,11 +301,11 @@ jobs:
         id: slack_notification
         run: |
           if [[ "${{ steps.test_status.outputs.run_result }}" == "failedtest" ]]; then
-            echo "slack_message=There are test failures in the run. Cypress Dashboard: <https://internal.appsmith.com/app/cypress-dashboard/rundetails-64ec3df0c632e24c00764938?branch=master&workflowId=${{ github.run_id }}&attempt=${{ github.run_attempt }}&selectiontype=test&testsstatus=failed&specsstatus=fail|Click here!>" >> $GITHUB_OUTPUT
+            echo "slack_message=There are test failures in the run. Cypress Dashboard: <https://internal.appsmith.com/app/cypress-dashboard/rundetails-65890b3c81d7400d08fa9ee5?branch=master&workflowId=${{ github.run_id }}&attempt=${{ github.run_attempt }}&selectiontype=test&testsstatus=failed&specsstatus=fail|Click here!>" >> $GITHUB_OUTPUT
             echo "slack_color=#FF0000" >> $GITHUB_OUTPUT
             echo "slack_icon=:parachute:" >> $GITHUB_OUTPUT
           else
-            echo "slack_message=All tests passed successfully :tada: . Cypress Dashboard: <https://internal.appsmith.com/app/cypress-dashboard/rundetails-64ec3df0c632e24c00764938?branch=master&workflowId=${{ github.run_id }}&attempt=${{ github.run_attempt }}|Click here!>" >> $GITHUB_OUTPUT
+            echo "slack_message=All tests passed successfully :tada: . Cypress Dashboard: <https://internal.appsmith.com/app/cypress-dashboard/rundetails-65890b3c81d7400d08fa9ee5?branch=master&workflowId=${{ github.run_id }}&attempt=${{ github.run_attempt }}|Click here!>" >> $GITHUB_OUTPUT
             echo "slack_color=#00FF00" >> $GITHUB_OUTPUT
             echo "slack_icon=:eight_spoked_asterisk:" >> $GITHUB_OUTPUT
           fi

@@ -1,9 +1,11 @@
 import log from "loglevel";
 import moment from "moment";
 import localforage from "localforage";
-import type { VersionUpdateState } from "../sagas/WebsocketSagas/versionUpdatePrompt";
 import { isNumber } from "lodash";
 import { EditorModes } from "components/editorComponents/CodeEditor/EditorConfig";
+import type { EditorViewMode } from "IDE/Interfaces/EditorTypes";
+import type { OverriddenFeatureFlags } from "./hooks/useFeatureFlagOverride";
+import { AvailableFeaturesToOverride } from "./hooks/useFeatureFlagOverride";
 
 export const STORAGE_KEYS: {
   [id: string]: string;
@@ -12,7 +14,6 @@ export const STORAGE_KEYS: {
   ROUTE_BEFORE_LOGIN: "RedirectPath",
   COPIED_WIDGET: "CopiedWidget",
   GROUP_COPIED_WIDGETS: "groupCopiedWidgets",
-  POST_WELCOME_TOUR: "PostWelcomeTour",
   RECENT_ENTITIES: "RecentEntities",
   TEMPLATES_NOTIFICATION_SEEN: "TEMPLATES_NOTIFICATION_SEEN",
   ONBOARDING_FORM_IN_PROGRESS: "ONBOARDING_FORM_IN_PROGRESS",
@@ -37,6 +38,11 @@ export const STORAGE_KEYS: {
   CURRENT_ENV: "CURRENT_ENV",
   AI_KNOWLEDGE_BASE: "AI_KNOWLEDGE_BASE",
   PARTNER_PROGRAM_CALLOUT: "PARTNER_PROGRAM_CALLOUT",
+  IDE_VIEW_MODE: "IDE_VIEW_MODE",
+  CODE_WIDGET_NAVIGATION_USED: "CODE_WIDGET_NAVIGATION_USED",
+  OVERRIDDEN_FEATURE_FLAGS: "OVERRIDDEN_FEATURE_FLAGS",
+  ACTION_TEST_PAYLOAD: "ACTION_TEST_PAYLOAD",
+  LATEST_GIT_BRANCH: "LATEST_GIT_BRANCH",
 };
 
 const store = localforage.createInstance({
@@ -45,6 +51,7 @@ const store = localforage.createInstance({
 
 export const resetAuthExpiration = () => {
   const expireBy = moment().add(1, "h").format();
+
   store.setItem(STORAGE_KEYS.AUTH_EXPIRATION, expireBy).catch((error) => {
     log.error("Unable to set expiration time");
     log.error(error);
@@ -55,47 +62,69 @@ export const hasAuthExpired = async () => {
   const expireBy: string | null = await store.getItem(
     STORAGE_KEYS.AUTH_EXPIRATION,
   );
+
   if (expireBy && moment().isAfter(moment(expireBy))) {
     return true;
   }
+
   return false;
 };
 
 export const saveCopiedWidgets = async (widgetJSON: string) => {
   try {
     await store.setItem(STORAGE_KEYS.COPIED_WIDGET, widgetJSON);
+
     return true;
   } catch (error) {
     log.error("An error occurred when storing copied widget: ", error);
+
     return false;
   }
 };
 
+// TODO: Fix this the next time the file is edited
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const getStoredUsersBetaFlags = async (email: any) => {
   return store.getItem(email);
 };
 
+// TODO: Fix this the next time the file is edited
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const setStoredUsersBetaFlags = async (email: any, userBetaFlagsObj: any) => {
   return store.setItem(email, userBetaFlagsObj);
 };
 
+// TODO: Fix this the next time the file is edited
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const setBetaFlag = async (email: any, key: string, value: any) => {
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const userBetaFlagsObj: any = await getStoredUsersBetaFlags(email);
   const updatedObj = {
     ...userBetaFlagsObj,
     [key]: value,
   };
+
   setStoredUsersBetaFlags(email, updatedObj);
 };
 
+// TODO: Fix this the next time the file is edited
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const getBetaFlag = async (email: any, key: string) => {
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const userBetaFlagsObj: any = await getStoredUsersBetaFlags(email);
 
   return userBetaFlagsObj && userBetaFlagsObj[key];
 };
 
+// TODO: Fix this the next time the file is edited
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const getReflowOnBoardingFlag = async (email: any) => {
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const userBetaFlagsObj: any = await getStoredUsersBetaFlags(email);
+
   return (
     userBetaFlagsObj && userBetaFlagsObj[STORAGE_KEYS.REFLOW_ONBOARDED_FLAG]
   );
@@ -106,84 +135,119 @@ export const getCopiedWidgets = async () => {
     const copiedWidgetData: string | null = await store.getItem(
       STORAGE_KEYS.COPIED_WIDGET,
     );
+
     if (copiedWidgetData && copiedWidgetData.length > 0) {
       return JSON.parse(copiedWidgetData);
     }
   } catch (error) {
     log.error("An error occurred when fetching copied widget: ", error);
+
     return;
   }
+
   return [];
 };
 
-// Function to save the current environment and the appId in indexedDB
-export const saveCurrentEnvironment = async (envId: string, appId: string) => {
-  try {
-    await store.setItem(STORAGE_KEYS.CURRENT_ENV, { envId, appId });
-    return true;
-  } catch (error) {
-    log.error("An error occurred when storing current env: ", error);
-    return false;
-  }
-};
-
-// Function to fetch the current environment and related appId from indexedDB
-export const getSavedCurrentEnvironmentDetails = async (): Promise<{
+export const migrateAppIdToEditorId = async (values: {
   envId: string;
-  appId: string;
+  appId?: string;
+}): Promise<{
+  envId: string;
+  editorId: string;
 }> => {
   try {
-    return (
-      (await store.getItem(STORAGE_KEYS.CURRENT_ENV)) || {
-        envId: "",
-        appId: "",
-      }
-    );
+    await store.setItem(STORAGE_KEYS.CURRENT_ENV, {
+      envId: values.envId,
+      editorId: values.appId,
+    });
+
+    return {
+      envId: values.envId || "",
+      editorId: values.appId || "",
+    };
   } catch (error) {
-    log.error("An error occurred when fetching current env: ", error);
+    log.error("An error occurred when updating current env: ", error);
+
     return {
       envId: "",
-      appId: "",
+      editorId: "",
     };
   }
 };
 
-// Function to reset the current environment and related appId from indexedDB
+// Function to save the current environment and the editorId in indexedDB
+export const saveCurrentEnvironment = async (
+  envId: string,
+  editorId: string,
+) => {
+  try {
+    await store.setItem(STORAGE_KEYS.CURRENT_ENV, { envId, editorId });
+
+    return true;
+  } catch (error) {
+    log.error("An error occurred when storing current env: ", error);
+
+    return false;
+  }
+};
+
+// Function to fetch the current environment and related editorId from indexedDB
+export const getSavedCurrentEnvironmentDetails = async (): Promise<{
+  envId: string;
+  editorId: string;
+}> => {
+  try {
+    let values = (await store.getItem(STORAGE_KEYS.CURRENT_ENV)) as {
+      envId: string;
+      editorId: string;
+      appId?: string;
+    };
+
+    if (values && values.hasOwnProperty("appId")) {
+      values = await migrateAppIdToEditorId(values);
+    }
+
+    return (
+      values || {
+        envId: "",
+        editorId: "",
+      }
+    );
+  } catch (error) {
+    log.error("An error occurred when fetching current env: ", error);
+
+    return {
+      envId: "",
+      editorId: "",
+    };
+  }
+};
+
+// Function to reset the current environment and related editorId from indexedDB
 export const resetCurrentEnvironment = async () => {
   try {
     await store.removeItem(STORAGE_KEYS.CURRENT_ENV);
+
     return true;
   } catch (error) {
     log.error("An error occurred when resetting current env: ", error);
+
     return false;
   }
 };
 
-export const setPostWelcomeTourState = async (flag: boolean) => {
-  try {
-    await store.setItem(STORAGE_KEYS.POST_WELCOME_TOUR, flag);
-    return true;
-  } catch (error) {
-    log.error("An error occurred when setting post welcome tour state", error);
-    return false;
-  }
-};
-
-export const getPostWelcomeTourState = async () => {
-  try {
-    return await store.getItem(STORAGE_KEYS.POST_WELCOME_TOUR);
-  } catch (error) {
-    log.error("An error occurred when getting post welcome tour state", error);
-  }
-};
-
+// TODO: Fix this the next time the file is edited
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const setRecentAppEntities = async (entities: any, appId: string) => {
   try {
     const recentEntities =
       ((await store.getItem(STORAGE_KEYS.RECENT_ENTITIES)) as Record<
         string,
+        // TODO: Fix this the next time the file is edited
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         any
       >) || {};
+
     recentEntities[appId] = entities;
     await store.setItem(STORAGE_KEYS.RECENT_ENTITIES, recentEntities);
   } catch (error) {
@@ -196,7 +260,10 @@ export const fetchRecentAppEntities = async (recentEntitiesKey: string) => {
   try {
     const recentEntities = (await store.getItem(
       STORAGE_KEYS.RECENT_ENTITIES,
+      // TODO: Fix this the next time the file is edited
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     )) as Record<string, any>;
+
     return (recentEntities && recentEntities[recentEntitiesKey]) || [];
   } catch (error) {
     log.error("An error occurred while fetching recent entities");
@@ -209,12 +276,16 @@ export const deleteRecentAppEntities = async (appId: string) => {
     const recentEntities =
       ((await store.getItem(STORAGE_KEYS.RECENT_ENTITIES)) as Record<
         string,
+        // TODO: Fix this the next time the file is edited
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         any
       >) || {};
+
     if (typeof recentEntities === "object") {
       // todo (rishabh s) purge recent entities across branches
       delete recentEntities[appId];
     }
+
     await store.setItem(STORAGE_KEYS.RECENT_ENTITIES, recentEntities);
   } catch (error) {
     log.error("An error occurred while saving recent entities");
@@ -225,10 +296,12 @@ export const deleteRecentAppEntities = async (appId: string) => {
 export const setOnboardingFormInProgress = async (flag?: boolean) => {
   try {
     await store.setItem(STORAGE_KEYS.ONBOARDING_FORM_IN_PROGRESS, flag);
+
     return true;
   } catch (error) {
     log.error("An error occurred when setting ONBOARDING_FORM_IN_PROGRESS");
     log.error(error);
+
     return false;
   }
 };
@@ -238,6 +311,7 @@ export const getOnboardingFormInProgress = async () => {
     const onboardingFormInProgress = await store.getItem(
       STORAGE_KEYS.ONBOARDING_FORM_IN_PROGRESS,
     );
+
     return onboardingFormInProgress;
   } catch (error) {
     log.error("An error occurred while fetching ONBOARDING_FORM_IN_PROGRESS");
@@ -248,6 +322,7 @@ export const getOnboardingFormInProgress = async () => {
 export const setEnableStartSignposting = async (flag: boolean) => {
   try {
     await store.setItem(STORAGE_KEYS.ENABLE_START_SIGNPOSTING, flag);
+
     return true;
   } catch (error) {
     log.error("An error occurred while setting ENABLE_START_SIGNPOSTING");
@@ -260,6 +335,7 @@ export const getEnableStartSignposting = async () => {
     const enableStartSignposting: string | null = await store.getItem(
       STORAGE_KEYS.ENABLE_START_SIGNPOSTING,
     );
+
     return enableStartSignposting;
   } catch (error) {
     log.error("An error occurred while fetching ENABLE_START_SIGNPOSTING");
@@ -285,6 +361,7 @@ export const setAIRecentQuery = async (
       if (applicationTypeQueries.length >= 3) {
         applicationTypeQueries.pop();
       }
+
       applicationTypeQueries = [query, ...applicationTypeQueries];
     }
 
@@ -313,6 +390,7 @@ export const getApplicationAIRecentQueriesByType = async (
         [task: string]: string[];
       };
     } | null = await store.getItem(STORAGE_KEYS.AI_RECENT_QUERIES);
+
     return (
       recentQueries?.[applicationId]?.[type]?.slice(0, 3) ??
       defaultRecentQueries
@@ -320,6 +398,7 @@ export const getApplicationAIRecentQueriesByType = async (
   } catch (error) {
     log.error("An error occurred while fetching AI_RECENT_QUERIES");
     log.error(error);
+
     return defaultRecentQueries;
   }
 };
@@ -332,16 +411,19 @@ export const setFirstTimeUserOnboardingApplicationId = async (id: string) => {
 
     if (ids) {
       ids = JSON.parse(ids as string);
+
       if (Array.isArray(ids) && !ids.includes(id)) {
         ids.push(id);
       }
     } else {
       ids = [id];
     }
+
     await store.setItem(
       STORAGE_KEYS.FIRST_TIME_USER_ONBOARDING_APPLICATION_IDS,
       JSON.stringify(ids),
     );
+
     return true;
   } catch (error) {
     log.error(
@@ -361,6 +443,7 @@ export const removeFirstTimeUserOnboardingApplicationId = async (
 
     if (ids) {
       ids = JSON.parse(ids as string);
+
       if (Array.isArray(ids)) {
         ids = ids.filter((exisitingId) => exisitingId !== id);
         await store.setItem(
@@ -369,6 +452,7 @@ export const removeFirstTimeUserOnboardingApplicationId = async (
         );
       }
     }
+
     return true;
   } catch (error) {
     log.error(
@@ -384,6 +468,7 @@ export const removeAllFirstTimeUserOnboardingApplicationIds = async () => {
       STORAGE_KEYS.FIRST_TIME_USER_ONBOARDING_APPLICATION_IDS,
       JSON.stringify([]),
     );
+
     return true;
   } catch (error) {
     log.error(
@@ -422,6 +507,7 @@ export const setFirstTimeUserOnboardingIntroModalVisibility = async (
       STORAGE_KEYS.FIRST_TIME_USER_ONBOARDING_INTRO_MODAL_VISIBILITY,
       flag,
     );
+
     return true;
   } catch (error) {
     log.error(
@@ -436,6 +522,7 @@ export const getFirstTimeUserOnboardingIntroModalVisibility = async () => {
     const flag: string | null = await store.getItem(
       STORAGE_KEYS.FIRST_TIME_USER_ONBOARDING_INTRO_MODAL_VISIBILITY,
     );
+
     return flag;
   } catch (error) {
     log.error(
@@ -451,6 +538,7 @@ export const hideConcurrentEditorWarningToast = async () => {
       STORAGE_KEYS.HIDE_CONCURRENT_EDITOR_WARNING_TOAST,
       true,
     );
+
     return true;
   } catch (error) {
     log.error(
@@ -465,6 +553,7 @@ export const getIsConcurrentEditorWarningToastHidden = async () => {
     const flag = await store.getItem(
       STORAGE_KEYS.HIDE_CONCURRENT_EDITOR_WARNING_TOAST,
     );
+
     return flag;
   } catch (error) {
     log.error(
@@ -479,12 +568,14 @@ export const getTemplateNotificationSeen = async () => {
     const seenTemplateNotifications = await store.getItem(
       STORAGE_KEYS.TEMPLATES_NOTIFICATION_SEEN,
     );
+
     return seenTemplateNotifications;
   } catch (error) {
     log.error(
       "An error occurred while getting TEMPLATES_NOTIFICATION_SEEN flag: ",
       error,
     );
+
     return false;
   }
 };
@@ -492,12 +583,14 @@ export const getTemplateNotificationSeen = async () => {
 export const setTemplateNotificationSeen = async (flag: boolean) => {
   try {
     await store.setItem(STORAGE_KEYS.TEMPLATES_NOTIFICATION_SEEN, flag);
+
     return true;
   } catch (error) {
     log.error(
       "An error occurred while setting TEMPLATES_NOTIFICATION_SEEN flag: ",
       error,
     );
+
     return false;
   }
 };
@@ -507,6 +600,7 @@ export const getFirstTimeUserOnboardingTelemetryCalloutIsAlreadyShown =
       const flag = await store.getItem(
         STORAGE_KEYS.FIRST_TIME_USER_ONBOARDING_TELEMETRY_CALLOUT_VISIBILITY,
       );
+
       return flag;
     } catch (error) {
       log.error(
@@ -524,6 +618,7 @@ export const setFirstTimeUserOnboardingTelemetryCalloutVisibility = async (
       STORAGE_KEYS.FIRST_TIME_USER_ONBOARDING_TELEMETRY_CALLOUT_VISIBILITY,
       flag,
     );
+
     return true;
   } catch (error) {
     log.error(
@@ -573,11 +668,16 @@ export const getAIPromptTriggered = async (mode: string) => {
   } catch (error) {
     log.error("An error occurred while fetching AI_TRIGGERED");
     log.error(error);
+
     return 0;
   }
 };
+// TODO: Fix this the next time the file is edited
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const setFeatureWalkthroughShown = async (key: string, value: any) => {
   try {
+    // TODO: Fix this the next time the file is edited
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let flagsJSON: Record<string, any> | null = await store.getItem(
       STORAGE_KEYS.FEATURE_WALKTHROUGH,
     );
@@ -589,6 +689,7 @@ export const setFeatureWalkthroughShown = async (key: string, value: any) => {
     }
 
     await store.setItem(STORAGE_KEYS.FEATURE_WALKTHROUGH, flagsJSON);
+
     return true;
   } catch (error) {
     log.error("An error occurred while updating FEATURE_WALKTHROUGH");
@@ -598,6 +699,8 @@ export const setFeatureWalkthroughShown = async (key: string, value: any) => {
 
 export const getFeatureWalkthroughShown = async (key: string) => {
   try {
+    // TODO: Fix this the next time the file is edited
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const flagsJSON: Record<string, any> | null = await store.getItem(
       STORAGE_KEYS.FEATURE_WALKTHROUGH,
     );
@@ -615,6 +718,8 @@ export const getFeatureWalkthroughShown = async (key: string) => {
 
 export const setUserSignedUpFlag = async (email: string) => {
   try {
+    // TODO: Fix this the next time the file is edited
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let userSignedUp: Record<string, any> | null = await store.getItem(
       STORAGE_KEYS.USER_SIGN_UP,
     );
@@ -626,6 +731,7 @@ export const setUserSignedUpFlag = async (email: string) => {
     }
 
     await store.setItem(STORAGE_KEYS.USER_SIGN_UP, userSignedUp);
+
     return true;
   } catch (error) {
     log.error("An error occurred while updating USER_SIGN_UP");
@@ -635,6 +741,8 @@ export const setUserSignedUpFlag = async (email: string) => {
 
 export const isUserSignedUpFlagSet = async (email: string) => {
   try {
+    // TODO: Fix this the next time the file is edited
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const userSignedUp: Record<string, any> | null = await store.getItem(
       STORAGE_KEYS.USER_SIGN_UP,
     );
@@ -647,27 +755,9 @@ export const isUserSignedUpFlagSet = async (email: string) => {
   } catch (error) {
     log.error("An error occurred while reading USER_SIGN_UP");
     log.error(error);
+
     return false;
   }
-};
-
-export const setVersionUpdateState = async (state: VersionUpdateState) => {
-  try {
-    await store.setItem(STORAGE_KEYS.VERSION_UPDATE_STATE, state);
-  } catch (e) {
-    log.error("An error occurred while storing version update state", e);
-  }
-};
-
-export const getVersionUpdateState =
-  async (): Promise<VersionUpdateState | null> => {
-    return await store.getItem<VersionUpdateState | null>(
-      STORAGE_KEYS.VERSION_UPDATE_STATE,
-    );
-  };
-
-export const removeVersionUpdateState = async () => {
-  return store.removeItem(STORAGE_KEYS.VERSION_UPDATE_STATE);
 };
 
 export const getAppKbState = async (appId: string) => {
@@ -726,6 +816,7 @@ export const initAppKbState = async (
           acc[pageSlug] = {
             hasReacted: false,
           };
+
           return acc;
         },
         {} as Record<string, { hasReacted: boolean }>,
@@ -735,6 +826,7 @@ export const initAppKbState = async (
     aiKBApplicationMap[appId] = appKbState;
 
     await store.setItem(STORAGE_KEYS.AI_KNOWLEDGE_BASE, aiKBApplicationMap);
+
     return appKbState;
   } catch (error) {
     log.error("An error occurred while updating AI_KNOWLEDGE_BASE");
@@ -769,6 +861,7 @@ export const reactToPageKB = async (
     }
 
     await store.setItem(STORAGE_KEYS.AI_KNOWLEDGE_BASE, aiKBApplicationMap);
+
     return true;
   } catch (error) {
     log.error("An error occurred while updating AI_KNOWLEDGE_BASE");
@@ -816,6 +909,7 @@ export const getAISuggestedPromptShownForType = async (type: string) => {
   } catch (error) {
     log.error("An error occurred while fetching AI_SUGGESTED_PROMPTS_SHOWN");
     log.error(error);
+
     return 0;
   }
 };
@@ -823,6 +917,7 @@ export const getAISuggestedPromptShownForType = async (type: string) => {
 export const setPartnerProgramCalloutShown = async () => {
   try {
     await store.setItem(STORAGE_KEYS.PARTNER_PROGRAM_CALLOUT, true);
+
     return true;
   } catch (error) {
     log.error("An error occurred while setting PARTNER_PROGRAM_CALLOUT");
@@ -833,6 +928,7 @@ export const setPartnerProgramCalloutShown = async () => {
 export const getPartnerProgramCalloutShown = async () => {
   try {
     const flag = await store.getItem(STORAGE_KEYS.PARTNER_PROGRAM_CALLOUT);
+
     return flag;
   } catch (error) {
     log.error("An error occurred while fetching PARTNER_PROGRAM_CALLOUT");
@@ -840,24 +936,184 @@ export const getPartnerProgramCalloutShown = async () => {
   }
 };
 
-export const setUsersFirstApplicationId = async (appId: string) => {
+export const storeIDEViewMode = async (mode: EditorViewMode) => {
   try {
-    await store.setItem(STORAGE_KEYS.USERS_FIRST_APPLICATION_ID, appId);
+    await store.setItem(STORAGE_KEYS.IDE_VIEW_MODE, mode);
+
     return true;
   } catch (error) {
-    log.error("An error occurred while setting USERS_FIRST_APPLICATION_ID");
+    log.error("An error occurred while setting IDE_VIEW_MODE");
     log.error(error);
   }
 };
 
-export const getUsersFirstApplicationId = async () => {
+export const retrieveIDEViewMode = async (): Promise<
+  EditorViewMode | undefined
+> => {
   try {
-    const firstApplicationId: string | null = await store.getItem(
-      STORAGE_KEYS.USERS_FIRST_APPLICATION_ID,
-    );
-    return firstApplicationId;
+    const mode = (await store.getItem(
+      STORAGE_KEYS.IDE_VIEW_MODE,
+    )) as EditorViewMode;
+
+    return mode;
   } catch (error) {
-    log.error("An error occurred while fetching USERS_FIRST_APPLICATION_ID");
+    log.error("An error occurred while fetching IDE_VIEW_MODE");
     log.error(error);
+  }
+};
+
+export const storeCodeWidgetNavigationUsed = async (count: number) => {
+  try {
+    await store.setItem(STORAGE_KEYS.CODE_WIDGET_NAVIGATION_USED, count);
+
+    return true;
+  } catch (error) {
+    log.error("An error occurred while setting CODE_WIDGET_NAVIGATION_USED");
+    log.error(error);
+  }
+};
+
+export const retrieveCodeWidgetNavigationUsed = async (): Promise<number> => {
+  try {
+    const mode = (await store.getItem(
+      STORAGE_KEYS.CODE_WIDGET_NAVIGATION_USED,
+    )) as number;
+
+    return mode || 0;
+  } catch (error) {
+    log.error("An error occurred while fetching CODE_WIDGET_NAVIGATION_USED");
+    log.error(error);
+
+    return 0;
+  }
+};
+
+/**
+
+
+Retrieves the overridden values for feature flags.
+
+
+@param flagsToFetch - The feature flags to fetch the overridden values for.
+
+@returns An object containing the overridden values for each feature flag.
+*/
+export const getFeatureFlagOverrideValues = async (
+  flagsToFetch = AvailableFeaturesToOverride,
+) => {
+  const featureFlagValues: OverriddenFeatureFlags = {};
+
+  for (const flag of flagsToFetch) {
+    featureFlagValues[flag] = (await store.getItem(flag)) as boolean;
+  }
+
+  return featureFlagValues;
+};
+
+/**
+
+
+Sets the override values for feature flags.
+
+
+@param featureFlagValues - An object containing the feature flags and their corresponding override values.
+
+@returns {Promise<void>} - A promise that resolves when all the feature flags have been set.
+*/
+export const setFeatureFlagOverrideValues = async (
+  featureFlagValues: OverriddenFeatureFlags,
+) => {
+  for (const [flag, value] of Object.entries(featureFlagValues)) {
+    await store.setItem(flag, value);
+  }
+};
+
+export const getAllActionTestPayloads = async () => {
+  try {
+    const storedPayload: Record<string, unknown> | null = await store.getItem(
+      STORAGE_KEYS.ACTION_TEST_PAYLOAD,
+    );
+
+    return storedPayload;
+  } catch (error) {
+    log.error("An error occurred while fetching ACTION_TEST_PAYLOAD");
+    log.error(error);
+
+    return null;
+  }
+};
+
+export const storeActionTestPayload = async (payload: {
+  actionId: string;
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  testData: any;
+}) => {
+  try {
+    const storedPayload: Record<string, unknown> | null = await store.getItem(
+      STORAGE_KEYS.ACTION_TEST_PAYLOAD,
+    );
+    const newPayload = {
+      ...storedPayload,
+      [payload.actionId]: payload.testData,
+    };
+
+    await store.setItem(STORAGE_KEYS.ACTION_TEST_PAYLOAD, newPayload);
+
+    return true;
+  } catch (error) {
+    log.error("An error occurred while setting ACTION_TEST_PAYLOAD");
+    log.error(error);
+
+    return false;
+  }
+};
+
+export const setLatestGitBranchInLocal = async (
+  userEmail: string,
+  baseApplicationId: string,
+  branch: string,
+) => {
+  try {
+    const storedBranches: Record<
+      string,
+      Record<string, string>
+    > = (await store.getItem(STORAGE_KEYS.LATEST_GIT_BRANCH)) ?? {};
+    const userBranches = storedBranches?.[userEmail] ?? {};
+    const newBranches = {
+      ...(storedBranches ?? {}),
+      [userEmail]: {
+        ...userBranches,
+        [baseApplicationId]: branch,
+      },
+    };
+
+    await store.setItem(STORAGE_KEYS.LATEST_GIT_BRANCH, newBranches);
+
+    return true;
+  } catch (error) {
+    log.error("An error occurred while setting LATEST_GIT_BRANCH");
+    log.error(error);
+
+    return false;
+  }
+};
+
+export const getLatestGitBranchFromLocal = async (
+  userEmail: string,
+  baseApplicationId: string,
+) => {
+  try {
+    const storedBranches: Record<string, Record<string, string>> | null =
+      await store.getItem(STORAGE_KEYS.LATEST_GIT_BRANCH);
+    const userBranches = storedBranches?.[userEmail] ?? {};
+    const branch = userBranches?.[baseApplicationId] ?? null;
+
+    return branch;
+  } catch (error) {
+    log.error("An error occurred while fetching LATEST_GIT_BRANCH");
+    log.error(error);
+
+    return null;
   }
 };

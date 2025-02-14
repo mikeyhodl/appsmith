@@ -28,6 +28,7 @@ import {
 } from "layoutSystems/common/utils/constants";
 import { DynamicHeight } from "utils/WidgetFeatures";
 import IconSVG from "../icon.svg";
+import ThumbnailSVG from "../thumbnail.svg";
 
 import type {
   SnipingModeProperty,
@@ -46,6 +47,7 @@ const RichTextEditorComponent = lazy(async () =>
 );
 
 const converter = new showdown.Converter();
+
 class RichTextEditorWidget extends BaseWidget<
   RichTextEditorWidgetProps,
   WidgetState
@@ -56,6 +58,7 @@ class RichTextEditorWidget extends BaseWidget<
     return {
       name: "Rich Text Editor",
       iconSVG: IconSVG,
+      thumbnailSVG: ThumbnailSVG,
       tags: [WIDGET_TAGS.INPUTS],
       needsMeta: true,
       searchTags: ["input", "rte"],
@@ -465,6 +468,8 @@ class RichTextEditorWidget extends BaseWidget<
     };
   }
 
+  // TODO: Fix this the next time the file is edited
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   static getMetaPropertiesMap(): Record<string, any> {
     return {
       text: undefined,
@@ -528,9 +533,11 @@ class RichTextEditorWidget extends BaseWidget<
 
   getWidgetView() {
     let value = this.props.text ?? "";
+
     if (this.props.inputType === RTEFormats.MARKDOWN) {
       value = converter.makeHtml(value);
     }
+
     const { componentHeight } = this.props;
 
     return (

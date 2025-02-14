@@ -1,14 +1,13 @@
 package com.appsmith.server.helpers.ce;
 
 import com.appsmith.server.applications.base.ApplicationService;
-import com.appsmith.server.domains.GitApplicationMetadata;
+import com.appsmith.server.domains.GitArtifactMetadata;
 import com.appsmith.server.helpers.GitCloudServicesUtils;
 import com.appsmith.server.helpers.GitPrivateRepoHelper;
 import com.appsmith.server.services.FeatureFlagService;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -16,7 +15,6 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.boot.test.mock.mockito.SpyBean;
 import org.springframework.security.test.context.support.WithUserDetails;
 import org.springframework.test.annotation.DirtiesContext;
-import org.springframework.test.context.junit.jupiter.SpringExtension;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
@@ -29,7 +27,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
 
-@ExtendWith(SpringExtension.class)
 @SpringBootTest
 @Slf4j
 @DirtiesContext
@@ -97,7 +94,7 @@ public class GitPrivateRepoCEImplTest {
                 .verifyComplete();
     }
 
-    boolean isBranchProtected(GitApplicationMetadata metaData, String branchName) {
+    boolean isBranchProtected(GitArtifactMetadata metaData, String branchName) {
         return Boolean.TRUE.equals(
                 gitPrivateRepoHelper.isBranchProtected(metaData, branchName).block());
     }
@@ -105,7 +102,7 @@ public class GitPrivateRepoCEImplTest {
     @Test
     @WithUserDetails(value = "api_user")
     public void isBranchProtected() {
-        GitApplicationMetadata metaData = new GitApplicationMetadata();
+        GitArtifactMetadata metaData = new GitArtifactMetadata();
 
         assertFalse(isBranchProtected(null, "master"));
         assertFalse(isBranchProtected(metaData, "master"));
