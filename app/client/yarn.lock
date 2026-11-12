@@ -3887,12 +3887,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@hono/node-server@npm:^1.19.9 || ^2.0.5":
-  version: 2.1.1
-  resolution: "@hono/node-server@npm:2.1.1"
+"@hono/node-server@npm:^1.19.9 || ^2.0.5, @hono/node-server@npm:^2.1.6":
+  version: 2.1.8
+  resolution: "@hono/node-server@npm:2.1.8"
   peerDependencies:
-    hono: ^4
-  checksum: 3d836cb848b3c0e2ab0b8da9a878de67cc0949aaeaeb1913253804c2da7b39c99eca9ef36bd4a8a5e777ed5c03c54df31114a8e5fd77f646f423a9b9d01334f4
+    hono: ^4 || ^5.0.0-0
+  checksum: d809ef41c05271d7c2a249c1c1effa4cc0f23ffd48bdeb43abd9d188635cad49e08c685ef7fb740364cf8ea364c80307fbd5821e097f08aa65372bf30ac60745
   languageName: node
   linkType: hard
 
@@ -13725,7 +13725,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "appsmith-mcp@workspace:packages/mcp"
   dependencies:
-    "@hono/node-server": ^1.19.9 || ^2.0.5
+    "@hono/node-server": ^2.1.6
     "@modelcontextprotocol/sdk": ^1.30.0
     "@types/jest": ^29.5.3
     "@types/node": "*"
